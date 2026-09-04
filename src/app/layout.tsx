@@ -7,7 +7,7 @@ import { normalizeThemePreference, THEME_COOKIE } from "@/lib/theme";
 import { getBranding } from "@/server/branding";
 import "./globals.css";
 
-// Las tres voces de la marca, las mismas de vocerocrm.com. next/font las
+// Las tres voces de la marca de Uniko. next/font las
 // descarga en BUILD y las sirve self-hosted (sin CDN en runtime: soberanía).
 const archivo = Archivo({
   subsets: ["latin"],

@@ -3,16 +3,16 @@ import {
   BRAND_MARK_BODY,
   BRAND_MARK_STROKE,
   BRAND_MARK_TAIL,
-  isVoceroName,
+  isUnikoName,
 } from "./brand";
 import { resolveAccentSet, type Branding } from "./branding";
 
 /**
  * El icono de la pestaña, white-label.
  *
- * Toda instancia tiene uno **sin configurar nada**: si se llama Vocero, es el
- * logo de la marca (la "v" con remate cian sobre el mosaico azul, igual que en
- * vocerocrm.com); con otro nombre se dibuja la inicial sobre el acento. Una
+ * Toda instancia tiene uno **sin configurar nada**: si se llama Uniko, es el
+ * logo de la marca (la "v" con remate cian sobre el mosaico azul, el mismo
+ * de la barra lateral); con otro nombre se dibuja la inicial sobre el acento. Una
  * agencia que despliega para su cliente puede subir el logo real y
  * reemplazarlo.
  *
@@ -119,11 +119,11 @@ export function generatedFaviconSvg(branding: Branding): string {
 }
 
 /**
- * El favicon de vocerocrm.com, con el degradado en el acento de la instancia:
- * una instancia llamada Vocero pero con otro color sigue viendo SU color.
+ * El favicon de la marca, con el degradado en el acento de la instancia:
+ * una instancia llamada Uniko pero con otro color sigue viendo SU color.
  * El trazo sale de `lib/brand`, el mismo que dibuja la barra lateral.
  */
-function voceroFaviconSvg(from: string, to: string): string {
+function unikoFaviconSvg(from: string, to: string): string {
   return [
     `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="64" height="64">`,
     `<defs><linearGradient id="g" x1="0" y1="0" x2="64" y2="64" gradientUnits="userSpaceOnUse">`,

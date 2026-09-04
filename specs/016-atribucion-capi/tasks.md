@@ -58,7 +58,7 @@ porque sin esquema y sin bandera no hay nada que encender ni que probar.
 
 - [x] **T017** `src/lib/meta/capi.ts`: catálogo cerrado, `buildEventPayload`
       (`action_source`, `messaging_channel`, `user_data`, `custom_data`,
-      `partner_agent: "vocero-crm"`), `sendBusinessMessagingEvent` con la regla
+      `partner_agent: "uniko-crm"`), `sendBusinessMessagingEvent` con la regla
       `events_received >= 1`.
 - [x] **T018** `src/server/attribution/conversions.ts`: `emitConversion`
       (dedup por UNIQUE, `skipped` con motivo, `failed` con el error de Meta,

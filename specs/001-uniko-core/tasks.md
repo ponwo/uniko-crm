@@ -1,6 +1,6 @@
-# Tasks: Vocero CRM — Núcleo v1
+# Tasks: Uniko CRM — Núcleo v1
 
-**Input**: Design documents from `/specs/001-vocero-core/`
+**Input**: Design documents from `/specs/001-uniko-core/`
 
 **Prerequisites**: plan.md, spec.md, research.md, data-model.md, contracts/, quickstart.md
 
@@ -175,7 +175,7 @@ US1, US2 (MVP gate) → US3, US4, US5, US8 (núcleo P1) → US6 (P2) → US7 (P3
 - [X] T075 [US8] Seed "Ferretería El Martillo": scripts/seed/demo.mjs + POST /api/seed/demo + botón en UI (solo BD de dominio vacía) — ~8 contactos MX, conversaciones con cotizaciones MXN, pipeline poblado, KB llena con huecos INTENCIONALES (garantías y devoluciones), 1 corrida de Laboratorio de ejemplo guardada; idempotente (DELETE org demo por orden de FKs)
 - [X] T076 [US8] INSTALL-IA.md — guía para que una IA (Claude Code + Coolify MCP) instale sola: pregunta SOLO dominio, token OpenRouter (opcional) y ruta A/B; genera secretos con openssl; crea app+Postgres en Coolify; termina indicando que WhatsApp se conecta en Settings
 - [X] T077 [US8] README.md completo — pitch, features (Laboratorio PRIMERO), instalación A/B, conexión del número (modo directo y **checklist de 5 pasos del modo agencia con diagrama de texto** + limitación de plantillas y su sync), cumplimiento Meta (5 puntos), FAQ, roadmap, licencia MIT, placeholders `[LINKS-KEVIN]`
-- [X] T078 [P] [US8] LICENSE (MIT) + revisión de metadata pública de package.json (name vocero-crm, license MIT)
+- [X] T078 [P] [US8] LICENSE (MIT) + revisión de metadata pública de package.json (name uniko-crm, license MIT)
 - [X] T079 [US8] Reescribir CLAUDE.md del repo para el usuario final (agencia que modifica con Claude Code): stack real sin corchetes, fronteras de modificación (lib/ai, lib/meta, schema, prompts), reglas de constitución II endurecida (sin regla S3), envs con ejemplo OPENROUTER_JUDGE_MODEL, metodología de verificación
 - [X] T080 [US8] Checkpoint E2E compose: build+up, https://localhost, registro→seed→inbound mock→**SSE ≤2s a través de Caddy**, healthchecks verdes, logs sin secretos
 
@@ -226,7 +226,7 @@ US1, US2 (MVP gate) → US3, US4, US5, US8 (núcleo P1) → US6 (P2) → US7 (P3
 - [X] T095 Auditoría de fugas OBLIGATORIA: `git log -p` + working tree, grep por nombres privados, dominios internos y rutas de máquina local; hits en historial → reescribir historia antes de reportar; verificar .mcp.json/.claude sin datos privados
 - [X] T096 [P] Capturas para README en docs/screenshots/ (bandeja, kanban, Laboratorio-reporte, wizard) — DIFERIBLE
 - [X] T097 Lista "pendiente de verificación humana" + reporte final (verde con evidencia / diferido con instrucciones / roadmap) en el chat
-- [X] T098 Merge `001-vocero-core` → `main` (merge normal, conservar rama — OK explícito ya dado), validar con /speckit-git-validate, dejar `main` activa
+- [X] T098 Merge `001-uniko-core` → `main` (merge normal, conservar rama — OK explícito ya dado), validar con /speckit-git-validate, dejar `main` activa
 
 ---
 

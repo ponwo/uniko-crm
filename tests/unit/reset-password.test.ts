@@ -72,6 +72,9 @@ describe("reset-password", () => {
     // formato o los parámetros de scrypt, esto se pone rojo AQUÍ — antes de
     // que las contraseñas ya guardadas dejen de funcionar en producción y
     // nadie pueda entrar a arreglarlo.
+    // La contraseña de abajo es PARTE del fixture congelado: el hash se
+    // calculó CON esa cadena. No la renombres —ni en un cambio de marca—
+    // o la verificación falla sin que nada esté roto de verdad.
     const congelado =
       "181acaf1397646b882722b5b5b7f71e7:b8106a42eb4765159f070a73f3bb5cd2f8839753da5b959dc4096a88e6af95a2622146a025f42c10cf6865fbbd065ecdc04766f19c0ba90992fff8080a5c847e";
     expect(

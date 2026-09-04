@@ -1,4 +1,4 @@
-# INSTALL-IA.md — Instalación de Vocero CRM guiada por IA
+# INSTALL-IA.md — Instalación de Uniko CRM guiada por IA
 
 > **Para el asistente de IA** (Claude Code u otro agente con acceso a
 > herramientas): este archivo ES tu guion de instalación. Síguelo de arriba a
@@ -10,7 +10,7 @@
 > ningún otro archivo**: Coolify construye directo desde GitHub y los secretos
 > viven como variables de la plataforma.
 
-**Repositorio**: `https://github.com/kevinrivm/vocero-crm` (público, rama `main`,
+**Repositorio**: `https://github.com/ponwo/uniko-crm` (público, rama `main`,
 `Dockerfile` en la raíz).
 
 ## Reglas para el asistente
@@ -39,7 +39,7 @@
 | Variable | Valor |
 |---|---|
 | `APP_BASE_URL` | `https://<dominio>` |
-| `DATABASE_URL` | `postgresql://postgres:<POSTGRES_PASSWORD>@<host-postgres>:5432/vocero` |
+| `DATABASE_URL` | `postgresql://postgres:<POSTGRES_PASSWORD>@<host-postgres>:5432/uniko` |
 | `POSTGRES_PASSWORD` | generado |
 | `BETTER_AUTH_SECRET` | generado |
 | `ENCRYPTION_KEY` | generado (base64, 44 caracteres) |
@@ -53,10 +53,10 @@
 ## Ruta A — Coolify (con el MCP de Coolify)
 
 1. **Base de datos**: crea un servicio PostgreSQL 16 en el proyecto
-   (`database` tipo `postgresql`), con la contraseña generada y base `vocero`.
+   (`database` tipo `postgresql`), con la contraseña generada y base `uniko`.
    Anota su host interno (algo como `<uuid>:5432`).
 2. **Aplicación**: crea una app tipo **repositorio público** apuntando a
-   `https://github.com/kevinrivm/vocero-crm` (rama `main`, build pack
+   `https://github.com/ponwo/uniko-crm` (rama `main`, build pack
    `dockerfile`, puerto expuesto `3000`) — no requiere GitHub App ni deploy
    keys. Asigna el dominio del usuario con HTTPS.
 3. **Variables**: configura las variables de la tabla en la app (runtime, no
@@ -71,7 +71,7 @@
 ## Ruta B — docker compose (VPS con Docker)
 
 ```bash
-git clone https://github.com/kevinrivm/vocero-crm.git vocero && cd vocero
+git clone https://github.com/ponwo/uniko-crm.git uniko && cd uniko
 cp .env.example .env
 # rellena .env con el dominio del usuario y los secretos generados
 docker compose up -d --build
@@ -83,7 +83,7 @@ docker compose up -d --build
 
 ## Cierre (obligatorio decirlo al usuario)
 
-> ✅ Vocero quedó instalado en `https://<dominio>`.
+> ✅ Uniko quedó instalado en `https://<dominio>`.
 >
 > 1. Entra y **regístrate**: el primer registro crea tu organización (después
 >    el registro público se cierra solo).

@@ -46,11 +46,11 @@ describe("white-label: acento", () => {
     expect(lum).toBeLessThan(0xd0);
   });
 
-  it("hex inválido cae al default (el azul Vocero)", () => {
+  it("hex inválido cae al default (el azul Uniko)", () => {
     expect(resolveAccentSet("rojo")).toEqual(ACCENT_PRESETS["#0d5bff"]!.set);
   });
 
-  it("el azul Vocero es el default y trae los valores exactos de la landing", () => {
+  it("el azul Uniko es el default y trae los valores exactos de la landing", () => {
     expect(DEFAULT_BRANDING.accent).toBe("#0d5bff");
     expect(resolveAccentSet(DEFAULT_BRANDING.accent)).toEqual({
       accent: "#0d5bff",

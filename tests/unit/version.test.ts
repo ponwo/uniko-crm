@@ -28,7 +28,7 @@ describe("versión de la app", () => {
   });
 
   it("la insignia no cablea el nombre del producto", () => {
-    // Esto es white-label: una instancia rebautizada que dice "Vocero" en el
+    // Esto es white-label: una instancia rebautizada que dice "Uniko" en el
     // tooltip delata el producto de debajo justo donde el operador la mira
     // todos los días.
     const nav = readFileSync(
@@ -37,7 +37,7 @@ describe("versión de la app", () => {
     );
     const insignia = nav.slice(nav.indexOf("versionLabel()") - 600);
     expect(insignia).toContain("branding.name");
-    expect(insignia).not.toMatch(/`Vocero \$\{/);
+    expect(insignia).not.toMatch(/`Uniko \$\{/);
   });
 
   it("el Dockerfile acepta el commit sin exigirlo", () => {

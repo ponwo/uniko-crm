@@ -3,7 +3,7 @@
 @tailwind utilities;
 
 /*
-  Sistema de diseño de Vocero: la misma marca que vocerocrm.com dentro del CRM.
+  Sistema de diseño de Uniko: la marca del producto dentro del CRM.
   Papel frío (#f6f8fc), tinta azul marino, acento azul eléctrico con remate
   cian, tipografía Archivo para la interfaz, Instrument Serif itálica para los
   acentos editoriales e IBM Plex Mono para etiquetas y horas.
@@ -37,7 +37,7 @@
     --bubble-out-border: var(--accent-soft);
     --bubble-out-text: var(--text);
 
-    /* Acento (default: azul Vocero; el white-label lo sobreescribe) */
+    /* Acento (default: azul Uniko; el white-label lo sobreescribe) */
     --accent: #0d5bff;
     --accent-hover: #0a4de6;
     --accent-soft: #d3e2ff;
@@ -107,7 +107,7 @@
     --bubble-in: #0f2419;
     --bubble-in-border: #1c3b2a;
 
-    /* Acento: respaldo con el azul Vocero ya aclarado para fondo oscuro; el
+    /* Acento: respaldo con el azul Uniko ya aclarado para fondo oscuro; el
        white-label lo recalcula (ver resolveAccentSet en lib/branding). */
     --accent: #256bff;
     --accent-hover: #4883ff;

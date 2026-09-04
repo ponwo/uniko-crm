@@ -8,7 +8,7 @@ asistentes de IA para operar y modificar este repositorio.
 
 **Next.js 15 (App Router) + React 19** en monolito · TypeScript estricto
 (`strict` + `noUncheckedIndexedAccess`) · Tailwind CSS (sistema de diseño de la
-marca Vocero, el mismo de vocerocrm.com: tokens en `src/app/globals.css`, tema
+marca Uniko: tokens en `src/app/globals.css`, tema
 claro/oscuro, acento white-label por defecto `#0d5bff`, fuentes Archivo +
 Instrument Serif + IBM Plex Mono self-hosted vía `next/font`; el logo vive en
 `src/lib/brand.ts` y se dibuja con `src/components/brand-mark.tsx`) ·
@@ -99,7 +99,7 @@ OPENROUTER_JUDGE_MODEL=anthropic/claude-haiku-4.5   # opcional: juez más barato
 ```
 
 Para el self-test local existe además el modo de pruebas interno (mocks) —
-ver `specs/001-vocero-core/quickstart.md`. Nunca actives mocks en producción.
+ver `specs/001-uniko-core/quickstart.md`. Nunca actives mocks en producción.
 
 ## Manejo de credenciales (obligatorio)
 

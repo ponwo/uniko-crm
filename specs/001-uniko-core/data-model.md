@@ -1,4 +1,4 @@
-# Data Model — Vocero CRM v1 (001-vocero-core)
+# Data Model — Uniko CRM v1 (001-uniko-core)
 
 Convenciones globales:
 

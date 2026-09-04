@@ -3,7 +3,7 @@ import animate from "tailwindcss-animate";
 
 /**
  * Los nombres semánticos existentes (background, primary, muted…) se remapean
- * a los tokens del sistema de diseño de Vocero (la marca de vocerocrm.com) para
+ * a los tokens del sistema de diseño de Uniko (la marca del producto) para
  * que toda la app comparta el tema activo (claro u oscuro, ver globals.css);
  * la escala `brand-*` expone el acento white-label y las escalas de estado
  * exponen la tríada tint/soft/text.

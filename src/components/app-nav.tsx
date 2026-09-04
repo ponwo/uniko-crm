@@ -130,7 +130,7 @@ export function AppNav({
         open ? "visible translate-x-0 shadow-pop" : "invisible -translate-x-full"
       )}
     >
-      {/* Marca: el logo de Vocero o, white-label, la inicial y el nombre */}
+      {/* Marca: el logo de Uniko o, white-label, la inicial y el nombre */}
       <div className="mb-5 flex items-start gap-1.5 px-2 pt-0.5">
         {/* En móvil el cajón necesita su propio cierre: el velo no siempre es
             alcanzable con el pulgar. */}
@@ -209,7 +209,7 @@ export function AppNav({
       {/* `text-2` y no `text-3`: a 10.5px, el gris más claro no pasa AA contra
           el fondo de la barra. Discreta sí, ilegible no. */}
       {/* El nombre sale de la marca, no de una constante: esto es white-label,
-          y una instancia rebautizada que dice "Vocero" en el tooltip delata el
+          y una instancia rebautizada que dice "Uniko" en el tooltip delata el
           producto de debajo justo donde el operador la mira todos los días. */}
       <p
         className="mt-2 px-2.5 font-mono text-[10.5px] tracking-[0.06em] text-text-2"

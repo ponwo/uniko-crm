@@ -1,5 +1,5 @@
 # ============================================================
-# Vocero CRM — imagen multi-etapa (Next.js standalone + Node 22)
+# Uniko CRM — imagen multi-etapa (Next.js standalone + Node 22)
 # Los secretos NO se necesitan en build: llegan en runtime.
 # ============================================================
 
@@ -34,20 +34,20 @@ FROM node:22-alpine AS runner
 WORKDIR /app
 ENV NODE_ENV=production
 ENV NEXT_TELEMETRY_DISABLED=1
-RUN addgroup -S vocero && adduser -S vocero -G vocero
+RUN addgroup -S uniko && adduser -S uniko -G uniko
 # 008: punto de montaje del volumen de adjuntos, propiedad del usuario de la
 # app — el volumen nombrado hereda este dueño al montarse vacío (sin esto,
 # monta como root y el guardado de adjuntos falla con EACCES).
-RUN mkdir -p /data/media && chown -R vocero:vocero /data
+RUN mkdir -p /data/media && chown -R uniko:uniko /data
 
-COPY --from=builder --chown=vocero:vocero /app/.next/standalone ./
-COPY --from=builder --chown=vocero:vocero /app/.next/static ./.next/static
-COPY --from=builder --chown=vocero:vocero /app/public ./public
-COPY --from=builder --chown=vocero:vocero /app/migrate.bundle.mjs ./migrate.mjs
-COPY --from=builder --chown=vocero:vocero /app/seed-demo.bundle.mjs ./seed-demo.mjs
-COPY --from=builder --chown=vocero:vocero /app/drizzle ./drizzle
+COPY --from=builder --chown=uniko:uniko /app/.next/standalone ./
+COPY --from=builder --chown=uniko:uniko /app/.next/static ./.next/static
+COPY --from=builder --chown=uniko:uniko /app/public ./public
+COPY --from=builder --chown=uniko:uniko /app/migrate.bundle.mjs ./migrate.mjs
+COPY --from=builder --chown=uniko:uniko /app/seed-demo.bundle.mjs ./seed-demo.mjs
+COPY --from=builder --chown=uniko:uniko /app/drizzle ./drizzle
 
-USER vocero
+USER uniko
 EXPOSE 3000
 ENV PORT=3000
 ENV HOSTNAME=0.0.0.0

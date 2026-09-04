@@ -1,13 +1,13 @@
 # specs/
 
-Especificaciones de Vocero CRM. **Esta carpeta no es el mapa completo del
+Especificaciones de Uniko CRM. **Esta carpeta no es el mapa completo del
 producto** — y saberlo antes de leerla ahorra una confusión.
 
 ## Qué hay aquí
 
 | | Carril | Artefactos |
 |---|---|---|
-| `001-vocero-core` | Ciclo completo | spec, plan, research, data-model, 5 contratos, tasks, checklist |
+| `001-uniko-core` | Ciclo completo | spec, plan, research, data-model, 5 contratos, tasks, checklist |
 | `002-diseno-atlas-white-label` | — | spec + plan |
 | `003-paridad-inbox-whatsapp` | — | spec |
 | `014-canal-instagram` | Ciclo completo | spec |

@@ -1,5 +1,5 @@
 /**
- * La marca Vocero — la misma de vocerocrm.com.
+ * La marca Uniko.
  *
  * Vive aquí, sin React, porque la usan dos mundos: los componentes (el trazo
  * del panel lateral y del login) y el servidor (el favicon generado que se
@@ -33,5 +33,3 @@ export const BRAND_CYAN_ON_TILE = "#3fdcff";
 export function isUnikoName(name: string): boolean {
   return name.trim().toLowerCase() === "uniko";
 }
-
-export const isVoceroName = isUnikoName;

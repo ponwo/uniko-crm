@@ -50,9 +50,9 @@ TODOs diferidos:
     sin spec): sigue igual; esta enmienda no la toca.
 -->
 
-# Vocero CRM Constitution
+# Uniko CRM Constitution
 
-Vocero CRM es un CRM de WhatsApp con agente de IA, open source (MIT), self-hosted y
+Uniko CRM es un CRM de WhatsApp con agente de IA, open source (MIT), self-hosted y
 gratuito, diseñado para que las agencias de IA lo desplieguen en el VPS de sus
 clientes: una instancia = un negocio. Esta constitución define las reglas no
 negociables del producto. Aplica a todas las fases del flujo de trabajo (specify,
@@ -79,7 +79,7 @@ fallo catastrófico e irreversible; prevenirlo siempre cuesta menos que remediar
 
 ### II. Soberanía / Self-Hosted (ENDURECIDO)
 
-Vocero CRM opera completo sobre la infraestructura del operador. La lista de
+Uniko CRM opera completo sobre la infraestructura del operador. La lista de
 dependencias externas en runtime es CERRADA:
 
 - Dependencias externas permitidas en runtime, ÚNICAMENTE:
@@ -124,7 +124,7 @@ fuga de soberanía que rompe la promesa "gratis y tuyo".
 ### III. Multi-Tenancy Real
 
 El sistema sirve a organizaciones independientes desde una sola instancia lógica.
-En Vocero cada instancia sirve a UN negocio, pero el modelo de datos es
+En Uniko cada instancia sirve a UN negocio, pero el modelo de datos es
 multi-tenant real (organización del plugin de auth) para mantener el aislamiento
 exigible y no cerrar la puerta a evoluciones.
 

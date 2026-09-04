@@ -5,13 +5,13 @@ import {
   BRAND_MARK_BODY,
   BRAND_MARK_STROKE,
   BRAND_MARK_TAIL,
-  isVoceroName,
+  isUnikoName,
 } from "@/lib/brand";
 import { faviconInitial } from "@/lib/favicon";
 import { cn } from "@/lib/utils";
 
 /**
- * El trazo de la marca: la "v" caligráfica con remate cian de vocerocrm.com.
+ * El trazo de la marca: la "v" caligráfica con remate cian de Uniko.
  * El cuerpo hereda `currentColor`; píntalo con `text-brand` (o blanco sobre el
  * mosaico) y el remate sigue siendo cian.
  */
@@ -44,7 +44,7 @@ export function BrandMark({
 
 /**
  * Mosaico cuadrado con degradado del acento: es el favicon en grande. Con la
- * marca Vocero lleva la "v"; con un nombre white-label, la inicial.
+ * marca Uniko lleva la "v"; con un nombre white-label, la inicial.
  */
 export function BrandTile({
   branding,
@@ -95,7 +95,7 @@ export function BrandLogo({
   size?: keyof typeof WORDMARK_SIZE;
   className?: string;
 }) {
-  if (isVoceroName(branding.name)) {
+  if (isUnikoName(branding.name)) {
     return (
       <span className={cn("flex items-center gap-2.5 text-foreground", className)}>
         <BrandTile branding={branding} className={TILE_SIZE[size]} />

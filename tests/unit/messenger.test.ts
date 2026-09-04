@@ -324,7 +324,7 @@ describe("017 · reparto de Zernio por plataforma (un webhook, varios canales)",
     expect(zernioTargetChannel(zernioEvent({ account: { id: ACCOUNT, platform: "MESSENGER" } }))).toBe("messenger");
   });
 
-  it("una plataforma que Vocero no atiende no es de nadie", () => {
+  it("una plataforma que Uniko no atiende no es de nadie", () => {
     for (const platform of ["whatsapp", "x", "tiktok", "linkedin", ""]) {
       expect(zernioTargetChannel(zernioEvent({ account: { id: ACCOUNT, platform } }))).toBeNull();
     }

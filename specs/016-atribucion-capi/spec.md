@@ -6,7 +6,7 @@
 
 **Status**: Implementada y verificada en vivo (2026-08-28) — arnés E2E en verde en las dos configuraciones de la bandera
 
-**Input**: Decisión del dueño 2026-08-28: llevar a Vocero raíz, **en modo
+**Input**: Decisión del dueño 2026-08-28: llevar a Uniko raíz, **en modo
 bandera** (como la multicanalidad de IG y el motor de agenda), lo que el fork de
 agencia lleva en producción desde el 29-jul-2026 sobre la **Conversions API de
 Meta**. Alcance acordado en la misma decisión: **núcleo neutro** — capturar el
@@ -22,7 +22,7 @@ diga, el algoritmo optimiza hacia lo único que ve —que alguien abra el chat�
 entrega el público más barato de hacer escribir, que no es el que compra. El
 negocio lo vive como "me llegan muchos mensajes y no cierro ninguno".
 
-Vocero está en el único lugar donde esa verdad existe: sabe que la conversación
+Uniko está en el único lugar donde esa verdad existe: sabe que la conversación
 `cv_x` vino del anuncio `A`, que su lead se calificó el martes y que se ganó el
 viernes por $12,000. La Conversions API es el camino oficial para devolverle a
 Meta ese desenlace, y `business_messaging` es su variante para conversaciones de
@@ -50,7 +50,7 @@ Esta feature tiene historia y conviene decirla completa:
    aplicada igual. La constitución 1.4.0 lo escribió como categoría.
 3. Así que sube **el mecanismo, sin las decisiones**: qué etapa significa
    "calificado" lo elige cada negocio en su pantalla; el evento de venta cuelga
-   de la etapa ganada que el CRM ya tiene; y `partner_agent` dice `vocero-crm`.
+   de la etapa ganada que el CRM ya tiene; y `partner_agent` dice `uniko-crm`.
 
 ## Alcance
 
