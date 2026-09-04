@@ -20,14 +20,19 @@
  * Cuerpo de la "u": se pinta con el color del contexto.
  *
  * Un solo trazo continuo en un lienzo de 24×24: asta izquierda hacia abajo,
- * panza redonda y asta derecha subiendo, que termina más corta que la
- * izquierda para que el remate la prolongue en vez de chocar con ella.
+ * panza redonda y asta derecha subiendo casi a la misma altura. Las dos astas
+ * parejas son lo que hace que se lea "u" y no "v" a 16 px, que es el tamaño
+ * al que de verdad se ve en una pestaña.
  */
 export const BRAND_MARK_BODY =
-  "M4.6 5.3c-.5 5.5-.2 9.8.9 12 1.5 2.9 5.3 2.2 7.2-1.2 1.4-2.3 1.9-5.2 1.9-7.9";
+  "M4.6 5.3c-.5 5.5-.2 9.8.9 12 1.5 2.9 5.3 2.2 7.2-1.2 1.5-2.4 2.3-5.8 2.3-9.9";
 
-/** Remate corto, siempre cian: continúa el asta derecha hacia arriba. */
-export const BRAND_MARK_TAIL = "M14.6 8.2c1.2-2.2 3-3.4 5.2-3.6";
+/**
+ * Remate corto, siempre cian: sale del alto del asta derecha casi en
+ * horizontal. Plano y no vertical a propósito — subiendo se empastaba con el
+ * asta al reducir, y el remate acababa pareciendo una gota pegada encima.
+ */
+export const BRAND_MARK_TAIL = "M15 6.2c1.5-1.5 3.3-2 5.4-1.7";
 
 export const BRAND_MARK_STROKE = 3.4;
 
