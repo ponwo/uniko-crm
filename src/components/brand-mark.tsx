@@ -11,7 +11,7 @@ import { faviconInitial } from "@/lib/favicon";
 import { cn } from "@/lib/utils";
 
 /**
- * El trazo de la marca: la "v" caligráfica con remate cian de Uniko.
+ * El trazo de la marca: la "u" caligráfica con remate cian de Uniko.
  * El cuerpo hereda `currentColor`; píntalo con `text-brand` (o blanco sobre el
  * mosaico) y el remate sigue siendo cian.
  */
@@ -44,14 +44,20 @@ export function BrandMark({
 
 /**
  * Mosaico cuadrado con degradado del acento: es el favicon en grande. Con la
- * marca Uniko lleva la "v"; con un nombre white-label, la inicial.
+ * marca Uniko lleva la "u"; con un nombre white-label, la inicial.
+ *
+ * Esta rama tiene que decidir lo mismo que `generatedFaviconSvg`: la pestaña y
+ * la barra se miran a la vez, y verlas discrepar es justo lo que hace dudar de
+ * si el despliegue tomó la marca nueva.
  */
 export function BrandTile({
   branding,
   className,
+  size = "md",
 }: {
   branding: Pick<Branding, "name">;
   className?: string;
+  size?: keyof typeof MARK_SIZE;
 }) {
   return (
     <span
@@ -61,7 +67,13 @@ export function BrandTile({
       )}
       aria-hidden
     >
-      <span className="font-bold leading-none">{faviconInitial(branding.name)}</span>
+      {isUnikoName(branding.name) ? (
+        // El cian del mosaico y no el de fondo claro: sobre el azul, el otro
+        // se hunde y el remate deja de leerse.
+        <BrandMark className={MARK_SIZE[size]} cyan={BRAND_CYAN_ON_TILE} />
+      ) : (
+        <span className="font-bold leading-none">{faviconInitial(branding.name)}</span>
+      )}
     </span>
   );
 }
@@ -98,7 +110,7 @@ export function BrandLogo({
   if (isUnikoName(branding.name)) {
     return (
       <span className={cn("flex items-center gap-2.5 text-foreground", className)}>
-        <BrandTile branding={branding} className={TILE_SIZE[size]} />
+        <BrandTile branding={branding} className={TILE_SIZE[size]} size={size} />
         <span
           className={cn(
             "font-[800] leading-none tracking-[-0.045em]",

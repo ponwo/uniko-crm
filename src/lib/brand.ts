@@ -4,20 +4,30 @@
  * Vive aquí, sin React, porque la usan dos mundos: los componentes (el trazo
  * del panel lateral y del login) y el servidor (el favicon generado que se
  * sirve como texto). Tener el dibujo en un solo sitio es lo que garantiza que
- * la pestaña y la barra lateral enseñen la MISMA "v".
+ * la pestaña y la barra lateral enseñen la MISMA "u".
  *
- * El trazo es una "v" caligráfica fluida con remate cian. El cuerpo se pinta
+ * El trazo es una "u" caligráfica fluida con remate cian. El cuerpo se pinta
  * con `currentColor` (así hereda el acento white-label); el remate es una
  * constante de marca y NO se recalcula con el acento: es lo que la hace
  * reconocible.
+ *
+ * La letra es la inicial del producto: se redibujó de "v" a "u" al renombrar
+ * la marca. Si vuelve a cambiar el nombre, este par de paths es lo único que
+ * hay que tocar — todo lo demás (favicon, mosaico de la barra) los consume.
  */
 
-/** Cuerpo de la "v": se pinta con el color del contexto. */
+/**
+ * Cuerpo de la "u": se pinta con el color del contexto.
+ *
+ * Un solo trazo continuo en un lienzo de 24×24: asta izquierda hacia abajo,
+ * panza redonda y asta derecha subiendo, que termina más corta que la
+ * izquierda para que el remate la prolongue en vez de chocar con ella.
+ */
 export const BRAND_MARK_BODY =
-  "M4 5c2 8 5 14.5 7.8 14.7 2.3.2 3.7-4.1 4.7-8.2";
+  "M4.6 5.3c-.5 5.5-.2 9.8.9 12 1.5 2.9 5.3 2.2 7.2-1.2 1.4-2.3 1.9-5.2 1.9-7.9";
 
-/** Remate corto, siempre cian. */
-export const BRAND_MARK_TAIL = "M16.5 11.5c.8-3 2-5.5 4-6.1";
+/** Remate corto, siempre cian: continúa el asta derecha hacia arriba. */
+export const BRAND_MARK_TAIL = "M14.6 8.2c1.2-2.2 3-3.4 5.2-3.6";
 
 export const BRAND_MARK_STROKE = 3.4;
 

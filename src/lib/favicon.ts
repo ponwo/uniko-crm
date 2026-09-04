@@ -11,9 +11,9 @@ import { resolveAccentSet, type Branding } from "./branding";
  * El icono de la pestaña, white-label.
  *
  * Toda instancia tiene uno **sin configurar nada**: si se llama Uniko, es el
- * logo de la marca (la "v" con remate cian sobre el mosaico azul, el mismo
- * de la barra lateral); con otro nombre se dibuja la inicial sobre el acento. Una
- * agencia que despliega para su cliente puede subir el logo real y
+ * logo de la marca (la "u" con remate cian sobre el mosaico azul, el mismo
+ * de la barra lateral); con otro nombre se dibuja la inicial sobre el acento.
+ * Una agencia que despliega para su cliente puede subir el logo real y
  * reemplazarlo.
  *
  * Que exista un respaldo generado no es un adorno: sin él, quien no suba nada
@@ -103,6 +103,10 @@ export function faviconInitial(name: string): string {
  */
 export function generatedFaviconSvg(branding: Branding): string {
   const { accent, hover, fg } = resolveAccentSet(branding.accent);
+  // La marca propia lleva su trazo; una instancia rebautizada, su inicial. El
+  // degradado sale del acento en los dos casos: quien se llame Uniko pero haya
+  // elegido otro color sigue viendo SU color detrás del logo.
+  if (isUnikoName(branding.name)) return unikoFaviconSvg(accent, hover);
   const letra = faviconInitial(branding.name)
     .replace(/&/g, "&amp;")
     .replace(/</g, "&lt;");
