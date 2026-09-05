@@ -1,63 +1,113 @@
 <!--
 SYNC IMPACT REPORT
 ==================
-Versión: 1.3.0 → 1.4.0
+Versión: 1.4.0 → 1.5.0
 
 Cambios:
-  - Principio II "Soberanía / Self-Hosted" → EXPANDIDO: la lista cerrada de
-    dependencias de runtime gana una tercera categoría, **conectores
-    opcionales**, admisible SOLO bajo cinco condiciones (apagados por defecto
-    tras una bandera de despliegue, aislados tras adaptador dedicado con
-    contrato público, instancia completa sin ellos con degradación definida,
-    credenciales cifradas del propio negocio, y verificables en CI apagados y
-    encendidos). La frase de prohibición se acota: de "PROHIBIDO en v1 … y
-    servicios de Google" a "PROHIBIDO como dependencia del núcleo", con la vía
-    única del conector opcional para servicios de terceros.
-  - Principios I, III, IV, V, VI, VII, VIII y IX: íntegros (sin cambio).
-  - "Restricciones de Plataforma y Seguridad": sin cambio — su regla de
-    aislamiento tras adaptadores dedicados ya cubre a los conectores.
+  - Principio X "Irreversibilidad ante Datos de Clientes" → NUEVO: las
+    migraciones de esquema son lo único sin marcha atrás (corren al arrancar,
+    solo hacia adelante, sin `down`), y quedan bajo cuatro reglas: ensayo
+    obligatorio contra un PostgreSQL desechable con respaldo real restaurado
+    ANTES de `main` (`pnpm seed:demo` no basta), prohibición de restaurar el
+    respaldo de un cliente sobre una instancia viva ajena (es violación del
+    Principio I aunque la intención sea probar), cambios destructivos partidos
+    en dos entregas (agregar + backfill, borrar después), y plan de reversión
+    declarado en todo PR que toque `drizzle/`.
+  - Encabezado → REEMPLAZADO: de "open source (MIT), self-hosted y gratuito,
+    diseñado para que las agencias de IA lo desplieguen en el VPS de sus
+    clientes" a self-hosted "operado como flota" (un despliegue y una base por
+    cliente), derivado de Vocero CRM con licencia MIT y atribución conservada,
+    desarrollado hoy como repositorio privado.
+  - Principio VIII, tercer bullet → REEMPLAZADO: el criterio de aceptación de
+    alcance deja de invocar a "la agencia que despliega" (actor que ya no
+    existe) y pasa a "el negocio que opera UNA instancia, o el operador de la
+    flota en su trabajo de sostener las instancias". El resto del VIII, íntegro.
+  - "Flujo de Desarrollo y Puertas de Calidad" → EXPANDIDO: se añade la
+    **Puerta de promoción a producción**. El disparador sigue siendo humano
+    (señal explícita del responsable, nunca plazo ni automatismo); lo nuevo son
+    las seis condiciones que deben cumplirse antes (CI verde para ESE commit en
+    toda la matriz; el cambio ya corriendo en la instancia de pruebas con uso
+    real; self-test del Principio IX contra la instancia desplegada; ensayo del
+    Principio X si se toca `drizzle/`; `git log production..main` revisado; plan
+    de reversión declarado) más el cierre verificando `/api/health` en todas las
+    instancias contra el commit promovido.
+  - Principios I, II, III, IV, V, VI, VII y IX: íntegros (sin cambio).
+  - "Restricciones de Plataforma y Seguridad": sin cambio.
   - Governance: sin cambio.
 
-Bump: MINOR (1.3.0 → 1.4.0) — expansión material de un principio; no elimina ni
-redefine nada de forma incompatible: una instancia default sigue cumpliendo
-exactamente la promesa vigente ("un VPS, un dominio, credenciales de Meta y un
-token de OpenRouter. Nada más").
+Bump: MINOR (1.4.0 → 1.5.0) — se añade un principio nuevo (X) y se expande una
+sección existente (puerta de promoción), sin eliminar ni renumerar nada.
+El punto discutible es el tercer bullet del Principio VIII: retira el caso "la
+agencia que despliega", y un lector estricto podría llamarlo redefinición
+incompatible (MAJOR). Se resuelve como MINOR porque no se retira una capacidad
+vigente sino una premisa que ya era falsa — ninguna agencia tercera despliega
+Uniko hoy, así que ninguna feature real queda fuera de alcance por el cambio.
+Decisión ratificada por el responsable (ver más abajo).
 
 Motivación:
-  El canal de Instagram (014 / ADR-001) entró como integración opcional detrás
-  de CHANNELS sin tocar este principio, porque es la misma Meta Graph API del
-  canal permitido. El motor de agendamiento (feature 015) necesita Zoom y
-  Google — proveedores nuevos — y el principio no daba ninguna vía, ni siquiera
-  apagados por defecto; la única salida habría sido "cada quien su fork", que
-  ADR-001 ya demostró insostenible (la rama 004-motor-agenda quedó irrescatable
-  en 26 días: 76 commits atrás y migración colisionada). La soberanía que el
-  principio protege no se toca: el costo lo paga únicamente la instancia que
-  enciende la bandera y pega SUS credenciales, y la condición 5 lo vuelve
-  verificable en vez de prometido.
-  Propuesta por escrito y ratificación del responsable (2026-08-26):
-  specs/015-motor-agenda-universal/enmienda-constitucional.md.
+  La constitución seguía describiendo el proyecto que Uniko era —repositorio
+  público, sin instancias vivas, sin datos de nadie— y no el que es: tres
+  despliegues sobre el mismo `main`, dos con clientes reales, y LanCo a punto de
+  dejar de estar vacía. Los tres cambios ya estaban escritos, pero en
+  `docs/despliegue-flota.md`, que es un runbook: describe cómo se hace algo, no
+  constituye una regla que un PR tenga que cumplir.
+  El desbalance que corrige el Principio X es el más grande del repositorio:
+  todo lo reversible (tipos, lint, build, tests) tiene máquina detrás en cada
+  PR, en dos configuraciones de matriz; lo único irreversible —una migración
+  aplicada sobre la base de un cliente— vivía como promesa, sin gate ni mención
+  constitucional. Además, el runbook aconsejaba restaurar el respaldo de un
+  cliente EN LanCo: con LanCo vacía funcionaba, con LanCo viva sería volcar
+  datos de un cliente sobre una instancia que ya recibe los suyos, justo el
+  cruce que el Principio I prohíbe.
+  Propuesta por escrito y ratificación del responsable (2026-09-05):
+  docs/enmienda-constitucional-1.5.0.md. Tres decisiones que la propuesta dejaba
+  abiertas quedaron resueltas por el responsable: (1) bump MINOR; (2) encabezado
+  con la redacción propuesta, incluida la palabra "flota"; (3) se conserva la
+  condición 2 de la puerta de promoción ("ya ejerció uso real"), a sabiendas de
+  que es la única no verificable por máquina.
 
 Plantillas dependientes:
+  - .specify/templates/plan-template.md — ✅ compatible (sin cambios). Su
+    Constitution Check no enumera principios: dice "[Gates determined based on
+    constitution file]", así que el Principio X entra solo.
   - .specify/templates/spec-template.md — ✅ compatible (sin cambios).
-  - .specify/templates/plan-template.md — ✅ compatible; su Constitution Check
-    se evalúa contra esta versión (un conector externo pasa el gate si y solo
-    si cumple las cinco condiciones).
-  - .specify/templates/tasks-template.md — ✅ compatible.
-  - CLAUDE.md — ✅ actualizado en este mismo cambio (regla de Soberanía).
+  - .specify/templates/tasks-template.md — ✅ compatible (sin cambios). Su
+    única mención de migraciones es un ejemplo de tarea de andamiaje.
+  - .specify/templates/constitution-template.md — ✅ compatible (sin cambios).
+    Es un andamio genérico con marcadores (`[PRINCIPLE_N_NAME]`) y ya ejemplifica
+    el sufijo "(NON-NEGOTIABLE)"; un décimo principio no le exige nada.
+  - CLAUDE.md — ✅ actualizado en este mismo cambio (Principio X y puerta de
+    promoción en el bloque de reglas no negociables).
+  - docs/despliegue-flota.md — ✅ actualizado en este mismo cambio: el ensayo de
+    migraciones pasa a PostgreSQL desechable (ya no "en LanCo") y "Cómo se
+    suelta un cambio" enlaza la puerta de promoción.
+  - .github/workflows/ci.yml — ✅ actualizado en este mismo cambio: el comentario
+    de cabecera justificaba la CI "sobre todo por los PRs de fuera", supuesto
+    heredado de la premisa que corrige el Cambio 2.
 
 TODOs diferidos:
   - Deuda documental heredada de la 1.3.0 (features entre `003` y la app 1.2.0
     sin spec): sigue igual; esta enmienda no la toca.
+  - Premisa "agencias" residual: el Rationale del Principio II ("El producto se
+    regala para que agencias lo desplieguen en VPS de clientes… la promesa
+    'gratis y tuyo'") y el párrafo de apertura del Principio VIII ("que las
+    agencias despliegan para negocios") siguen apoyándose en el modelo que el
+    Cambio 2 corrige. La propuesta ratificada acota el Cambio 2 al encabezado y
+    al tercer bullet del VIII, y dice explícitamente que "el resto del Principio
+    VIII queda íntegro"; se respeta al pie de la letra y estos dos restos quedan
+    para una enmienda de redacción posterior (PATCH). No alteran ninguna regla:
+    son texto de justificación, no criterio de aceptación.
 -->
 
 # Uniko CRM Constitution
 
-Uniko CRM es un CRM de WhatsApp con agente de IA, open source (MIT), self-hosted y
-gratuito, diseñado para que las agencias de IA lo desplieguen en el VPS de sus
-clientes: una instancia = un negocio. Esta constitución define las reglas no
-negociables del producto. Aplica a todas las fases del flujo de trabajo (specify,
-plan, tasks, implement). Cualquier conflicto entre una decisión de implementación y
-esta constitución SE RESUELVE A FAVOR de esta constitución.
+Uniko CRM es un CRM de WhatsApp con agente de IA, self-hosted, operado como
+flota: una instancia = un negocio, un despliegue y una base de datos por
+cliente. Deriva de Vocero CRM (licencia MIT, atribución conservada) y hoy se
+desarrolla como repositorio privado. Esta constitución define las reglas no
+negociables del producto. Aplica a todas las fases del flujo de trabajo
+(specify, plan, tasks, implement). Cualquier conflicto entre una decisión de
+implementación y esta constitución SE RESUELVE A FAVOR de esta constitución.
 
 ## Core Principles
 
@@ -230,9 +280,9 @@ conversaciones de WhatsApp de UN negocio* se rechaza.
 - WhatsApp Cloud API es el canal; el producto es el CRM. Features de canal que no
   sirvan a atender/organizar/convertir (broadcast masivo, scraping de números,
   flujos visuales genéricos) quedan FUERA del alcance de v1.
-- Toda feature MUST servir a la agencia que despliega o al negocio que opera UNA
-  instancia. Lo que solo sirva a una plataforma centralizada (billing, planes,
-  multi-instancia) queda FUERA.
+- Toda feature MUST servir al negocio que opera UNA instancia, o al operador
+  de la flota en su trabajo de sostener las instancias. Lo que solo sirva a una
+  plataforma centralizada (billing, planes, multi-instancia) queda FUERA.
 
 **Rationale**: Un foco vertical explícito mantiene el modelo de datos alineado con el
 negocio real y da un criterio claro para aceptar o rechazar alcance.
@@ -273,6 +323,36 @@ cerrarlo: el implementador itera hasta verde en vez de devolver trabajo a medias
 en local primero mantiene el ciclo ágil; y sin guardarraíles duros, una prueba con
 herramientas no oficiales podría provocar un baneo irreversible.
 
+### X. Irreversibilidad ante Datos de Clientes (NO NEGOCIABLE)
+
+Las migraciones de esquema son lo único que este proyecto hace sin marcha
+atrás. Corren al arrancar el contenedor, en todas las instancias de la flota,
+y se generan solo hacia adelante: no existe `down`. Redesplegar el commit
+anterior devuelve el código, nunca el esquema.
+
+- **Ensayo obligatorio contra datos reales.** Todo cambio que toque
+  `drizzle/` se ensaya, ANTES de llegar a `main`, contra un PostgreSQL
+  desechable con un respaldo real restaurado. Nunca contra base vacía: contra
+  una base vacía toda migración pasa; lo que rompe es la forma de los datos
+  que ya existen. `pnpm seed:demo` no satisface este requisito.
+- **Nunca sobre una instancia viva ajena.** El respaldo de un cliente se
+  restaura en un PostgreSQL aislado y desechable, jamás sobre otra instancia
+  de la flota. Restaurar datos de un cliente en la instancia de otro es una
+  violación del Principio I aunque la intención sea probar.
+- **Los cambios destructivos van en dos entregas.** Primero agregar (columna
+  nueva, nullable) y backfill; borrar lo viejo en una entrega posterior,
+  cuando ya se sabe que nadie lo usa. Una sola entrega que borra no se puede
+  deshacer con un redeploy.
+- **Un PR que toca `drizzle/` declara su plan de reversión.** Si la respuesta
+  honesta es que no se puede revertir, es que le falta partirse en dos
+  entregas.
+
+**Rationale**: El resto del proyecto está cubierto por gates que corren solos;
+esto no, y es lo único cuyo fallo no se arregla volviendo atrás. Una regla que
+solo vive en un runbook se cumple mientras alguien la recuerde — y el día que
+no, el costo lo pagan bases de datos de clientes que no participaron en la
+decisión.
+
 ## Restricciones de Plataforma y Seguridad
 
 Estas restricciones derivan de los Principios I y II y son verificables en revisión:
@@ -312,6 +392,25 @@ Estas restricciones derivan de los Principios I y II y son verificables en revis
   verificación humana (Principio V). Para features con comportamiento observable de cara
   al usuario, "Hecho" exige además el self-test de comportamiento en vivo ejecutado por el
   implementador, con sus guardarraíles (Principio IX).
+- **Puerta de promoción a producción**: un cambio pasa de `main` a
+  `production` —y con ello a las instancias de clientes— únicamente por señal
+  explícita del responsable, nunca por plazo transcurrido ni de forma
+  automática. La señal es el disparador; estas condiciones son la puerta, y
+  todas deben cumplirse antes:
+  1. CI en verde para ESE commit, en todas las configuraciones de la matriz.
+  2. El cambio ya corre en la instancia de pruebas (`main` desplegado, no
+     `main` recién mergeado) y ahí ejerció uso real.
+  3. El self-test de comportamiento del Principio IX ejecutado contra la
+     instancia de pruebas desplegada, no solo contra `localhost`.
+  4. Si algún commit toca `drizzle/`: el ensayo del Principio X está hecho.
+  5. `git log production..main` revisado: quien da la señal reconoce todo lo
+     que va a viajar.
+  6. Plan de reversión declarado, o el cambio partido en dos entregas.
+
+  La promoción es `git merge --ff-only`: si falla, alguien tocó `production` a
+  mano y se corrige antes de seguir, nunca se fuerza. Cierra verificando
+  `/api/health` en todas las instancias y comparando el commit reportado
+  contra el promovido — las bases de clientes migran al arrancar y a la vez.
 - **Trazabilidad**: decisiones bajo incertidumbre y supuestos se documentan de forma
   visible (Principio VII), no en comentarios enterrados.
 
@@ -334,4 +433,4 @@ práctica, convención o preferencia; ante un conflicto, gana la constitución.
 - **Propagación**: al enmendar la constitución se revisan y, si procede, se actualizan
   las plantillas dependientes (plan, spec, tasks).
 
-**Version**: 1.4.0 | **Ratified**: 2026-07-09 | **Last Amended**: 2026-08-26
+**Version**: 1.5.0 | **Ratified**: 2026-07-09 | **Last Amended**: 2026-09-05
