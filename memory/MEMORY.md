@@ -13,3 +13,6 @@ correcciones del dueño. Qué no: lo que el repo ya registra por sí mismo
 
 Vacío al inicio; se irá poblando.
 -->
+
+- [Build rojo desde la unidad G:](build-rojo-desde-la-unidad-g.md) — entorno de la máquina de desarrollo: G: es un subst de C:\G; entra por la ruta real. No es Windows ni el código.
+- [Puerta de la ruta real](puerta-de-la-ruta-real.md) — predev/prebuild cortan si entras por el alias; solo opina en win32, jamás puede tumbar un contenedor.
