@@ -84,6 +84,23 @@ Ver [.specify/memory/constitution.md](.specify/memory/constitution.md).
   migración aplicada igual. Nunca en una rama aparte
   ([ADR-001](docs/adr-001-canales-opcionales.md),
   [ADR-002](docs/adr-002-conectores-de-agenda.md)).
+- **Irreversibilidad ante datos de clientes (X — 1.5.0)**: las migraciones
+  corren al arrancar, en toda la flota, y solo hacia adelante (no hay `down`);
+  redesplegar el commit anterior devuelve el código, nunca el esquema. Todo
+  cambio que toque `drizzle/` se ensaya ANTES de `main` contra un Postgres
+  desechable con un respaldo real restaurado — nunca contra base vacía y nunca
+  volcando el respaldo de un cliente sobre una instancia viva (eso viola el I
+  aunque sea para probar); `pnpm seed:demo` no basta. Lo destructivo va en dos
+  entregas (agregar + backfill, borrar después) y el PR declara su plan de
+  reversión.
+- **Puerta de promoción a producción**: `main` → `production` solo por señal
+  explícita del dueño (nunca por plazo ni automatismo) y solo si antes se
+  cumplen: CI verde para ESE commit en toda la matriz, el cambio ya corriendo
+  con uso real en la instancia de pruebas, el self-test del IX contra esa
+  instancia desplegada (no solo `localhost`), el ensayo del X si se toca
+  `drizzle/`, `git log production..main` revisado, y plan de reversión
+  declarado. Se promueve con `merge --ff-only` y se cierra verificando
+  `/api/health` en todas las instancias ([runbook](docs/despliegue-flota.md)).
 
 ## Variables de entorno
 

@@ -2,10 +2,13 @@ name: CI
 
 # Los cuatro gates del proyecto, corridos por una máquina en cada PR.
 #
-# Existe sobre todo por los PRs de fuera: quien manda uno no tiene la base de
-# datos ni el `.env` de nadie, así que hoy la única forma de saber si su cambio
-# sirve es que un humano lo clone y lo corra a mano. Con esto, el resultado
-# llega pegado al PR y el colaborador lo ve antes que el mantenedor.
+# Existe por la flota: este repo alimenta tres despliegues, dos con clientes
+# reales, y un cambio que entra a `main` redespliega la instancia de pruebas
+# sola. La CI es la única evidencia reproducible de que ese commit compila y
+# pasa —en las dos configuraciones de la matriz, no solo en la máquina de quien
+# lo escribió—, y es además la primera condición de la puerta de promoción a
+# producción (constitución, "Flujo de Desarrollo y Puertas de Calidad"): sin
+# verde para ESE commit, no viaja a los clientes.
 on:
   pull_request:
   push:

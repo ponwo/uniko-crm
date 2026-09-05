@@ -94,8 +94,15 @@ rama de feature ──PR──► main ──fast-forward──► production
    (`default` y `completo`). **Es el único sitio donde se sabe si el build pasa**
    si tu máquina no lo puede correr.
 3. Merge a `main`. LanCo se redespliega sola: ahí se mira.
-4. Cuando convence, `production` avanza a ese commit y los clientes se
-   redespliegan solos:
+4. Promoción a `production`, y con ella a los clientes. El disparador es una
+   señal explícita del dueño, nunca un plazo ni un automatismo — pero la señal
+   solo abre la puerta si se cumplen antes las seis condiciones de la **puerta
+   de promoción a producción** ([constitución, "Flujo de Desarrollo y Puertas de
+   Calidad"](../.specify/memory/constitution.md)): CI verde para ESE commit en
+   las dos configuraciones, el cambio ya corriendo en LanCo desplegada y con uso
+   real encima, el self-test de comportamiento contra LanCo (no solo contra
+   `localhost`), el ensayo del Principio X si algún commit toca `drizzle/`,
+   `git log production..main` revisado, y plan de reversión declarado. Entonces:
 
 ```bash
 git checkout production && git merge --ff-only main && git push
@@ -104,6 +111,11 @@ git checkout production && git merge --ff-only main && git push
 `--ff-only` no es adorno: obliga a que `production` sea siempre un punto exacto
 de la historia de `main`. Si el comando falla, es que alguien tocó `production`
 a mano — arréglalo antes de seguir, no lo fuerces.
+
+Cierra verificando `/api/health` en las tres instancias y comparando el commit
+que reporta cada una contra el que promoviste. No es trámite: las bases de los
+clientes migran al arrancar y a la vez, y un contenedor que no levanta porque la
+migración reventó no avisa — su health sigue respondiendo con el commit viejo.
 
 Para saber qué NO han recibido todavía los clientes:
 
@@ -123,14 +135,25 @@ Corren **al arrancar el contenedor**, en las tres bases, y Drizzle las genera
 **solo hacia adelante**: no hay `down`. Redesplegar el commit anterior devuelve
 el código, no el esquema. De ahí dos reglas:
 
-- **Todo PR que toque `drizzle/` se prueba en LanCo con datos dentro.** Contra
-  una base vacía, una migración siempre pasa; lo que rompe es la forma de los
-  datos reales. La vía limpia es restaurar en LanCo un respaldo de un cliente
-  antes de probar; `pnpm seed:demo` es el sustituto pobre, mejor que nada.
+Esto ya no es solo criterio operativo: es el [Principio
+X](../.specify/memory/constitution.md) de la constitución. Las reglas:
+
+- **Todo PR que toque `drizzle/` se ensaya contra datos reales, antes de
+  `main`.** Contra una base vacía, una migración siempre pasa; lo que rompe es
+  la forma de los datos que ya existen. La vía limpia es levantar un PostgreSQL
+  **desechable**, restaurar ahí un respaldo real y correr la migración contra
+  esa copia. `pnpm seed:demo` no satisface el requisito.
+- **El respaldo de un cliente nunca se restaura sobre una instancia viva.** Ni
+  siquiera sobre LanCo: con LanCo recibiendo sus propias conversaciones, volcarle
+  encima los datos de un cliente es un cruce entre negocios, que el Principio I
+  prohíbe aunque la intención sea probar. El respaldo va a un Postgres aislado
+  que se tira al terminar.
 - **Los cambios destructivos van en dos entregas.** Primero agregar (columna
   nueva, nullable) y backfill; borrar lo viejo en una entrega posterior, cuando
   ya se sabe que nadie lo usa. Una sola entrega que borra no se puede deshacer
   con un redeploy.
+- **El PR declara su plan de reversión.** Si la respuesta honesta es que no se
+  puede revertir, es que le falta partirse en dos entregas.
 
 Los respaldos de las bases se llevan a nivel del VPS, fuera de Coolify.
 
