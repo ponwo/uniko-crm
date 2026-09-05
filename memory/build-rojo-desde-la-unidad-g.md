@@ -41,7 +41,7 @@ ser una salida válida: un build rojo vuelve a ser señal que hay que atender.
 Desde este hallazgo hay puerta: `scripts/check-real-path.mjs`, enganchado en
 `predev` y `prebuild`, corta con exit 1 si detecta el alias. Solo opina en
 win32; en cualquier otra plataforma pasa sin decir nada, para no poder tumbar
-jamás el build de un contenedor. Ver [[puerta-de-la-ruta-real]].
+jamás el build de un contenedor —`prebuild` corre también dentro de él.
 
 Estado verde verificado 2026-09-05 desde `C:\G\...`: typecheck, lint, test
 (48 archivos / 402 tests) y build.
