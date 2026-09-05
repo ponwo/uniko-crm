@@ -34,7 +34,8 @@ las apps del servidor.
 | Puerto | `3000` | el que expone el standalone de Next |
 | Volumen | `/data/media` | los adjuntos de WhatsApp y el favicon subido viven ahí; **sin volumen se pierden en cada redeploy** |
 | HTTPS forzado | sí | Meta exige `https` para el webhook |
-| Auto-deploy | sí | un push a `main` redespliega las tres |
+| Auto-deploy | sí | pero cada instancia sigue SU rama — ver abajo |
+| Rama | `main` en LanCo, `production` en los clientes | LanCo estrena; los clientes esperan |
 
 Las migraciones se aplican **al arrancar el contenedor**, no al construir. Un
 despliegue que arranca es un despliegue migrado.
@@ -76,6 +77,62 @@ cuando hagan falta, agregando la variable y redesplegando:
   variables de entorno**: se pegan en Ajustes → WhatsApp dentro de la app, y se
   guardan cifradas con `ENCRYPTION_KEY`.
 
+## Cómo se suelta un cambio
+
+```
+rama de feature ──PR──► main ──fast-forward──► production
+                         │                         │
+                         ▼                         ▼
+                   uniko-lanco              uniko-iltu
+                   (estrena solo)           uniko-nuriaandrea
+```
+
+1. Rama por feature. La skill `speckit-git-feature` la crea con la numeración
+   del proyecto, alineada a `specs/`.
+2. PR. La CI corre los cuatro gates en las dos configuraciones de la matriz
+   (`default` y `completo`). **Es el único sitio donde se sabe si el build pasa**
+   si tu máquina no lo puede correr.
+3. Merge a `main`. LanCo se redespliega sola: ahí se mira.
+4. Cuando convence, `production` avanza a ese commit y los clientes se
+   redespliegan solos:
+
+```bash
+git checkout production && git merge --ff-only main && git push
+```
+
+`--ff-only` no es adorno: obliga a que `production` sea siempre un punto exacto
+de la historia de `main`. Si el comando falla, es que alguien tocó `production`
+a mano — arréglalo antes de seguir, no lo fuerces.
+
+Para saber qué NO han recibido todavía los clientes:
+
+```bash
+git log production..main --oneline
+```
+
+Un commit que solo toca `docs/` o `specs/` llega a `main`, redespliega LanCo y
+ahí se queda hasta que alguien decida soltarlo. Por eso no hacen falta
+`watch_paths`: la separación de ramas ya evita que documentación reconstruya
+producción, y sin el riesgo de que un patrón mal escrito se salte un deploy que
+sí hacía falta.
+
+### Migraciones: la única parte irreversible
+
+Corren **al arrancar el contenedor**, en las tres bases, y Drizzle las genera
+**solo hacia adelante**: no hay `down`. Redesplegar el commit anterior devuelve
+el código, no el esquema. De ahí dos reglas:
+
+- **Todo PR que toque `drizzle/` se prueba en LanCo con datos dentro.** Contra
+  una base vacía, una migración siempre pasa; lo que rompe es la forma de los
+  datos reales. La vía limpia es restaurar en LanCo un respaldo de un cliente
+  antes de probar; `pnpm seed:demo` es el sustituto pobre, mejor que nada.
+- **Los cambios destructivos van en dos entregas.** Primero agregar (columna
+  nueva, nullable) y backfill; borrar lo viejo en una entrega posterior, cuando
+  ya se sabe que nadie lo usa. Una sola entrega que borra no se puede deshacer
+  con un redeploy.
+
+Los respaldos de las bases se llevan a nivel del VPS, fuera de Coolify.
+
 ## Alta de un cliente nuevo
 
 1. Registro **A** de `uniko.<dominio-del-cliente>` a la IP del servidor. Espera
@@ -86,7 +143,8 @@ cuando hagan falta, agregando la variable y redesplegando:
 4. App desde `ponwo/uniko-crm` con la configuración de la tabla de arriba.
 5. Volumen persistente en `/data/media`.
 6. Variables de entorno, con secretos nuevos.
-7. Desplegar y verificar `/api/health`.
+7. Desplegar y verificar `/api/health`. Si es un cliente, la app sigue la rama
+   `production`; solo LanCo sigue `main`.
 8. Registrar la primera cuenta: el registro público **se cierra solo** tras la
    primera organización. Quien se registre primero es el propietario.
 9. Conectar el número de WhatsApp en Ajustes → WhatsApp y pegar en Meta la URL
