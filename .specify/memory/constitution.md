@@ -1,102 +1,71 @@
 <!--
 SYNC IMPACT REPORT
 ==================
-Versión: 1.4.0 → 1.5.0
+Versión: 1.5.0 → 1.5.1
 
 Cambios:
-  - Principio X "Irreversibilidad ante Datos de Clientes" → NUEVO: las
-    migraciones de esquema son lo único sin marcha atrás (corren al arrancar,
-    solo hacia adelante, sin `down`), y quedan bajo cuatro reglas: ensayo
-    obligatorio contra un PostgreSQL desechable con respaldo real restaurado
-    ANTES de `main` (`pnpm seed:demo` no basta), prohibición de restaurar el
-    respaldo de un cliente sobre una instancia viva ajena (es violación del
-    Principio I aunque la intención sea probar), cambios destructivos partidos
-    en dos entregas (agregar + backfill, borrar después), y plan de reversión
-    declarado en todo PR que toque `drizzle/`.
-  - Encabezado → REEMPLAZADO: de "open source (MIT), self-hosted y gratuito,
-    diseñado para que las agencias de IA lo desplieguen en el VPS de sus
-    clientes" a self-hosted "operado como flota" (un despliegue y una base por
-    cliente), derivado de Vocero CRM con licencia MIT y atribución conservada,
-    desarrollado hoy como repositorio privado.
-  - Principio VIII, tercer bullet → REEMPLAZADO: el criterio de aceptación de
-    alcance deja de invocar a "la agencia que despliega" (actor que ya no
-    existe) y pasa a "el negocio que opera UNA instancia, o el operador de la
-    flota en su trabajo de sostener las instancias". El resto del VIII, íntegro.
-  - "Flujo de Desarrollo y Puertas de Calidad" → EXPANDIDO: se añade la
-    **Puerta de promoción a producción**. El disparador sigue siendo humano
-    (señal explícita del responsable, nunca plazo ni automatismo); lo nuevo son
-    las seis condiciones que deben cumplirse antes (CI verde para ESE commit en
-    toda la matriz; el cambio ya corriendo en la instancia de pruebas con uso
-    real; self-test del Principio IX contra la instancia desplegada; ensayo del
-    Principio X si se toca `drizzle/`; `git log production..main` revisado; plan
-    de reversión declarado) más el cierre verificando `/api/health` en todas las
-    instancias contra el commit promovido.
-  - Principios I, II, III, IV, V, VI, VII y IX: íntegros (sin cambio).
-  - "Restricciones de Plataforma y Seguridad": sin cambio.
-  - Governance: sin cambio.
+  - Principio II, Rationale → REDACCIÓN: dejaba de pie la premisa que el Cambio
+    2 de la 1.5.0 ya había corregido en el encabezado ("El producto se regala
+    para que agencias lo desplieguen en VPS de clientes… rompe la promesa
+    'gratis y tuyo'"). Pasa a apoyarse en la premisa vigente: cada instancia es
+    el despliegue de UN negocio y la flota multiplica lo que se meta en el
+    núcleo. El argumento no cambia —cada dependencia externa es costo, punto de
+    fallo y fuga de soberanía—, cambia el hecho sobre el que se apoya.
+  - Principio VIII, párrafo de apertura → REDACCIÓN: "Es un CRM … que las
+    agencias despliegan para negocios" pasa a "… desplegado una vez por
+    negocio". Se toca ÚNICAMENTE esa primera oración descriptiva; la que sigue
+    en el mismo párrafo ("Lo que no ayude a atender, organizar y convertir
+    conversaciones de WhatsApp de UN negocio se rechaza") SÍ es criterio de
+    aceptación y queda literal, igual que los tres bullets y el Rationale.
+  - Ningún otro Rationale de la constitución arrastraba la premisa: barrida
+    completa por "agencia", "gratis/gratuito", "open source" y "despliega".
+  - Principios I, III, IV, V, VI, VII, IX y X: íntegros (sin cambio).
+  - Encabezado, "Restricciones de Plataforma y Seguridad", "Flujo de Desarrollo
+    y Puertas de Calidad" y Governance: sin cambio.
 
-Bump: MINOR (1.4.0 → 1.5.0) — se añade un principio nuevo (X) y se expande una
-sección existente (puerta de promoción), sin eliminar ni renumerar nada.
-El punto discutible es el tercer bullet del Principio VIII: retira el caso "la
-agencia que despliega", y un lector estricto podría llamarlo redefinición
-incompatible (MAJOR). Se resuelve como MINOR porque no se retira una capacidad
-vigente sino una premisa que ya era falsa — ninguna agencia tercera despliega
-Uniko hoy, así que ninguna feature real queda fuera de alcance por el cambio.
-Decisión ratificada por el responsable (ver más abajo).
+Bump: PATCH (1.5.0 → 1.5.1) — refinamiento de redacción sin efecto semántico. No
+se añade, elimina ni redefine ningún principio, y ningún criterio de aceptación
+cambia de contenido: los dos párrafos tocados son texto de justificación. Un PR
+que pasaba el Constitution Check con la 1.5.0 lo pasa idéntico con la 1.5.1.
 
 Motivación:
-  La constitución seguía describiendo el proyecto que Uniko era —repositorio
-  público, sin instancias vivas, sin datos de nadie— y no el que es: tres
-  despliegues sobre el mismo `main`, dos con clientes reales, y LanCo a punto de
-  dejar de estar vacía. Los tres cambios ya estaban escritos, pero en
-  `docs/despliegue-flota.md`, que es un runbook: describe cómo se hace algo, no
-  constituye una regla que un PR tenga que cumplir.
-  El desbalance que corrige el Principio X es el más grande del repositorio:
-  todo lo reversible (tipos, lint, build, tests) tiene máquina detrás en cada
-  PR, en dos configuraciones de matriz; lo único irreversible —una migración
-  aplicada sobre la base de un cliente— vivía como promesa, sin gate ni mención
-  constitucional. Además, el runbook aconsejaba restaurar el respaldo de un
-  cliente EN LanCo: con LanCo vacía funcionaba, con LanCo viva sería volcar
-  datos de un cliente sobre una instancia que ya recibe los suyos, justo el
-  cruce que el Principio I prohíbe.
-  Propuesta por escrito y ratificación del responsable (2026-09-05):
-  docs/enmienda-constitucional-1.5.0.md. Tres decisiones que la propuesta dejaba
-  abiertas quedaron resueltas por el responsable: (1) bump MINOR; (2) encabezado
-  con la redacción propuesta, incluida la palabra "flota"; (3) se conserva la
-  condición 2 de la puerta de promoción ("ya ejerció uso real"), a sabiendas de
-  que es la única no verificable por máquina.
+  Deuda que la propia 1.5.0 dejó anotada como TODO diferido. El Cambio 2 de esa
+  enmienda corrigió la premisa del producto en el encabezado y en el tercer
+  bullet del Principio VIII, pero su alcance estaba acotado por la propuesta
+  ratificada, que decía explícitamente "el resto del Principio VIII queda
+  íntegro". El resultado era una constitución que afirmaba dos cosas distintas
+  sobre quién despliega Uniko según el párrafo que se leyera: el encabezado
+  hablaba de flota y el Rationale del II seguía hablando de un producto que "se
+  regala" a agencias. Que sea texto de justificación no lo vuelve inocuo: los
+  Rationale son lo que se lee para decidir los casos que la regla no previó.
+  No se toca la licencia MIT ni la atribución a Vocero CRM y a Kevin Belier en
+  LICENSE y en los agradecimientos del README: lo que dejó de ser cierto es la
+  distribución pública, no la licencia.
 
 Plantillas dependientes:
-  - .specify/templates/plan-template.md — ✅ compatible (sin cambios). Su
-    Constitution Check no enumera principios: dice "[Gates determined based on
-    constitution file]", así que el Principio X entra solo.
+  - .specify/templates/plan-template.md — ✅ compatible (sin cambios).
   - .specify/templates/spec-template.md — ✅ compatible (sin cambios).
-  - .specify/templates/tasks-template.md — ✅ compatible (sin cambios). Su
-    única mención de migraciones es un ejemplo de tarea de andamiaje.
+  - .specify/templates/tasks-template.md — ✅ compatible (sin cambios).
   - .specify/templates/constitution-template.md — ✅ compatible (sin cambios).
-    Es un andamio genérico con marcadores (`[PRINCIPLE_N_NAME]`) y ya ejemplifica
-    el sufijo "(NON-NEGOTIABLE)"; un décimo principio no le exige nada.
-  - CLAUDE.md — ✅ actualizado en este mismo cambio (Principio X y puerta de
-    promoción en el bloque de reglas no negociables).
-  - docs/despliegue-flota.md — ✅ actualizado en este mismo cambio: el ensayo de
-    migraciones pasa a PostgreSQL desechable (ya no "en LanCo") y "Cómo se
-    suelta un cambio" enlaza la puerta de promoción.
-  - .github/workflows/ci.yml — ✅ actualizado en este mismo cambio: el comentario
-    de cabecera justificaba la CI "sobre todo por los PRs de fuera", supuesto
-    heredado de la premisa que corrige el Cambio 2.
+  - CLAUDE.md — ✅ compatible (sin cambios): su bloque de reglas no negociables
+    resume principios, y ninguno cambió de contenido.
+  - docs/despliegue-flota.md — ✅ compatible (sin cambios): ya se escribió sobre
+    la premisa de flota.
+  - README.md — ✅ actualizado en este mismo cambio: el público "Agencias de
+    IA/automatización … despliegas una instancia por cliente en su VPS" pasa a
+    "Quien opera una flota", y la sección Stack deja de decir "diseñado para que
+    una agencia lo modifique". Sin tocar Licencia ni Créditos.
+  - docs/getting-started.md — ✅ compatible (sin cambios): no menciona agencias
+    ni la premisa de distribución pública.
 
 TODOs diferidos:
   - Deuda documental heredada de la 1.3.0 (features entre `003` y la app 1.2.0
     sin spec): sigue igual; esta enmienda no la toca.
-  - Premisa "agencias" residual: el Rationale del Principio II ("El producto se
-    regala para que agencias lo desplieguen en VPS de clientes… la promesa
-    'gratis y tuyo'") y el párrafo de apertura del Principio VIII ("que las
-    agencias despliegan para negocios") siguen apoyándose en el modelo que el
-    Cambio 2 corrige. La propuesta ratificada acota el Cambio 2 al encabezado y
-    al tercer bullet del VIII, y dice explícitamente que "el resto del Principio
-    VIII queda íntegro"; se respeta al pie de la letra y estos dos restos quedan
-    para una enmienda de redacción posterior (PATCH). No alteran ninguna regla:
-    son texto de justificación, no criterio de aceptación.
+  - README, "Modo agencia (Tech Provider)": NO es la premisa corregida aquí sino
+    una capacidad real del producto (una plataforma de agencia que ya hizo el
+    Embedded Signup conecta su backend a la instancia). Se deja intacta a
+    propósito. Queda anotado para que una futura limpieza de la premisa no la
+    borre por parecido de nombre.
 -->
 
 # Uniko CRM Constitution
@@ -167,9 +136,11 @@ dependencias externas en runtime es CERRADA:
 - Las integraciones externas permitidas se aíslan tras adaptadores dedicados
   (cliente Graph API propio; adaptador LLM) para no acoplar el dominio a ellas.
 
-**Rationale**: El producto se regala para que agencias lo desplieguen en VPS de
-clientes; cada dependencia externa adicional es un costo, un punto de fallo y una
-fuga de soberanía que rompe la promesa "gratis y tuyo".
+**Rationale**: Cada instancia es el despliegue de UN negocio, con su base y sus
+credenciales, y la flota multiplica por tres todo lo que se meta aquí: cada
+dependencia externa adicional es un costo, un punto de fallo y una fuga de
+soberanía que rompe la promesa de que los datos de un cliente viven en su
+servidor y en ningún otro sitio.
 
 ### III. Multi-Tenancy Real
 
@@ -269,8 +240,8 @@ de deuda oculta; hacerlas visibles permite corregirlas a tiempo.
 
 ### VIII. Foco Vertical — CRM de Conversaciones y Leads de WhatsApp
 
-Es un CRM de conversaciones y leads de WhatsApp que las agencias despliegan para
-negocios. No es plataforma de marketing masivo, ni constructor visual de flujos, ni
+Es un CRM de conversaciones y leads de WhatsApp, desplegado una vez por negocio.
+No es plataforma de marketing masivo, ni constructor visual de flujos, ni
 herramienta de scraping. Lo que no ayude a *atender, organizar y convertir
 conversaciones de WhatsApp de UN negocio* se rechaza.
 
@@ -433,4 +404,4 @@ práctica, convención o preferencia; ante un conflicto, gana la constitución.
 - **Propagación**: al enmendar la constitución se revisan y, si procede, se actualizan
   las plantillas dependientes (plan, spec, tasks).
 
-**Version**: 1.5.0 | **Ratified**: 2026-07-09 | **Last Amended**: 2026-09-05
+**Version**: 1.5.1 | **Ratified**: 2026-07-09 | **Last Amended**: 2026-09-05
