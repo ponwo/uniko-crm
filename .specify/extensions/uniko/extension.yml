@@ -1,0 +1,35 @@
+schema_version: "1.0"
+
+extension:
+  id: uniko
+  name: "Uniko Fleet Operations"
+  version: "1.0.0"
+  description: "Puerta de promoción a producción y verificación de la flota, según la constitución del proyecto"
+  author: uniko-crm
+  license: MIT
+
+requires:
+  speckit_version: ">=0.2.0"
+  tools:
+    - name: git
+      required: true
+    - name: curl
+      required: true
+    - name: gh
+      required: true
+
+provides:
+  commands:
+    - name: uniko.promote
+      file: commands/uniko.promote.md
+      description: "Ejecuta la puerta de promoción a producción; verifica, resume y se detiene sin promover"
+
+# Sin hooks a propósito: la promoción no se engancha a ninguna fase del flujo
+# SDD. La constitución exige señal humana explícita, nunca automatismo, así que
+# este comando no debe dispararse solo detrás de otro.
+hooks: {}
+
+tags:
+  - "deploy"
+  - "flota"
+  - "constitucion"

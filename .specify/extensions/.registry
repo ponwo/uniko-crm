@@ -32,6 +32,22 @@
       },
       "registered_skills": [],
       "installed_at": "2026-06-07T22:31:39.157037+00:00"
+    },
+    "uniko": {
+      "version": "1.0.0",
+      "source": "local",
+      "manifest_hash": "sha256:c248c0d5cbe6ae1ef4dfe5b81ea3c4602037df132fccbc62d2d44866737574b6",
+      "enabled": true,
+      "priority": 10,
+      "registered_commands": {
+        "claude": [
+          "uniko.promote"
+        ]
+      },
+      "registered_skills": [
+        "uniko-promote"
+      ],
+      "installed_at": "2026-09-05T21:40:00.000000+00:00"
     }
   }
 }
