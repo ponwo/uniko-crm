@@ -24,9 +24,9 @@ nunca sale del CRM.
 
 ## ¿Para quién es?
 
-- **Agencias de IA/automatización** que implementan CRM + agente para sus
-  clientes: despliegas una instancia por cliente en su VPS, la configuras y la
-  entregas con evidencia de calidad (el reporte del Laboratorio).
+- **Quien opera una flota** de instancias para varios negocios: despliegas una
+  instancia por cliente —su servidor, su base, sus credenciales—, la configuras
+  y la entregas con evidencia de calidad (el reporte del Laboratorio).
 - **Negocios** que quieren atender WhatsApp con IA sin regalar sus datos a un
   SaaS: todo corre en tu servidor.
 
@@ -479,8 +479,8 @@ latencia y sus caídas a la pantalla que más se usa.
 
 Next.js 15 (App Router) + React 19 · TypeScript estricto · PostgreSQL +
 Drizzle ORM · Better Auth · Tailwind CSS · SSE (sin WebSockets) · Docker
-multi-stage con migraciones al arranque. Diseñado para que una agencia lo
-modifique con un asistente de IA: specs y decisiones de diseño en
+multi-stage con migraciones al arranque. Diseñado para modificarse con un
+asistente de IA: specs y decisiones de diseño en
 [`specs/`](specs/), guía de modificación en [`CLAUDE.md`](CLAUDE.md).
 
 ## Licencia
