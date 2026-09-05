@@ -92,12 +92,20 @@ cuando hagan falta, agregando la variable y redesplegando:
 9. Conectar el número de WhatsApp en Ajustes → WhatsApp y pegar en Meta la URL
    del webhook y el verify token que la propia app enseña.
 
-## Estado de vocero-iltu
+## Historia: qué había antes
 
-La app `arwru6uh1ohbp7pldqnarmzn` (`vocero-iltu.ilovetheuniverse.mx`) y su base
-`ybdm3mpaqtpwm2rnxv4ldrgc` fueron el arranque de pruebas de I Love The Universe,
-sobre `kevinrivm/vocero-crm`. Las sustituye `uniko-iltu`.
+**vocero-iltu** — `vocero-iltu.ilovetheuniverse.mx`, sobre `kevinrivm/vocero-crm`,
+fue el arranque de pruebas de I Love The Universe. La sustituyó `uniko-iltu` y el
+dueño la borró a mano, con su base, el 2026-09-04. Ya no existe en Coolify.
 
-**Se detienen, no se borran**, hasta que el dueño lo apruebe explícitamente. El
-borrado es irreversible y se llevaría por delante las conversaciones y contactos
-que haya en esa base.
+**kosmo-crm** — `kosmo.lanco.cloud`, sobre `ponwo/kosmo-CRM`, es el MISMO
+producto que este repo: los dos salen de Vocero y se bifurcaron en la migración
+`0007`. Kosmo siguió por su lado (PWA y notificaciones push, conocimiento con
+caducidad, correo por SMTP, Embedded Signup) con seis migraciones propias que
+chocan con las de aquí; este repo siguió por el suyo (canales opcionales, agenda,
+atribución CAPI).
+
+**Corre en paralelo y se queda así por ahora.** No es parte de esta flota, no se
+toca y no se fusiona: reconciliar las dos cadenas de migración es un trabajo
+propio, para cuando se decida hacerlo. Si vas a portar algo de allá para acá,
+cuenta con reescribir su migración sobre esta cadena.
