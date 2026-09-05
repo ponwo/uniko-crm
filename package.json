@@ -10,7 +10,9 @@
     "node": ">=20"
   },
   "scripts": {
+    "predev": "node scripts/check-real-path.mjs",
     "dev": "next dev",
+    "prebuild": "node scripts/check-real-path.mjs",
     "build": "next build",
     "start": "next start",
     "lint": "eslint .",
