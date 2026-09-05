@@ -12,8 +12,9 @@ base y nada más.
 ## Inventario
 
 Servidor `v8y5y29zlbg1aft37px9qfxg` (`localhost`), red `coolify`
-(`goowhn5rf251hqsf4f2ub1pp`). Todas las apps salen de `ponwo/uniko-crm`, rama
-`main`, por el GitHub App **lanco-tools** (`lnwheppq2uthod0ur1d8dhwp`).
+(`goowhn5rf251hqsf4f2ub1pp`). Todas las apps salen de `ponwo/uniko-crm` por el
+GitHub App **lanco-tools** (`lnwheppq2uthod0ur1d8dhwp`), cada una siguiendo su
+rama (ver "Cómo se suelta un cambio").
 
 | | LanCo (prueba) | I Love The Universe | NuriaAndrea |
 |---|---|---|---|
@@ -52,7 +53,7 @@ instancia, con valores DISTINTOS en cada una:
 | `BETTER_AUTH_SECRET` | `openssl rand -base64 32` |
 | `ENCRYPTION_KEY` | `openssl rand -base64 32` — **exactamente 32 bytes**, se valida al arrancar |
 | `META_WEBHOOK_VERIFY_TOKEN` | `openssl rand -hex 20` — es el segmento secreto de la URL del webhook |
-| `META_GRAPH_API_VERSION` | `v25.0` |
+| `META_GRAPH_API_VERSION` | `v26.0` |
 | `MEDIA_DIR` | `/data/media` — tiene que coincidir con el volumen |
 
 Jamás se reutiliza un secreto entre instancias. Compartir `ENCRYPTION_KEY` entre
