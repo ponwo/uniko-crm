@@ -51,7 +51,12 @@ export function BookingsClient() {
   }, []);
 
   // La agenda cambia también cuando agenda la IA: SSE mantiene la vista viva.
-  useEvents({ onBookingUpdated: () => void refresh() });
+  // Y tras un hueco de conexión hay que recargar: una cita creada o movida
+  // mientras no llegaban eventos no aparecería nunca sola.
+  useEvents({
+    onBookingUpdated: () => void refresh(),
+    onReconnect: () => void refresh(),
+  });
 
   async function refresh() {
     const [list, avail] = await Promise.all([

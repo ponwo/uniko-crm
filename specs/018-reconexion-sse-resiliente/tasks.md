@@ -52,8 +52,8 @@ haya migración.
 
 **Purpose**: lo compartido que no depende de nada.
 
-- [ ] T001 [P] Crear `src/lib/sse-constants.ts` con el intervalo del heartbeat, el margen de silencio (60 s, research R5) y la escala de reintento (1→15 s, research R6), en un solo sitio para que servidor y cliente no se desincronicen
-- [ ] T002 [P] Añadir el guion de la historia en `tests/e2e/us-reconexion-sse.md` con los pasos del quickstart (niveles 2 y 3), incluida la casilla de "¿se reprodujo el fallo en iOS?" que exige SC-009
+- [x] T001 [P] Crear `src/lib/sse-constants.ts` con el intervalo del heartbeat, el margen de silencio (60 s, research R5) y la escala de reintento (1→15 s, research R6), en un solo sitio para que servidor y cliente no se desincronicen
+- [x] T002 [P] Añadir el guion de la historia en `tests/e2e/us-reconexion-sse.md` con los pasos del quickstart (niveles 2 y 3), incluida la casilla de "¿se reprodujo el fallo en iOS?" que exige SC-009
 
 ---
 
@@ -64,14 +64,14 @@ depende de que esto esté **desplegado**, no solo escrito.
 
 **Alcance**: solo servidor y contrato. Ni una línea de cliente.
 
-- [ ] T003 Emitir un evento con nombre junto al `: ping` existente en `src/app/api/events/route.ts`, en el mismo tic del heartbeat, sin carga útil de dominio y **sin quitar el comentario** (contrato aditivo, `contracts/sse-heartbeat.md`)
-- [ ] T004 [P] Actualizar `specs/001-uniko-core/contracts/sse.md` con el añadido, dejando escrito que es aditivo y que el servidor sigue sin garantizar replay
-- [ ] T005 [P] Test en `tests/unit/sse-heartbeat.test.ts`: el stream emite el evento con nombre al ritmo del heartbeat, y sigue emitiendo el comentario `: ping`
-- [ ] T006 Gate técnico completo desde la ruta real (`pnpm typecheck && pnpm lint && pnpm test && pnpm build`), PR y merge a `main`
+- [x] T003 Emitir un evento con nombre junto al `: ping` existente en `src/app/api/events/route.ts`, en el mismo tic del heartbeat, sin carga útil de dominio y **sin quitar el comentario** (contrato aditivo, `contracts/sse-heartbeat.md`)
+- [x] T004 [P] Actualizar `specs/001-uniko-core/contracts/sse.md` con el añadido, dejando escrito que es aditivo y que el servidor sigue sin garantizar replay
+- [x] T005 [P] Test en `tests/unit/sse-heartbeat.test.ts`: el stream emite el evento con nombre al ritmo del heartbeat, y sigue emitiendo el comentario `: ping`
+- [x] T006 Gate técnico completo desde la ruta real (`pnpm typecheck && pnpm lint && pnpm test && pnpm build`), PR y merge a `main`
 
 ### 🚦 T007 — PUERTA DE DESPLIEGUE (no se salta)
 
-- [ ] T007 Verificar en **LanCo desplegada** que el evento con nombre se está emitiendo: `curl -N https://uniko.lanco.cloud/api/events` con sesión válida y observar el evento llegando cada ~25 s. Comprobar además que `/api/health` reporta el commit de la Entrega 1
+- [x] T007 ✅ VERIFICADA POR EL DUEÑO (2026-09-06, cuatro tics limpios en LanCo). Verificar en **LanCo desplegada** que el evento con nombre se está emitiendo: `curl -N https://uniko.lanco.cloud/api/events` con sesión válida y observar el evento llegando cada ~25 s. Comprobar además que `/api/health` reporta el commit de la Entrega 1
 
 **Hasta que T007 esté marcada, NO empezar la Fase 3.** Si la Entrega 1 no está
 viva en LanCo, el vigilante del cliente no tendrá nada que ver y declarará
@@ -97,21 +97,23 @@ apoyarse.
 
 ### Lógica pura primero (es lo que hace posible probarla)
 
-- [ ] T008 [US1] Extraer la decisión a una función pura con reloj inyectable en `src/lib/sse-watchdog.ts`: dado `lastTrafficAt`, visibilidad, `readyState` y número de intentos → qué hacer (esperar / reconectar / sesión terminada)
-- [ ] T009 [P] [US1] Tests en `tests/unit/sse-watchdog.test.ts` con reloj falso: silencio bajo el margen no dispara; por encima sí; visibilidad fuerza comprobación inmediata; `CONNECTING` espera; `CLOSED` no reintenta en bucle; el backoff crece y se reinicia al conectar; oculta no reintenta
+- [x] T008 [US1] Extraer la decisión a una función pura con reloj inyectable en `src/lib/sse-watchdog.ts`: dado `lastTrafficAt`, visibilidad, `readyState` y número de intentos → qué hacer (esperar / reconectar / sesión terminada)
+- [x] T009 [P] [US1] Tests en `tests/unit/sse-watchdog.test.ts` con reloj falso: silencio bajo el margen no dispara; por encima sí; visibilidad fuerza comprobación inmediata; `CONNECTING` espera; `CLOSED` no reintenta en bucle; el backoff crece y se reinicia al conectar; oculta no reintenta
 
 ### Cablearlo al transporte
 
-- [ ] T010 [US1] En `src/components/use-events.ts`, registrar el evento de heartbeat y actualizar `lastTrafficAt` con **cualquier** dato recibido (heartbeat o evento de dominio)
-- [ ] T011 [US1] En `src/components/use-events.ts`, añadir el vigilante: intervalo de comprobación + `visibilitychange` + `pageshow`, comparando **sellos de tiempo** y no si el intervalo disparó (research R3)
-- [ ] T012 [US1] En `src/components/use-events.ts`, implementar la reconexión: cerrar y construir un `EventSource` nuevo registrando los listeners **una sola vez**, con la espera creciente de T001 y sin insistir con la página oculta
-- [ ] T013 [US1] En `src/components/use-events.ts`, tratar `error` según `readyState` (research R4): `CONNECTING` esperar; `CLOSED` un intento controlado y, si vuelve a cerrar, sesión terminada sin más reintentos (FR-306)
-- [ ] T014 [US1] Disparar `onReconnect` al quedar la conexión abierta de nuevo, y exponer desde el hook el estado de conexión y si el catch-up sigue en curso (lo consumirá US2)
+- [x] T010 [US1] En `src/components/use-events.ts`, registrar el evento de heartbeat y actualizar `lastTrafficAt` con **cualquier** dato recibido (heartbeat o evento de dominio)
+- [x] T011 [US1] En `src/components/use-events.ts`, añadir el vigilante: intervalo de comprobación + `visibilitychange` + `pageshow`, comparando **sellos de tiempo** y no si el intervalo disparó (research R3)
+- [x] T012 [US1] En `src/components/use-events.ts`, implementar la reconexión: cerrar y construir un `EventSource` nuevo registrando los listeners **una sola vez**, con la espera creciente de T001 y sin insistir con la página oculta
+- [x] T013 [US1] En `src/components/use-events.ts`, tratar `error` según `readyState` (research R4): `CONNECTING` esperar; `CLOSED` un intento controlado y, si vuelve a cerrar, sesión terminada sin más reintentos (FR-306)
+- [x] T014 [US1] Disparar `onReconnect` al quedar la conexión abierta de nuevo, y exponer desde el hook el estado de conexión y si el catch-up sigue en curso (lo consumirá US2)
 
 ### Poder probarlo en escritorio
 
-- [ ] T015 [P] [US1] Simulador de muerte silenciosa en `src/app/api/dev/sse-mudo/route.ts`: stream SSE válido que deja de escribir sin cerrarse, tras el gate existente `src/lib/dev-guard.ts` (404 incondicional en producción)
-- [ ] T016 [US1] Extender `scripts/e2e-selftest.mjs` con el camino completo: conectado → enmudece → se detecta → reconecta → catch-up → los mensajes del hueco están y no hay duplicados (FR-308)
+- [x] T015 [P] [US1] Simulador de muerte silenciosa en `src/app/api/dev/sse-mudo/route.ts`: stream SSE válido que deja de escribir sin cerrarse, tras el gate existente `src/lib/dev-guard.ts` (404 incondicional en producción) — con tests en `tests/unit/sse-mudo.test.ts` que fijan que **no** cierra el stream
+- [ ] T016 [US1] **DIFERIDA A LA FASE 4.** Extender `scripts/e2e-selftest.mjs` con el camino completo: conectado → enmudece → se detecta → reconecta → catch-up → los mensajes del hueco están y no hay duplicados (FR-308)
+
+  **Por qué se mueve**: su enunciado incluye "se detecta" en el sentido de *que el usuario lo ve*, y el aviso no existe hasta US2 (T017-T020). Escrita en la Fase 3 solo podría comprobar media cosa, y habría que volver a tocarla. Es un defecto de secuenciación de esta lista, detectado al implementar. Se ejecuta junto a T021, que ya vive en la Fase 4 y cubre el mismo camino.
 
 **Checkpoint**: la bandeja ya se recupera sola. Todavía no lo cuenta — eso es US2.
 
@@ -156,10 +158,22 @@ endpoints que ya existen (`/api/conversations`, `/api/lab/runs`, `/api/bookings`
 implementar aparece necesidad de servidor, es que el alcance se ensanchó:
 **parar y avisar**.
 
-- [ ] T022 [P] [US3] Cablear el catch-up en `src/components/app-nav.tsx` llamando a `refetchUnread` existente
-- [ ] T023 [P] [US3] Cablear el catch-up en `src/components/lab/lab-client.tsx` llamando a `refetchRuns` (y al detalle si hay corrida seleccionada)
-- [ ] T024 [P] [US3] Cablear el catch-up en `src/components/bookings/bookings-client.tsx` llamando a `refresh` existente
-- [ ] T025 [US3] Hacer que olvidar el catch-up no sea el camino fácil en `src/components/use-events.ts`: que el comportamiento por defecto sea el correcto en vez de depender de que cada consumidor se acuerde (tres de cinco lo olvidaron)
+> **T022-T025 se adelantaron a la Fase 3.** No fue una decisión de alcance sino
+> una consecuencia: al hacer `onReconnect` obligatorio (T025), el compilador
+> señaló las tres vistas que lo olvidaban y el proyecto dejó de compilar hasta
+> cablearlas. La alternativa —dejarlo opcional ahora y obligatorio en la Fase 5—
+> significaba entregar una versión con el fallo todavía dentro y cambiar el tipo
+> dos veces. El trabajo es el mismo y sale de una pieza.
+>
+> Vale la pena anotar que **T025 funcionó exactamente como se esperaba**: era el
+> intento de que olvidar el catch-up dejara de ser el camino fácil, y lo primero
+> que hizo fue convertir un fallo silencioso de tres vistas en un error de
+> compilación.
+
+- [x] T022 [P] [US3] Cablear el catch-up en `src/components/app-nav.tsx` llamando a `refetchUnread` existente
+- [x] T023 [P] [US3] Cablear el catch-up en `src/components/lab/lab-client.tsx` llamando a `refetchRuns` (y al detalle si hay corrida seleccionada)
+- [x] T024 [P] [US3] Cablear el catch-up en `src/components/bookings/bookings-client.tsx` llamando a `refresh` existente
+- [x] T025 [US3] Hacer que olvidar el catch-up no sea el camino fácil en `src/components/use-events.ts`: que el comportamiento por defecto sea el correcto en vez de depender de que cada consumidor se acuerde (tres de cinco lo olvidaron)
 - [ ] T026 [P] [US3] Añadir al arnés: tras la recuperación, el contador de no leídos coincide con la bandeja (SC-004)
 
 **Checkpoint**: ninguna vista se queda con datos viejos sin avisar.

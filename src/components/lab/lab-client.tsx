@@ -95,6 +95,12 @@ export function LabClient() {
         void refetchDetail(data.runId);
       }
     },
+    // Una corrida que termina durante un hueco de conexión seguiría
+    // mostrándose "en curso" para siempre: el evento que la cerraba se perdió.
+    onReconnect: () => {
+      void refetchRuns();
+      if (selectedRunId) void refetchDetail(selectedRunId);
+    },
   });
 
   async function launch() {
