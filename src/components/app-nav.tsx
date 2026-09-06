@@ -107,6 +107,10 @@ export function AppNav({
   useEvents({
     onMessageNew: () => void refetchUnread(),
     onConversationUpdated: () => void refetchUnread(),
+    // El contador vive en la barra de TODAS las pantallas, así que un cero
+    // falso aquí es peor que una bandeja incompleta: ni siquiera invita a
+    // mirar. Tras un hueco hay que recontar.
+    onReconnect: () => void refetchUnread(),
   });
 
   const sha = commit || BUILD_COMMIT;
