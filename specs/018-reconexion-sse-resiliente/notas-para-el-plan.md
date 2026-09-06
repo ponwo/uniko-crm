@@ -26,12 +26,18 @@ espere minutos. Rango a valorar: 60–90 s.
 
 Ojo: **el comentario `: ping` llega al `EventSource` pero no dispara ningún
 handler de evento con nombre.** Hay que comprobar si el navegador expone algo
-observable al recibir un comentario; si no lo expone, el ping no sirve como
-señal de vida en el cliente y hay que elegir otra cosa (por ejemplo, que el
-heartbeat pase a ser un evento con nombre, lo que **sí tocaría el contrato**
-`contracts/sse.md` y con él FR-313). **Esto es lo primero que el plan debe
+observable al recibir un comentario. **Esto es lo primero que el plan debe
 verificar**: de la respuesta depende si la feature es solo de cliente o también
 de servidor.
+
+Si no es observable, la salida es añadir un evento con nombre **junto** al
+`: ping` actual. Eso está permitido dentro de esta feature (FR-313 lo dice
+expresamente) porque es **aditivo**: un `EventSource` ignora los eventos con
+nombre que no tiene registrados, así que ningún cliente existente se rompe. No
+lo trates como un obstáculo mayor ni como motivo para replantear el alcance.
+Lo que sí queda fuera es sustituir el `: ping` o cambiar el formato de los
+eventos que ya existen. Si se toca, `contracts/sse.md` se actualiza en el mismo
+PR.
 
 ## 3. Regreso a primer plano
 
@@ -52,11 +58,16 @@ Mientras `document.hidden`, no insistir.
 
 ## 5. El catch-up que falta
 
-`app-nav.tsx`, `lab-client.tsx` y `bookings-client.tsx` no pasan `onReconnect`
-(FR-307). Los tres ya tienen su función de refetch a mano, así que es cablear lo
-que existe. Valorar si el hook debería llamar a un refetch por defecto en vez de
-depender de que cada consumidor se acuerde — un contrato que se cumple
-recordándolo se erosiona.
+`app-nav.tsx`, `lab-client.tsx` y `bookings-client.tsx` no pasan `onReconnect`.
+**Ya no es un hallazgo pendiente de decidir: están dentro del alcance** (FR-307
+y su decisión en la spec). Los tres tienen su función de refetch a mano
+(`refetchUnread`, `refresh`, `refetchRuns`), así que es cablear lo que existe.
+
+Cuestión de diseño que sí queda abierta: si el hook debería disparar el catch-up
+**por defecto** en vez de depender de que cada consumidor pase `onReconnect`.
+Este fallo es la prueba de que un contrato que se cumple recordándolo se
+erosiona — tres de cinco consumidores lo olvidaron. Un diseño donde olvidarlo
+sea imposible vale más que uno donde esté documentado.
 
 ## 6. `since=` contra refetch completo
 
