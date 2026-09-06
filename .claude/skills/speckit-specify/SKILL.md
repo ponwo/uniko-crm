@@ -95,14 +95,32 @@ Given that feature description, do this:
    - `mkdir -p SPECIFY_FEATURE_DIRECTORY`
    - Copy `.specify/templates/spec-template.md` to `SPECIFY_FEATURE_DIRECTORY/spec.md` as the starting point
    - Set `SPEC_FILE` to `SPECIFY_FEATURE_DIRECTORY/spec.md`
-   - Persist the resolved path to `.specify/feature.json`:
-     ```json
-     {
-       "feature_directory": "<resolved feature dir>"
-     }
-     ```
-     Write the actual resolved directory path value (for example, `specs/003-user-auth`), not the literal string `SPECIFY_FEATURE_DIRECTORY`.
-     This allows downstream commands (`/speckit-plan`, `/speckit-tasks`, etc.) to locate the feature directory without relying on git branch name conventions.
+   - **DO NOT write `.specify/feature.json`.** This project deliberately removed
+     that file, and this step is disabled on purpose — do not restore it, and do
+     not recreate the file by any other means.
+
+     Upstream Spec Kit persists the resolved path there so downstream commands
+     (`/speckit-plan`, `/speckit-tasks`, …) can locate the feature directory
+     without relying on branch naming. In this repository that pin is a second
+     source of truth that goes stale silently: it sat pointing at
+     `specs/016-atribucion-capi` from the initial commit, was wrong through
+     features 014, 015 and 017 with nobody noticing, and made `/speckit-plan`
+     resolve 016 while on the `018` branch — one step away from writing a new
+     plan over a closed feature.
+
+     **The git branch is this repo's source of truth for which feature is
+     active.** With no `feature.json`, `Get-FeaturePathsEnv` in
+     `.specify/scripts/powershell/common.ps1` falls through to
+     `Get-FeatureDirFromBranchPrefixOrExit`, which matches `specs/` directories
+     by the branch's numeric prefix (`018-*`), so the branch slug and the
+     directory slug need not be identical — only the number.
+
+     **Trade-off accepted**: a spec directory whose number does not correspond
+     to the branch at all can no longer be located by downstream commands. This
+     repo does not use that decoupling; all features so far are branch-numbered
+     to match. If a future feature genuinely needs it, set the
+     `SPECIFY_FEATURE_DIRECTORY` environment variable for that session — it
+     still takes priority — instead of reintroducing the file.
 
    **IMPORTANT**:
    - You must only create one feature per `/speckit-specify` invocation
