@@ -28,7 +28,38 @@ No necesita servidor ni navegador: es la parte determinista.
 
 ## Nivel 2 — Escritorio, con muerte silenciosa simulada
 
-Levanta la app con los mocks:
+> ### ⚠️ BLOQUEADO: hoy no hay dónde correrlo
+>
+> Este nivel necesita la app levantada **fuera de producción**, y ahora mismo no
+> existe ese entorno en ningún sitio:
+>
+> - **En la máquina de desarrollo**, la app no arranca: no hay `.env`, no hay
+>   PostgreSQL escuchando en 5432 y no hay Docker ni WSL instalados para
+>   levantarlo. (Comprobado 2026-09-06.)
+> - **En LanCo, NO se puede**, y no es cuestión de poner una variable. El gate
+>   `isMockEnabled()` exige `WA_MOCK_ENABLED=true` **y**
+>   `NODE_ENV !== "production"`. LanCo corre el build standalone de producción,
+>   así que `/api/dev/sse-mudo` devuelve **404 ahí pase lo que pase**.
+>
+>   Y así debe quedarse: "las rutas de mock/desarrollo devuelven 404
+>   incondicional en producción" es una regla dura de la constitución
+>   (Restricciones de Plataforma y Seguridad). Aflojar ese gate para poder
+>   probar sería abrir una superficie de desarrollo en una instancia con datos
+>   reales — y LanCo ya tiene número de WhatsApp conectado. **No se hace.**
+>
+> **Consecuencia para esta feature**: la verificación determinista de la muerte
+> silenciosa se cubre hoy con los tests unitarios (`sse-watchdog.test.ts`,
+> `sse-mudo.test.ts`, `connection-status.test.ts`), y el camino de navegador
+> queda pendiente. El nivel 3 en dispositivo real **no lo sustituye pero sí lo
+> compensa**: prueba lo mismo con la causa real en vez de simulada.
+>
+> **Esto no es deuda de esta feature, es de infraestructura**: falta un entorno
+> donde la app arranque fuera de producción. Se ataca aparte. Anotarlo aquí
+> porque la **019 (PWA) lo va a sufrir más**: un service worker no se puede
+> probar de ninguna forma sin navegador contra una app viva.
+
+Cuando exista ese entorno, esto es lo que hay que correr. Levanta la app con los
+mocks:
 
 ```bash
 WA_MOCK_ENABLED=true pnpm dev
