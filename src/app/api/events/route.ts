@@ -1,4 +1,5 @@
 import { requireSession, UnauthorizedError } from "@/lib/auth/session";
+import { SSE_HEARTBEAT_MS, SSE_PING_EVENT } from "@/lib/sse-constants";
 import { subscribe } from "@/server/events/bus";
 
 /**
@@ -8,7 +9,7 @@ import { subscribe } from "@/server/events/bus";
  */
 export const dynamic = "force-dynamic";
 
-const HEARTBEAT_MS = 25_000;
+const HEARTBEAT_MS = SSE_HEARTBEAT_MS;
 const encoder = new TextEncoder();
 
 export async function GET(req: Request) {
@@ -45,7 +46,23 @@ export async function GET(req: Request) {
         );
       });
 
-      const heartbeat = setInterval(() => send(`: ping\n\n`), HEARTBEAT_MS);
+      // Dos señales de vida en el mismo tic, y no es redundancia:
+      //
+      // El comentario defiende del corte por inactividad en proxies, que es
+      // para lo que se puso. Pero la especificación de server-sent events manda
+      // ignorar las líneas que empiezan por `:` —"Ignore the line"— sin
+      // despachar evento ni tocar estado observable, así que el CLIENTE NO
+      // PUEDE VERLO. Sin algo más, una conexión sana y callada es indistinguible
+      // de una muerta, que es el fallo que arregla la 018.
+      //
+      // El evento con nombre es lo que el cliente sí puede escuchar. Se añade
+      // sin quitar el comentario: es un cambio aditivo, y un EventSource
+      // descarta en silencio los eventos con nombre que no tiene registrados,
+      // así que ningún cliente anterior se entera.
+      const heartbeat = setInterval(() => {
+        send(`: ping\n\n`);
+        send(`event: ${SSE_PING_EVENT}\n` + `data: {}\n\n`);
+      }, HEARTBEAT_MS);
 
       cleanup = () => {
         clearInterval(heartbeat);
