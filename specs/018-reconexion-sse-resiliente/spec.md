@@ -91,9 +91,13 @@ se instale nada.
   hueco), el cliente MUST dejar de reintentar y tratarlo como sesión terminada,
   no como caída de red. Reintentar contra un 401 no se recupera nunca.
 - **FR-307** El catch-up MUST alcanzar a **todos** los consumidores de eventos,
-  no solo a la bandeja: el contador de no leídos de la navegación, el
-  Laboratorio y la agenda quedan al día tras un hueco. (Ver "Lo que encontramos
-  en el código".)
+  no solo a la bandeja. En concreto, tras un hueco:
+  - el **contador de no leídos** de la navegación coincide con la bandeja;
+  - el **Laboratorio** refleja el estado real de la corrida (si terminó
+    mientras la conexión estaba caída, deja de mostrarse en curso);
+  - la **agenda** muestra las citas que se crearon o movieron durante el hueco.
+
+  Ver la decisión "Las tres vistas que hoy no se ponen al día".
 - **FR-308** La recuperación MUST ser idempotente en pantalla: un mensaje que ya
   estaba no se duplica, y un envío propio en vuelo no pierde su burbuja
   provisional ni aparece dos veces.
@@ -118,9 +122,18 @@ se instale nada.
 ### No romper lo que hay
 
 - **FR-313** El contrato SSE del servidor (headers, heartbeat ~25 s, formato de
-  eventos, sin garantía de replay) NO cambia como parte de esta feature. Si el
-  plan concluye que hace falta tocarlo, sube por la puerta del ciclo completo y
-  se actualiza `contracts/sse.md` en el mismo cambio.
+  eventos, sin garantía de replay) no cambia **de forma incompatible**. Lo
+  existente se mantiene: ningún cliente que hoy funcione puede dejar de
+  funcionar.
+
+  Si el plan concluye que el heartbeat tiene que ser observable desde el
+  cliente y hoy no lo es, **añadir un evento con nombre junto al `: ping`
+  actual es un cambio aditivo y está permitido dentro de esta feature**: quien
+  no lo escuche sigue igual, porque un `EventSource` ignora los eventos con
+  nombre que no tiene registrados. En ese caso se actualiza `contracts/sse.md`
+  en el mismo PR y se dice en el Constitution Check. Lo que sí quedaría fuera
+  es *sustituir* el `: ping` por otra cosa, o cambiar el formato de los eventos
+  que ya existen.
 - **FR-314** El comportamiento en escritorio con red estable NO cambia de forma
   observable: quien tiene la app abierta en un monitor no debe notar esta
   feature salvo por el aviso cuando de verdad se cae.
@@ -150,6 +163,36 @@ leer la verdad de ahora es más seguro que reproducir el pasado.
 vuelve a caerse a mitad), la vista queda incompleta. Por eso FR-311 ata el aviso
 al final del catch-up y no al de la reconexión: el usuario sigue advertido hasta
 que la vista sea de fiar.
+
+## Decisión: las tres vistas que hoy no se ponen al día
+
+**Entran en el alcance.** `app-nav.tsx` (contador de no leídos),
+`lab-client.tsx` y `bookings-client.tsx` reciben catch-up igual que la bandeja
+(FR-307), con criterio observable propio (SC-004, SC-007, SC-008).
+
+**Por qué entran.** Porque dejarlas fuera rompería la promesa central de esta
+feature. El bloque "decir la verdad" se compromete a que la app nunca presente
+como al día algo que no lo está — y **el usuario no distingue "el SSE se
+recuperó" de "la pantalla está al día"**: para él es lo mismo. Se podría
+arreglar la detección a la perfección, retirar el aviso al terminar el catch-up
+de la bandeja, y dejar el contador de no leídos mintiendo en la barra de
+navegación de todas las pantallas. Eso es exactamente el fallo silencioso que
+esta feature existe para eliminar, movido de sitio.
+
+El contador agrava el caso: **está presente en todas las vistas**, no solo en la
+bandeja. Es la primera cosa que un operador mira para decidir si hay trabajo. Un
+cero falso ahí es más dañino que una bandeja incompleta, porque ni siquiera
+invita a mirar.
+
+**Por qué es barato.** Las tres tienen ya su función de recarga escrita y
+llamable sin argumentos (`refetchUnread`, `refresh`, `refetchRuns`): es cablear
+lo que existe, no construir nada. El coste de incluirlas no justifica el riesgo
+de dejarlas.
+
+**Alcance exacto.** Solo el catch-up. Esta feature NO añade a esas tres vistas
+su propio indicador de conexión: el aviso de FR-309 vive donde el operador
+trabaja y ya cubre el estado global. Si el plan encuentra que alguna necesita
+señal propia, eso sube como decisión suya.
 
 ## Constitution Check
 
@@ -202,13 +245,44 @@ La definición de "Hecho" de esta feature **no puede ser un test en
    **Este modo NO sustituye al punto 3.** Simula el síntoma, no la causa: no
    prueba que el sistema operativo suspenda la app, ni que `readyState` mienta.
 
-3. **Dispositivo real, obligatorio.** Con la feature desplegada en LanCo: abrir
-   la app en un iPhone y en un Android, dejarla en segundo plano varios minutos
-   —lo bastante para que el sistema la congele—, hacer que entre un mensaje
-   durante el hueco, y volver a primer plano. El criterio es lo que ve el
-   operador: el mensaje aparece, y en ningún momento la pantalla afirmó estar al
-   día cuando no lo estaba. El camino infeliz —volver sin red— muestra el aviso
-   de sin conexión y se recupera al volver la red.
+3. **Dispositivo real, obligatorio.** Con la feature desplegada en LanCo. Las
+   dos plataformas son obligatorias, pero **no se está comprobando lo mismo en
+   cada una**, y confundirlas produciría un verde que no prueba nada.
+
+   **iOS — reproducir el fallo.** Es la plataforma donde está reportada la
+   muerte silenciosa. El objetivo es provocarla: abrir la app en un iPhone,
+   dejarla en segundo plano varios minutos —lo bastante para que el sistema la
+   congele—, hacer que entre un mensaje durante el hueco, y volver a primer
+   plano. Criterio: el mensaje aparece, y en ningún momento la pantalla afirmó
+   estar al día cuando no lo estaba.
+
+   Cuenta como prueba válida **solo si el fallo se reprodujo**. Si al volver
+   resulta que el navegador sí avisó del cierre, se ejerció el camino que ya
+   funcionaba antes y esta corrida no dice nada sobre la feature: hay que
+   repetir alargando el tiempo en segundo plano, o dejarlo escrito como "no
+   reproducido" en vez de darlo por bueno. Un verde sin fallo reproducido es
+   ruido.
+
+   **Android — comprobar que no se rompió nada.** El fallo silencioso **no está
+   reportado en Android**, y Chrome normalmente sí notifica el cierre al
+   reanudar, así que la reconexión de `EventSource` probablemente ya funcionaba
+   ahí. No se espera reproducir nada, y **no hay que forzar la narrativa**: si
+   no se reproduce, eso es lo esperado y así se registra. El criterio es otro,
+   de no regresión:
+   - el ciclo normal (segundo plano, mensaje entrante, volver) sigue poniendo la
+     vista al día, ahora también en el contador de no leídos;
+   - la vigilancia nueva **no** provoca reconexiones espurias ni parpadeo del
+     aviso en una plataforma que ya iba bien (FR-312);
+   - el aviso aparece cuando de verdad no hay red, y desaparece al volver.
+
+   Dicho de otro modo: **iOS prueba que la feature arregla algo; Android prueba
+   que no rompe nada.** La prueba determinista de la lógica de muerte silenciosa
+   es el nivel 2, no el 3 — en el dispositivo se depende de que el sistema
+   operativo colabore, y eso no se puede exigir en una corrida concreta.
+
+   **Camino infeliz, en las dos:** volver a primer plano sin red muestra el
+   aviso de sin conexión, no reintenta en bucle apretado, y se recupera solo al
+   volver la red.
 
 Los guiones E2E por historia viven en `tests/e2e/`; esta feature extiende ese
 arnés en vez de dejar solo el `.md`.
@@ -228,6 +302,13 @@ arnés en vez de dejar solo el `.md`.
   reintentando indefinidamente sin decírselo al usuario.
 - **SC-006** En escritorio con red estable durante una jornada, no aparecen
   avisos espurios de reconexión.
+- **SC-007** Una corrida del Laboratorio que termina mientras la conexión está
+  caída no sigue mostrándose en curso al recuperarse.
+- **SC-008** Una cita creada o movida durante el hueco aparece en la agenda al
+  recuperarse, sin recargar la página.
+- **SC-009** En iOS, la prueba en dispositivo del nivel 3 registra
+  explícitamente si el fallo silencioso se reprodujo. Una corrida en la que no
+  se reprodujo no cuenta como verificación de la feature.
 
 ## Fuera de alcance
 
@@ -256,7 +337,9 @@ confirmar:
   `src/components/lab/lab-client.tsx` y
   `src/components/bookings/bookings-client.tsx` **no pasan `onReconnect`**. Es
   un fallo preexistente: incluso cuando hoy la reconexión sí se detecta, esos
-  tres se quedan desactualizados. De ahí FR-307.
+  tres se quedan desactualizados. **Adoptado en alcance** — ver la decisión
+  correspondiente y FR-307. Las tres tienen ya su función de recarga escrita y
+  llamable sin argumentos (`refetchUnread`, `refresh`, `refetchRuns`).
 
 - **El contrato dice `since=` y la implementación hace refetch completo.** El
   contrato (`contracts/sse.md`) y el comentario de `use-events.ts` describen el
@@ -267,6 +350,19 @@ confirmar:
 
 - **`/api/events` ya responde 401 sin sesión**, así que FR-306 tiene un
   comportamiento de servidor sobre el que apoyarse; no hace falta añadir nada.
+
+- **El heartbeat es un comentario SSE (`: ping`), no un evento con nombre.** Un
+  comentario mantiene viva la conexión a través de los proxies —que es para lo
+  que se puso— pero no dispara ningún handler en el cliente. **Lo primero que el
+  plan debe verificar contra el código del servidor y el navegador es si el
+  cliente puede observar de algún modo que llegó.** Si puede, no hay nada que
+  cambiar y la feature es solo de cliente. Si no puede, hace falta un evento con
+  nombre, y conviene tener claro de qué tamaño es ese cambio: **es aditivo**
+  (FR-313), no rompe a ningún cliente existente, y tiene justo la forma de dos
+  entregas que el Principio X pide para lo que no se puede deshacer — primero
+  agregar la señal nueva conviviendo con la vieja, y solo mucho después, si
+  alguna vez, retirar nada. No es un obstáculo mayor; es un requisito que se
+  descubre antes de escribir código en vez de a mitad del `/implement`.
 
 ## Supuestos
 
