@@ -111,7 +111,7 @@ apoyarse.
 ### Poder probarlo en escritorio
 
 - [x] T015 [P] [US1] Simulador de muerte silenciosa en `src/app/api/dev/sse-mudo/route.ts`: stream SSE válido que deja de escribir sin cerrarse, tras el gate existente `src/lib/dev-guard.ts` (404 incondicional en producción) — con tests en `tests/unit/sse-mudo.test.ts` que fijan que **no** cierra el stream
-- [ ] T016 [US1] **DIFERIDA A LA FASE 4.** Extender `scripts/e2e-selftest.mjs` con el camino completo: conectado → enmudece → se detecta → reconecta → catch-up → los mensajes del hueco están y no hay duplicados (FR-308)
+- [ ] T016 [US1] **DIFERIDA A LA FASE 4 y luego BLOQUEADA con T021 — ver quickstart.md.** Extender `scripts/e2e-selftest.mjs` con el camino completo: conectado → enmudece → se detecta → reconecta → catch-up → los mensajes del hueco están y no hay duplicados (FR-308)
 
   **Por qué se mueve**: su enunciado incluye "se detecta" en el sentido de *que el usuario lo ve*, y el aviso no existe hasta US2 (T017-T020). Escrita en la Fase 3 solo podría comprobar media cosa, y habría que volver a tocarla. Es un defecto de secuenciación de esta lista, detectado al implementar. Se ejecuta junto a T021, que ya vive en la Fase 4 y cubre el mismo camino.
 
@@ -129,11 +129,11 @@ apoyarse.
 **Why this priority**: US1 arregla el fallo; US2 es lo que impide que vuelva a
 ser silencioso. Va después porque necesita el estado que expone T014.
 
-- [ ] T017 [US2] Componente de estado de conexión en `src/components/inbox/connection-status.tsx` con los dos estados visibles: *reconectando* y *sin conexión* ("al día" no se adorna, FR-310)
-- [ ] T018 [US2] Montarlo en `src/components/inbox/inbox-client.tsx` consumiendo el estado del hook (T014)
-- [ ] T019 [US2] Retardar la aparición del aviso lo justo para que una reconexión limpia no produzca parpadeo (FR-312), en `src/components/inbox/connection-status.tsx`
-- [ ] T020 [US2] Atar la desaparición del aviso al **fin del catch-up** y no a la reconexión (FR-311), en `src/components/inbox/inbox-client.tsx`
-- [ ] T021 [P] [US2] Añadir al arnés de `scripts/e2e-selftest.mjs`: el aviso aparece durante la caída, no parpadea en una reconexión rápida, y se retira solo tras el refresco
+- [x] T017 [US2] Componente de estado de conexión en `src/components/inbox/connection-status.tsx` con los dos estados visibles: *reconectando* y *sin conexión* ("al día" no se adorna, FR-310)
+- [x] T018 [US2] Montarlo en `src/components/inbox/inbox-client.tsx` consumiendo el estado del hook (T014)
+- [x] T019 [US2] Retardar la aparición del aviso lo justo para que una reconexión limpia no produzca parpadeo (FR-312), en `src/components/inbox/connection-status.tsx`
+- [x] T020 [US2] Atar la desaparición del aviso al **fin del catch-up** y no a la reconexión (FR-311), en `src/components/inbox/inbox-client.tsx`
+- [ ] T021 [P] [US2] **BLOQUEADA — ver quickstart.md.** No hay entorno no-producción donde correr el arnés: la máquina de desarrollo no levanta la app y en LanCo el simulador da 404 por diseño constitucional. Deuda de infraestructura, no de la feature. Añadir al arnés de `scripts/e2e-selftest.mjs`: el aviso aparece durante la caída, no parpadea en una reconexión rápida, y se retira solo tras el refresco
 
 **Checkpoint**: el fallo silencioso deja de ser silencioso.
 

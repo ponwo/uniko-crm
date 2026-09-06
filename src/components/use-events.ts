@@ -38,8 +38,13 @@ export type EventHandlers = {
    * erosiona; este se cumple porque no compila si no.
    *
    * Si de verdad no hay nada que refrescar, pásalo explícito: `() => {}`.
+   *
+   * **Puede devolver una promesa, y conviene que lo haga.** El hook la espera
+   * para saber cuándo la vista vuelve a ser de fiar: si el catch-up se lanza y
+   * se olvida, el aviso de "poniendo al día" desaparecería de inmediato, con la
+   * bandeja todavía sin refrescar — que es decir "todo bien" antes de tiempo.
    */
-  onReconnect: () => void;
+  onReconnect: () => void | Promise<void>;
 };
 
 /** Lo que el hook cuenta de la conexión, para que la interfaz no mienta. */
@@ -150,14 +155,20 @@ export function useEvents(handlers: EventHandlers): EventsStatus {
       }
 
       // Reconexión: la vista puede estar incompleta hasta que el catch-up
-      // termine, así que el aviso NO se retira todavía.
+      // termine, así que el aviso NO se retira todavía. Se ESPERA el catch-up
+      // (FR-311): reconectar no es estar al día.
       needsCatchUpRef.current = false;
       setStatus({ state: "conectado", catchingUp: true });
-      try {
-        handlersRef.current.onReconnect();
-      } finally {
-        setStatus({ state: "conectado", catchingUp: false });
-      }
+      void (async () => {
+        try {
+          await handlersRef.current.onReconnect();
+        } catch {
+          // Un catch-up que falla no debe dejar el aviso colgado para siempre;
+          // si la conexión sigue mal, el vigilante lo volverá a marcar.
+        } finally {
+          setStatus((prev) => ({ ...prev, catchingUp: false }));
+        }
+      })();
     };
 
     source.onerror = () => {

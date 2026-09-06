@@ -9,6 +9,7 @@ import type { ConversationDto, MessageDto } from "@/lib/types";
 import { CHANNEL_LABEL, type Channel } from "@/lib/channels";
 import { ChannelBadge } from "@/components/channel-badge";
 import { useEvents } from "@/components/use-events";
+import { ConnectionStatus } from "@/components/inbox/connection-status";
 import { ConversationList } from "./conversation-list";
 import { MessageThread } from "./message-thread";
 import { Composer } from "./composer";
@@ -116,7 +117,7 @@ export function InboxClient({ channels }: { channels: readonly Channel[] }) {
     if (match) select(match.id);
   }, [contactParam, conversations, select]);
 
-  useEvents({
+  const eventsStatus = useEvents({
     onMessageNew: ({ conversationId, message }) => {
       if (selectedIdRef.current === conversationId) {
         const m = message as MessageDto;
@@ -152,10 +153,17 @@ export function InboxClient({ channels }: { channels: readonly Channel[] }) {
       // El agente movió de etapa o cambió el handoff: refresca el panel en vivo.
       setDetailRev((v) => v + 1);
     },
-    onReconnect: () => {
-      // Catch-up tras reconexión (contrato sse.md): refetch completo.
-      void refetchConversations();
-      if (selectedIdRef.current) void refetchMessages(selectedIdRef.current);
+    // Catch-up tras reconexión (contrato sse.md): refetch completo.
+    //
+    // Devuelve la promesa a propósito: el hook la espera para no retirar el
+    // aviso hasta que la vista sea de fiar. Con un `void` aquí, "poniendo al
+    // día" desaparecería antes de que llegaran los datos (FR-311).
+    onReconnect: async () => {
+      const pendientes = [refetchConversations()];
+      if (selectedIdRef.current) {
+        pendientes.push(refetchMessages(selectedIdRef.current));
+      }
+      await Promise.allSettled(pendientes);
       setDetailRev((v) => v + 1);
     },
   });
@@ -271,7 +279,13 @@ export function InboxClient({ channels }: { channels: readonly Channel[] }) {
   );
 
   return (
-    <div className="flex h-full">
+    <div className="flex h-full flex-col">
+      {/* Arriba del todo y a lo ancho: si la vista puede no estar al día, eso
+          se dice antes que cualquier otra cosa, y da igual en qué columna esté
+          mirando el operador. */}
+      <ConnectionStatus status={eventsStatus} />
+
+      <div className="flex min-h-0 flex-1">
       {/* Móvil: una columna a la vez. La lista cede la pantalla completa al
           hilo en cuanto hay conversación elegida (patrón maestro-detalle). */}
       <section
@@ -398,6 +412,7 @@ export function InboxClient({ channels }: { channels: readonly Channel[] }) {
           </div>
         )}
       </section>
+      </div>
     </div>
   );
 }
