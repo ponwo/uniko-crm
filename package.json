@@ -7,11 +7,12 @@
   "private": true,
   "packageManager": "pnpm@11.5.0",
   "engines": {
-    "node": ">=20"
+    "node": "22.x"
   },
   "scripts": {
     "predev": "node scripts/check-real-path.mjs",
     "dev": "next dev",
+    "db:dev": "node scripts/dev-db.mjs",
     "prebuild": "node scripts/check-real-path.mjs",
     "build": "next build",
     "start": "next start",

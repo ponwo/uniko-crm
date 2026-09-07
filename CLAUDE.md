@@ -115,6 +115,11 @@ OPENROUTER_MODEL=anthropic/claude-sonnet-4.5
 OPENROUTER_JUDGE_MODEL=anthropic/claude-haiku-4.5   # opcional: juez más barato
 ```
 
+**Levantar el proyecto en una máquina**: [docs/desarrollo-local.md](docs/desarrollo-local.md)
+— Node 22 (`.nvmrc`, exigido por `engine-strict`) y PostgreSQL 16, las mismas
+versiones que corren las instancias. `pnpm db:dev` crea la base local y migra;
+se niega a apuntar a algo que no sea localhost.
+
 Para el self-test local existe además el modo de pruebas interno (mocks) —
 ver `specs/001-uniko-core/quickstart.md`. Nunca actives mocks en producción.
 
