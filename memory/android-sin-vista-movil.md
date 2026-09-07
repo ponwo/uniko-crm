@@ -1,51 +1,61 @@
 ---
 name: android-sin-vista-movil
-description: En Chrome/Android la app se ve como escritorio encogido con letra diminuta; en iOS se ve bien. NO es por falta de meta viewport — está presente. Sin diagnosticar. Bloquea de facto a la 019 (PWA).
+description: RESUELTO — la app se veía como escritorio encogido en Android porque Chrome tenía "Versión para ordenador" activada en ese sitio. No era del código. Lección- descartar eso ANTES de diagnosticar cualquier problema de renderizado móvil.
 metadata:
   type: project
 ---
 
-**Hallazgo del 2026-09-07, al probar la 018 en dispositivo real. No lo introduce
-esa feature: es anterior y está sin diagnosticar.**
+**RESUELTO el 2026-09-07. No era un problema de la aplicación.**
 
-En **Chrome sobre Android**, la aplicación entera se sirve como la vista de
-escritorio encogida, con la letra diminuta. En **Safari sobre iOS se ve
-optimizada**. El aviso de reconexión de la 018 se lee bien en las dos; el
-problema es el resto de la app.
+## La lección, que es lo único que hay que recordar
 
-## Lo que YA se comprobó, y descarta la primera hipótesis
+**Antes de diagnosticar un problema de renderizado móvil, descarta que el
+navegador esté forzando la vista de escritorio.** Es un ajuste por sitio, se
+queda activado sin que nadie lo recuerde, y produce exactamente los síntomas de
+un fallo de CSS o de viewport. Cuesta diez segundos comprobarlo y ahorra una
+investigación entera.
 
-La sospecha razonable era que faltara el `meta viewport` —Safari disimula esa
-ausencia y Chrome no—. **No es eso.** Comprobado dos veces:
+Se comprueba en Chrome/Android en el menú de tres puntos: la casilla **"Versión
+para ordenador"**. Si está marcada, desmárcala y recarga antes de mirar nada más.
 
-- `src/app/layout.tsx` no lo declara, ni hay ningún `export const viewport` en
-  todo `src/`.
-- **Pero el HTML servido SÍ lo lleva**: `curl` a LanCo devuelve
-  `<meta name="viewport" content="width=device-width, initial-scale=1"/>`.
-  Next.js inyecta ese valor por defecto cuando la app no lo declara.
+## Qué se observó
 
-O sea que la etiqueta está y es la correcta. La causa es otra.
+En Chrome sobre Android, la aplicación entera se servía como la vista de
+escritorio encogida, con la letra diminuta. En Safari sobre iOS se veía bien. El
+contraste entre plataformas fue lo que hizo pensar en un problema real del
+código, cuando en realidad solo reflejaba que en un navegador estaba el ajuste
+puesto y en el otro no.
 
-## Por dónde seguir cuando se ataque
+## La causa real
 
-Hipótesis viva, y la más barata de comprobar primero: que el dispositivo
-reporte un **ancho de viewport CSS ≥ 768 px**, con lo que los `md:` de Tailwind
-entran y la app muestra su layout de escritorio *legítimamente* — que es
-exactamente lo que se ve. La bandeja usa `md:w-[300px]`, `lg:`, `xl:` para
-decidir columnas.
+**Chrome tenía activada "Versión para ordenador" para ese sitio.** Al quitarla,
+la app se ve correctamente en Android. Cero cambios en el código.
 
-Lo primero que hay que medir en ese teléfono, no suponer: `window.innerWidth`,
-`document.documentElement.clientWidth` y `devicePixelRatio`. Si sale ≥ 768,
-el problema no es el viewport sino dónde están puestos los breakpoints. Otras
-pistas a descartar: "Sitio para computadora" activado en Chrome, y un
-`initial-scale` efectivo distinto por zoom del sistema.
+## Las dos hipótesis que se manejaron, y en qué quedaron
 
-## Por qué importa para la 019
+**1. Faltaba el `meta viewport`.** Era la sospecha razonable, porque Safari
+disimula esa ausencia y Chrome no. **Descartada con evidencia**: aunque
+`src/app/layout.tsx` no lo declara y no hay ningún `export const viewport` en
+`src/`, el HTML que sirve la app **sí lo lleva** —comprobado con `curl` contra
+LanCo: `<meta name="viewport" content="width=device-width, initial-scale=1"/>`—
+porque Next.js inyecta ese valor por defecto cuando la app no lo declara.
 
-**Le afecta de lleno.** La 019 pide botón de instalar en Android, e instalar una
-app que se ve como escritorio encogido no sirve de nada: el usuario la abre una
-vez y la borra. Una PWA instalable con la vista rota es peor que no ofrecer la
-instalación, porque la instalación es una promesa.
+Eso sigue siendo cierto y vale la pena saberlo por separado: **no hace falta
+declarar el viewport en este proyecto, Next ya pone uno correcto.**
 
-Conviene resolver esto **antes** de rematar la 019, o al menos decidir a
-sabiendas que se lanza sin ello. Ver [[019-pwa-instalable]].
+**2. El dispositivo reportaba ≥ 768 px CSS y entraban los `md:` de Tailwind.**
+Era la siguiente hipótesis y habría explicado el síntoma. **Nunca se llegó a
+medir**: quedó sin comprobar, no descartada por evidencia. Se volvió irrelevante
+al aparecer la causa real. Si algún día vuelve un síntoma parecido *con la vista
+de escritorio ya descartada*, esta sigue siendo la siguiente a medir —
+`window.innerWidth`, `document.documentElement.clientWidth`, `devicePixelRatio`—
+en vez de suponerla.
+
+## Historia
+
+Apareció el 2026-09-07 probando la feature 018 en dispositivo real. Se anotó
+entonces como problema anterior a esa feature, que no lo introducía, y **como
+bloqueo de la 019 (PWA)**, con el argumento de que instalar una app que se ve
+como escritorio encogido no sirve de nada.
+
+**Esa nota ya no aplica: la 019 no está bloqueada por esto.**
