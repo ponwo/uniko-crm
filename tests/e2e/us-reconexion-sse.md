@@ -38,7 +38,7 @@ No se comprueba lo mismo en cada plataforma.
 - [ ] **El mensaje aparece**, y en ningún momento la pantalla afirmó estar al día
       sin estarlo.
 
-**¿Se reprodujo el fallo silencioso?** → ☐ Sí ☐ No
+**¿Se reprodujo el fallo silencioso?** → ☑ **Sí** (2026-09-06) ☐ No
 
 Si **No**, esta corrida **no cuenta** como verificación (SC-009): se ejerció el
 camino que ya funcionaba antes. Repetir alargando el tiempo en segundo plano, o
@@ -57,14 +57,35 @@ esperado: **no fuerces la narrativa**.
 
 ## Registro de la corrida
 
-Rellenar al ejecutar el nivel 3 y copiar al PR:
+### iOS — 2026-09-06 ✅ VERDE
+
+| Dato | Valor |
+|---|---|
+| Fecha | 2026-09-06 |
+| Commit desplegado en LanCo | `3838181` |
+| **¿Fallo reproducido?** | **Sí** |
+| Tiempo en segundo plano | varios minutos |
+| Versión de iOS | *no registrada* |
+| Qué entró durante el hueco | un mensaje de WhatsApp real, al número conectado de LanCo |
+| Qué se vio al volver | primero el aviso de **reconectando**, después el mensaje en la bandeja |
+
+**Lectura**: es un verde de los buenos, no un falso positivo. El aviso apareció
+*antes* que el mensaje, lo que significa que la conexión estaba efectivamente
+muerta al volver, que se detectó, y que el catch-up trajo lo que se había
+perdido. Si el mensaje hubiera aparecido sin aviso previo, habría sido un "no
+reproducido" y no contaría (SC-009).
+
+El fallo silencioso de iOS se reprodujo y la feature lo resolvió.
+
+### Android — pendiente
+
+Criterio de **no regresión**, no de reproducción. Ver la lista de arriba.
 
 | Dato | Valor |
 |---|---|
 | Fecha | |
 | Commit desplegado en LanCo | |
-| ¿Fallo reproducido en iOS? | |
-| Tiempo en segundo plano | |
-| Versión de iOS | |
+| ¿Ciclo normal deja la vista al día? | |
+| ¿Contador de no leídos coincide? | |
+| ¿Avisos espurios o parpadeo? | |
 | Versión de Android | |
-| Qué se vio al volver | |
