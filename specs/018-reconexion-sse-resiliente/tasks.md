@@ -190,8 +190,8 @@ implementar aparece necesidad de servidor, es que el alcance se ensanchó:
 ### Nivel 3 — dispositivo real (OBLIGATORIO, Principio IX)
 
 - [x] T031 ✅ VERDE (2026-09-06, fallo reproducido) **iOS**: reproducir el fallo en un iPhone contra LanCo — segundo plano varios minutos, mensaje entrante durante el hueco, volver a primer plano. Registrar **si el fallo se reprodujo**; si no, repetir alargando el tiempo o anotarlo como "no reproducido" (SC-009). Un verde sin fallo reproducido no cuenta
-- [ ] T032 **Android**: comprobar no regresión en Chrome contra LanCo — el ciclo normal deja la vista al día incluido el contador, no hay reconexiones espurias ni parpadeo (FR-312), y el aviso sale y se va con la red. **No forzar la narrativa**: si el fallo no se reproduce, es lo esperado y así se registra
-- [~] T033 (iOS registrado; Android pendiente) Anotar en el PR y en `tests/e2e/us-reconexion-sse.md` lo observado: si se reprodujo en iOS, cuánto tiempo en segundo plano, versiones de iOS y Android, y qué se vio al volver
+- [x] T032 ✅ VERDE (2026-09-07) **Android**: en Chrome contra LanCo. **El fallo TAMBIÉN se reprodujo**, contra lo que la spec suponía — corregido ahí y en el quickstart. Además: el ciclo normal deja la vista al día incluido el contador, y no hubo reconexiones espurias ni parpadeo (FR-312)
+- [x] T033 Anotar en el PR y en `tests/e2e/us-reconexion-sse.md` lo observado: si se reprodujo en iOS, cuánto tiempo en segundo plano, versiones de iOS y Android, y qué se vio al volver
 
 ---
 
