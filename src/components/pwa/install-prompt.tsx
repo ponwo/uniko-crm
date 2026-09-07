@@ -129,10 +129,23 @@ export function InstallPrompt() {
           </button>
         </>
       ) : (
+        /*
+         * iOS: instrucciones, porque el sistema no deja ofrecer un botón.
+         *
+         * El texto dice QUÉ TOCAR, no qué es una aplicación web: quien lo lee
+         * quiere el icono en su teléfono, no una explicación. Por eso nombra el
+         * botón por su dibujo y por dónde está —el cuadrado con la flecha, abajo
+         * en Safari—, que es lo que se busca con el pulgar.
+         *
+         * Y está escrito para la quinta vez igual que para la primera (mismo
+         * criterio que FR-423): sin "bienvenido", sin dar por hecho que es nuevo
+         * aquí, y sin felicitar a nadie por instalar nada.
+         */
         <span className="min-w-0 flex-1">
-          <span className="font-medium">Instala la app</span>{" "}
+          <span className="font-medium">Ponla en tu pantalla de inicio:</span>{" "}
           <span className="opacity-80">
-            toca Compartir y luego <b>Añadir a pantalla de inicio</b>.
+            toca <b>Compartir</b> —el cuadrado con la flecha hacia arriba, abajo
+            en la barra— y luego <b>Añadir a pantalla de inicio</b>.
           </span>
         </span>
       )}

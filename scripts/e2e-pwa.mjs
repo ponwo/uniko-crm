@@ -23,7 +23,9 @@
  * Uso: node --env-file=.env scripts/e2e-pwa.mjs
  * Requiere: app corriendo (pnpm dev) con WA_MOCK_ENABLED=true y Playwright.
  */
-import { chromium } from "playwright";
+import { readFileSync } from "node:fs";
+import { chromium, devices } from "playwright";
+import { contextoConSesion } from "./e2e-sesion.mjs";
 
 const BASE = process.env.APP_BASE_URL ?? "http://localhost:3000";
 
@@ -40,26 +42,17 @@ const ok = (name, cond, extra = "") => {
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
 const browser = await chromium.launch();
-const ctx = await browser.newContext({ viewport: { width: 1400, height: 900 } });
-const req = ctx.request;
 
 /* ─────────────────── Setup ─────────────────── */
 
 console.log("== Setup: operador dentro ==");
-let r = await req.post(`${BASE}/api/auth/sign-up/email`, {
-  headers: { origin: BASE },
-  data: {
-    email: "e2e@uniko.test",
-    password: "password-e2e-123",
-    name: "Operador E2E",
-  },
+// Sesión compartida entre arneses: el login de la app limita intentos, y esa
+// defensa no se toca (ver scripts/e2e-sesion.mjs).
+const { ctx, reutilizada } = await contextoConSesion(browser, BASE, {
+  viewport: { width: 1400, height: 900 },
 });
-if (!r.ok())
-  r = await req.post(`${BASE}/api/auth/sign-in/email`, {
-    headers: { origin: BASE },
-    data: { email: "e2e@uniko.test", password: "password-e2e-123" },
-  });
-ok("login del operador", r.ok());
+const req = ctx.request;
+ok(`operador dentro (${reutilizada ? "sesión reutilizada" : "login nuevo"})`, true);
 
 /* ═════════ A: el manifiesto lleva la marca de la instancia ═════════ */
 
@@ -277,27 +270,208 @@ ok(
 
 console.log("\n== D: en modo instalado no se insiste (FR-404, SC-008) ==");
 
-const instalada = await ctx.newPage();
-// `display-mode: standalone` es lo que ve una app abierta desde la pantalla de
-// inicio. Playwright no lo expone, pero Chromium sí por CDP.
-const cdp = await ctx.newCDPSession(instalada);
-await cdp.send("Emulation.setEmulatedMedia", {
-  features: [{ name: "display-mode", value: "standalone" }],
+/*
+ * Cómo se simula "abierta desde la pantalla de inicio", y por qué así.
+ *
+ * Chromium NO emula display-mode: standalone. Se intentó con
+ * Emulation.setEmulatedMedia y matchMedia sigue diciendo "browser" (comprobado
+ * midiéndolo). Con esa emulación que no emulaba, este escenario pasaba **por el
+ * motivo equivocado**: el aviso no salía porque el contexto ya lo tenía
+ * descartado del escenario C, no porque la app estuviera instalada.
+ *
+ * Se inyecta entonces navigator.standalone, que es la señal REAL de iOS y la
+ * que lee lib/platform. Y se comprueba en un contexto LIMPIO, con las dos
+ * mitades: sin la señal el aviso SÍ aparece, con ella no. Sin la primera, la
+ * segunda no prueba nada.
+ */
+const { ctx: ctxLimpio } = await contextoConSesion(browser, BASE, {
+  viewport: { width: 1400, height: 900 },
 });
-await instalada.goto(`${BASE}/inbox`, { waitUntil: "load" });
-await instalada.evaluate(() => {
-  const ev = new Event("beforeinstallprompt");
-  Object.assign(ev, {
-    prompt: async () => {},
-    userChoice: Promise.resolve({ outcome: "accepted" }),
+
+const dispararEvento = async (pagina) => {
+  await pagina.evaluate(() => {
+    const ev = new Event("beforeinstallprompt");
+    Object.assign(ev, {
+      prompt: async () => {},
+      userChoice: Promise.resolve({ outcome: "accepted" }),
+    });
+    window.dispatchEvent(ev);
   });
-  window.dispatchEvent(ev);
-});
-await sleep(600);
+  await sleep(500);
+};
+
+const comoNavegador = await ctxLimpio.newPage();
+await comoNavegador.goto(`${BASE}/inbox`, { waitUntil: "load" });
+await sleep(800);
+await dispararEvento(comoNavegador);
 ok(
-  "en modo instalado no sale el aviso, ni siquiera con evento de instalación",
-  (await instalada.locator("[data-testid=install-prompt]").count()) === 0
+  "MITAD 1: en este contexto limpio el aviso SÍ aparece",
+  (await comoNavegador.locator("[data-testid=install-prompt]").count()) === 1,
+  "si no aparece, la mitad 2 no probaría nada"
 );
+
+const comoInstalada = await ctxLimpio.newPage();
+await comoInstalada.addInitScript(() => {
+  Object.defineProperty(navigator, "standalone", { get: () => true });
+});
+await comoInstalada.goto(`${BASE}/inbox`, { waitUntil: "load" });
+await sleep(800);
+await dispararEvento(comoInstalada);
+ok(
+  "MITAD 2: corriendo instalada NO aparece, ni con evento de instalación",
+  (await comoInstalada.locator("[data-testid=install-prompt]").count()) === 0
+);
+
+console.log("\n== E: en iPhone se explica el camino del sistema (US2) ==");
+
+const { ctx: ctxIphone } = await contextoConSesion(browser, BASE, {
+  ...devices["iPhone 13"],
+});
+const iphone = await ctxIphone.newPage();
+await iphone.goto(`${BASE}/inbox`, { waitUntil: "load" });
+await sleep(1500);
+
+const avisoIphone = iphone.locator("[data-testid=install-prompt]");
+ok("en iPhone aparece el aviso", (await avisoIphone.count()) === 1);
+ok(
+  "y son INSTRUCCIONES, no un botón (iOS no ofrece el evento)",
+  (await avisoIphone.getAttribute("data-aviso")) === "instrucciones",
+  await avisoIphone.getAttribute("data-aviso")
+);
+ok(
+  "no hay botón de instalar que tocar",
+  (await iphone.locator("[data-testid=install-button]").count()) === 0
+);
+
+const textoIphone = (await avisoIphone.innerText()).replace(/\s+/g, " ");
+ok(
+  "dice QUÉ TOCAR: Compartir y Añadir a pantalla de inicio",
+  /Compartir/i.test(textoIphone) && /Añadir a pantalla de inicio/i.test(textoIphone),
+  textoIphone
+);
+ok(
+  "y dónde está ese botón, no solo su nombre",
+  /flecha/i.test(textoIphone) && /barra|abajo/i.test(textoIphone),
+  textoIphone
+);
+ok(
+  "no explica qué es una PWA ni usa jerga",
+  !/PWA|aplicaci[oó]n web|progresiva|service worker|manifiesto/i.test(textoIphone),
+  textoIphone
+);
+ok(
+  "no da por hecho que es la primera vez (FR-423)",
+  !/bienvenid|la primera vez|por primera vez|enhorabuena|felicidades/i.test(textoIphone),
+  textoIphone
+);
+
+/* ═════════ F: volver a entrar en la app instalada (US2) ═════════ */
+
+console.log("\n== F: el re-login de iOS no parece un fallo (US2) ==");
+
+// Sin sesión Y en modo instalado: es la pantalla exacta que ve quien abre la
+// app desde la pantalla de inicio tras el descarte de los ~7 días de iOS.
+const ctxSinSesion = await browser.newContext({ ...devices["iPhone 13"] });
+const sinSesion = await ctxSinSesion.newPage();
+// Misma señal real de iOS que en D: Chromium no emula display-mode.
+await sinSesion.addInitScript(() => {
+  Object.defineProperty(navigator, "standalone", { get: () => true });
+});
+await sinSesion.goto(`${BASE}/login`, { waitUntil: "load" });
+await sleep(1200);
+
+const nota = sinSesion.locator("[data-testid=sesion-instalada]");
+ok("en la app instalada y sin sesión, el login lo explica", (await nota.count()) === 1);
+
+const textoNota = (await nota.innerText()).replace(/\s+/g, " ");
+ok(
+  "dice que no se ha perdido nada",
+  /no se ha perdido|sigue todo|donde estaba/i.test(textoNota),
+  textoNota
+);
+ok(
+  "sirve la quinta vez igual que la primera (FR-423)",
+  !/bienvenid|la primera vez|por primera vez|acabas de instalar|enhorabuena/i.test(textoNota),
+  textoNota
+);
+ok(
+  "menciona las DOS causas: sesión aparte y borrado por inactividad",
+  /aparte|separad/i.test(textoNota) && /d[ií]as|inactiv|sin usarla/i.test(textoNota),
+  textoNota
+);
+
+// En el navegador normal esa nota NO aparece: ahí entrar es lo de siempre.
+const enNavegador = await ctxSinSesion.newPage();
+await enNavegador.goto(`${BASE}/login`, { waitUntil: "load" });
+await sleep(800);
+ok(
+  "en el navegador normal esa nota no sale (FR-424)",
+  (await enNavegador.locator("[data-testid=sesion-instalada]").count()) === 0
+);
+
+/* ═════════ G: el icono que no sirve para instalar (US3) ═════════ */
+
+console.log("\n== G: sin PNG grande, se instala igual y se dice qué falta (US3) ==");
+
+// Estado de partida: el de las tres instancias de la flota hoy — icono generado
+// en SVG, que no sirve para la pantalla de inicio.
+await req.delete(`${BASE}/api/settings/branding/favicon`);
+const manSinPng = await (await req.get(`${BASE}/api/branding/manifest`)).json();
+ok(
+  "sin PNG del negocio, el manifiesto trae los DOS iconos de fábrica",
+  manSinPng.icons.length === 2 &&
+    manSinPng.icons.every((i) => i.src.startsWith("/icon-")),
+  JSON.stringify(manSinPng.icons.map((i) => i.src))
+);
+ok(
+  "y aun así la app es instalable (192 y 512 declarados)",
+  manSinPng.icons.some((i) => i.sizes.includes("192x192")) &&
+    manSinPng.icons.some((i) => i.sizes.includes("512x512")),
+  JSON.stringify(manSinPng.icons.map((i) => i.sizes))
+);
+
+const ajustes = await ctx.newPage();
+await ajustes.goto(`${BASE}/settings/branding`, { waitUntil: "load" });
+await sleep(1200);
+const avisoIcono = ajustes.locator("[data-testid=icono-no-instalable]");
+ok("Ajustes → Marca avisa de que el icono no sirve", (await avisoIcono.count()) === 1);
+const textoIcono = (await avisoIcono.innerText()).replace(/\s+/g, " ");
+ok(
+  "y dice exactamente qué subir",
+  /PNG/.test(textoIcono) && /512/.test(textoIcono) && /cuadrad/i.test(textoIcono),
+  textoIcono
+);
+
+// Ahora se sube uno que SÍ sirve: el propio icono de fábrica de 512.
+const png512 = readFileSync("public/icon-512.png");
+const subida = await req.put(`${BASE}/api/settings/branding/favicon`, {
+  headers: { "content-type": "image/png" },
+  data: png512,
+});
+ok("se sube un PNG de 512×512", subida.ok(), `status=${subida.status()}`);
+
+const manConPng = await (await req.get(`${BASE}/api/branding/manifest`)).json();
+ok(
+  "el manifiesto pasa a traer UNA sola entrada, la del negocio",
+  manConPng.icons.length === 1 &&
+    manConPng.icons[0].src.includes("/api/branding/icon"),
+  JSON.stringify(manConPng.icons)
+);
+ok(
+  "declarada para las dos medidas (nada de mezclar logos)",
+  manConPng.icons[0].sizes === "192x192 512x512",
+  manConPng.icons[0].sizes
+);
+
+await ajustes.reload({ waitUntil: "load" });
+await sleep(1200);
+ok(
+  "y el aviso desaparece solo (FR-428)",
+  (await ajustes.locator("[data-testid=icono-no-instalable]").count()) === 0
+);
+
+// Se deja como estaba: el icono generado.
+await req.delete(`${BASE}/api/settings/branding/favicon`);
 
 await browser.close();
 

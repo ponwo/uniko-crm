@@ -22,6 +22,7 @@
  * el reloj probaría el reloj falso, no la detección.
  */
 import { chromium } from "playwright";
+import { contextoConSesion } from "./e2e-sesion.mjs";
 
 const BASE = process.env.APP_BASE_URL ?? "http://localhost:3000";
 const PN = "PN-SSE-1";
@@ -71,26 +72,17 @@ async function esperarSinAviso(page, timeoutMs) {
 }
 
 const browser = await chromium.launch();
-const ctx = await browser.newContext({ viewport: { width: 1400, height: 900 } });
+// Sesión compartida entre arneses: el login de la app limita intentos a
+// propósito, y ese límite no se afloja para que pasen las pruebas.
+const { ctx, reutilizada } = await contextoConSesion(browser, BASE, {
+  viewport: { width: 1400, height: 900 },
+});
 const req = ctx.request;
 
 /* ─────────────────── Setup ─────────────────── */
 
 console.log("== Setup: operador, WhatsApp conectado y una conversación ==");
-let r = await req.post(`${BASE}/api/auth/sign-up/email`, {
-  headers: { origin: BASE },
-  data: {
-    email: "e2e@uniko.test",
-    password: "password-e2e-123",
-    name: "Operador E2E",
-  },
-});
-if (!r.ok())
-  r = await req.post(`${BASE}/api/auth/sign-in/email`, {
-    headers: { origin: BASE },
-    data: { email: "e2e@uniko.test", password: "password-e2e-123" },
-  });
-ok("login del operador", r.ok());
+ok(`operador dentro (${reutilizada ? "sesión reutilizada" : "login nuevo"})`, true);
 
 await req.put(`${BASE}/api/settings/whatsapp`, {
   data: { wabaId: "WABA-SSE", phoneNumberId: PN, token: "tok-sse" },

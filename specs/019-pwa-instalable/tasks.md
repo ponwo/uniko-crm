@@ -231,20 +231,30 @@ iniciar sesión no parezca un fallo — ni la primera vez ni la quinta.
 no el botón; y con la app en modo instalado y sin sesión, el login muestra la
 explicación.
 
-- [ ] T024 [US2] En `src/components/pwa/install-prompt.tsx`, añadir el estado de
+- [x] T024 [US2] En `src/components/pwa/install-prompt.tsx`, añadir el estado de
       iOS: instrucciones con la secuencia real (Compartir → Añadir a pantalla de
       inicio), elegidas por `lib/platform` y no por ancho de pantalla (FR-403)
-- [ ] T025 [US2] Añadir la línea del re-login en la pantalla de login
+- [x] T025 [US2] Añadir la línea del re-login en la pantalla de login
       (`src/app/(auth)/login/…`), visible solo si corre instalada y sin sesión,
       con un componente de cliente mínimo para detectar el modo (FR-422, FR-424)
-- [ ] T026 [US2] Redactar ese texto para que sirva **la quinta vez igual que la
+- [x] T026 [US2] Redactar ese texto para que sirva **la quinta vez igual que la
       primera** (FR-423): explica que la app instalada tiene su propia sesión, sin
       "bienvenido", sin "la primera vez", y sin dar por hecho que acaba de
       instalar — porque la misma pantalla la ve quien vuelve tras una semana, por
       el descarte de los ~7 días de iOS
-- [ ] T027 [US2] Añadir a `scripts/e2e-pwa.mjs`: emulando iPhone salen las
+- [x] T027 [US2] Añadir a `scripts/e2e-pwa.mjs`: emulando iPhone salen las
       instrucciones y **no** el botón; y el texto del re-login aparece en modo
-      instalado sin sesión
+      instalado sin sesión. Se comprueba además que el texto dice qué tocar y
+      dónde, sin jerga, y que ninguno de los dos textos da por hecho que es la
+      primera vez
+
+      **Chromium no emula `display-mode: standalone`** (medido:
+      `Emulation.setEmulatedMedia` no cambia `matchMedia`). Con esa emulación
+      que no emulaba, el escenario "ya instalada" pasaba **por el motivo
+      equivocado**: el aviso no salía porque estaba descartado de antes. Ahora se
+      inyecta `navigator.standalone` —la señal real de iOS, la que lee
+      `lib/platform`— y se comprueba con las dos mitades: en el mismo contexto
+      limpio, sin la señal el aviso SÍ aparece.
 
 **Checkpoint**: US1 y US2 funcionan por separado.
 
@@ -259,15 +269,15 @@ sirva para instalar lo sepa y sepa qué hacer — con la app instalable igualmen
 se instala con el logo de fábrica y su pantalla de marca lo dice; subir un PNG de
 512 quita el aviso y cambia el icono sin reinstalar.
 
-- [ ] T028 [P] [US3] En `src/server/branding.ts`, derivar "¿el icono actual sirve
+- [x] T028 [P] [US3] En `src/server/branding.ts`, derivar "¿el icono actual sirve
       para instalar?" con `lib/png`, sin guardarlo (data-model: es derivado)
-- [ ] T029 [US3] Exponer ese dato en el GET de la marca que ya existe
+- [x] T029 [US3] Exponer ese dato en el GET de la marca que ya existe
       (`src/app/api/settings/branding/route.ts`)
-- [ ] T030 [US3] En `src/components/settings/branding-client.tsx`, mostrar el
+- [x] T030 [US3] En `src/components/settings/branding-client.tsx`, mostrar el
       aviso con la instrucción exacta —*sube un PNG cuadrado de 512×512 o más*—,
       que no bloquea nada y desaparece solo cuando el icono cumple (FR-427,
       FR-428)
-- [ ] T031 [US3] Añadir a `scripts/e2e-pwa.mjs`: sin icono raster el manifiesto
+- [x] T031 [US3] Añadir a `scripts/e2e-pwa.mjs`: sin icono raster el manifiesto
       trae los dos PNG de fábrica y el aviso está; subiendo un PNG de 512 el
       manifiesto pasa a traer una sola entrada, la del dueño, y el aviso
       desaparece (FR-425, FR-426, FR-429, SC-011)
@@ -278,13 +288,13 @@ se instala con el logo de fábrica y su pantalla de marca lo dice; subir un PNG 
 
 ## Phase 6: Polish, guion y nivel 3
 
-- [ ] T032 [P] Escribir el guion de la historia en `tests/e2e/us-pwa.md`, con los
+- [x] T032 [P] Escribir el guion de la historia en `tests/e2e/us-pwa.md`, con los
       tres niveles y el hueco para registrar las corridas en dispositivo, al
       estilo de `tests/e2e/us-reconexion-sse.md`
-- [ ] T033 [P] Actualizar `docs/desarrollo-local.md`: `pnpm test:e2e` encadena
+- [x] T033 [P] Actualizar `docs/desarrollo-local.md`: `pnpm test:e2e` encadena
       ahora **tres** guiones, y cómo levantar el túnel HTTPS para probar la
       instalación
-- [ ] T034 Gate técnico completo desde la ruta real:
+- [x] T034 Gate técnico completo desde la ruta real:
       `pnpm typecheck && pnpm lint && pnpm test && pnpm build`
 - [ ] T035 **Nivel 3, pasada 1 (túnel)**: instalar en un Android y en un iPhone
       reales contra la app local por HTTPS. Anotar en `tests/e2e/us-pwa.md`:

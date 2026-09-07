@@ -2,7 +2,7 @@
 
 import { useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { ImageUp, Trash2 } from "lucide-react";
+import { ImageUp, Smartphone, Trash2 } from "lucide-react";
 import type { Branding } from "@/lib/branding";
 import {
   faviconHref,
@@ -19,7 +19,18 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
  * con la inicial y el acento. Así queda claro que la instancia ya tiene uno y
  * que subir algo es reemplazarlo, no estrenarlo.
  */
-export function FaviconCard({ branding }: { branding: Branding }) {
+export function FaviconCard({
+  branding,
+  iconoInstalable,
+}: {
+  branding: Branding;
+  /**
+   * 019 — ¿el icono actual sirve para la app instalada? Lo calcula el servidor
+   * mirando los bytes (PNG, cuadrado, ≥512). Si no sirve, la app se instala
+   * igual: lleva el logo de Uniko hasta que el dueño suba uno que valga.
+   */
+  iconoInstalable: boolean;
+}) {
   const router = useRouter();
   const input = useRef<HTMLInputElement>(null);
   const [subiendo, setSubiendo] = useState(false);
@@ -138,6 +149,27 @@ export function FaviconCard({ branding }: { branding: Branding }) {
           PNG, SVG, ICO, JPEG o WebP, hasta{" "}
           {Math.round(MAX_FAVICON_BYTES / 1024)} KB. Cuadrado se ve mejor.
         </p>
+
+        {/*
+          019 — El icono de la pestaña y el de la app instalada no piden lo
+          mismo: la pantalla de inicio de un teléfono necesita PNG grande. Esto
+          NO es un error y no bloquea nada; la app se instala igual. Solo dice
+          qué falta para que lleve el logo del negocio en vez del de Uniko.
+        */}
+        {!iconoInstalable && (
+          <p
+            data-testid="icono-no-instalable"
+            className="flex items-start gap-2 rounded-md border border-[var(--border)] bg-[var(--bg-subtle)] px-3 py-2 text-xs leading-relaxed text-text-2"
+          >
+            <Smartphone aria-hidden className="mt-0.5 h-4 w-4 shrink-0" />
+            <span>
+              En un teléfono, la app instalada usará el logo de Uniko: el icono
+              actual no sirve para la pantalla de inicio.{" "}
+              <b>Sube un PNG cuadrado de 512×512 o más</b> y pasará a ser el
+              tuyo, sin reinstalar nada.
+            </span>
+          </p>
+        )}
 
         {error && <p className="text-sm text-destructive">{error}</p>}
       </CardContent>

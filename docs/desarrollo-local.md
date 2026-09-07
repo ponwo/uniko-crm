@@ -126,7 +126,7 @@ Conduce la app real por las superficies de usuario con los mocks encendidos, y
 sale distinto de cero si algo falla. Es lo que el Principio IX pide antes de
 declarar "Hecho" cualquier feature con comportamiento observable.
 
-Encadena dos guiones:
+Encadena tres guiones:
 
 - `scripts/e2e-selftest.mjs` — por HTTP, sin navegador. Lo más rápido y lo más
   ancho: ingesta, bot API, agenda, atribución, adjuntos.
@@ -134,8 +134,26 @@ Encadena dos guiones:
   lo que solo se ve mirando la pantalla: la muerte silenciosa del canal SSE, el
   aviso de conexión y el catch-up (feature 018). Tarda ~3 min a propósito: el
   margen de silencio son 60 s de reloj de verdad.
+- `scripts/e2e-pwa.mjs` — también con navegador: el manifiesto con la marca de
+  la instancia, el botón de instalar, las instrucciones de iOS, y la
+  comprobación de que el service worker **no** se pone delante del canal SSE
+  (feature 019).
 
 La primera vez, Chromium hay que bajarlo: `pnpm exec playwright install chromium`.
+
+**Los tres comparten sesión.** El login de la app limita los intentos —es su
+defensa contra fuerza bruta y no se toca—, así que `scripts/e2e-sesion.mjs`
+guarda la sesión en `.e2e-session.json` (gitignorado) y la reutiliza: una tanda
+entera gasta un login en vez de uno por guion. Si aun así ves un 429, espera un
+par de minutos; no aflojes el límite.
+
+### Probar la instalación en un teléfono
+
+Necesita HTTPS, y `localhost` no lo da. Levanta un túnel con certificado hacia el
+puerto 3000 y arranca la app con `APP_BASE_URL` puesto a la URL del túnel: el
+manifiesto y el registro del service worker tienen que salir del mismo origen que
+visita el teléfono. El guion completo está en
+[`tests/e2e/us-pwa.md`](../tests/e2e/us-pwa.md).
 
 ---
 
