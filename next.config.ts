@@ -21,6 +21,14 @@ const nextConfig: NextConfig = {
     NEXT_PUBLIC_APP_VERSION: version,
     NEXT_PUBLIC_BUILD_COMMIT: process.env.SOURCE_COMMIT ?? "",
   },
+  // El service worker DEBE servirse desde la raíz: su ámbito es la carpeta de
+  // la que sale, y necesita controlar toda la app. El handler no puede vivir en
+  // `src/app/sw.js/` — un segmento del App Router terminado en `.js` hace que
+  // Next crea que la petición es del Pages Router y devuelve 500 en TODA la
+  // aplicación. Así que el handler vive en `/api/sw` y la URL pública es esta.
+  async rewrites() {
+    return [{ source: "/sw.js", destination: "/api/sw" }];
+  },
 };
 
 export default nextConfig;

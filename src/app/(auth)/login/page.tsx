@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { SesionInstalada } from "@/components/pwa/sesion-instalada";
 
 export default function LoginPage() {
   const router = useRouter();
@@ -40,6 +41,8 @@ export default function LoginPage() {
         <CardTitle>Iniciar sesión</CardTitle>
       </CardHeader>
       <CardContent>
+        {/* Solo en la app instalada: dice por qué se pide entrar otra vez. */}
+        <SesionInstalada />
         <form onSubmit={onSubmit} className="space-y-4">
           <div className="space-y-1.5">
             <Label htmlFor="email">Correo</Label>

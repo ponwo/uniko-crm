@@ -19,8 +19,19 @@ depurarlo en el navegador. Eso es lo que desbloquea el trabajo de la 019.
 comporta. Un móvil no llega a tu `localhost`, y sin HTTPS no hay ni manifest
 instalable ni service worker. Para eso hacen falta:
 
-- un **túnel** con certificado (ngrok o equivalente), o
+- un **túnel** con certificado, o
 - una **instancia desplegada** — LanCo, que ya tiene HTTPS.
+
+**Resuelto el 2026-09-07 con `cloudflared`** (`winget install
+Cloudflare.cloudflared`, luego `cloudflared tunnel --url http://localhost:3000`).
+Da una URL `https://…trycloudflare.com` **sin cuenta, sin token y sin página
+intermedia**, que es lo que hace falta aquí: cualquier interstitial en el origen
+ensucia el registro del service worker. El `ngrok` que ya estaba instalado NO
+sirvió: su versión gratuita exige authtoken de una cuenta.
+
+Lo que no se puede olvidar al montarlo: **arrancar la app con `APP_BASE_URL`
+puesto a la URL del túnel**. Si se queda en `localhost`, el login desde el
+teléfono falla por origen y parece un fallo de la feature.
 
 ## Por qué importa tenerlo escrito
 

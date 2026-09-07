@@ -3,7 +3,11 @@ import { apiError, parseBody, withAuth } from "@/lib/api";
 import { getSessionOrNull } from "@/lib/auth/session";
 import { isValidHex, resolveAccentSet } from "@/lib/branding";
 import { CURRENCIES } from "@/lib/money";
-import { getBranding, saveBranding } from "@/server/branding";
+import {
+  getBranding,
+  iconoInstalableDelNegocio,
+  saveBranding,
+} from "@/server/branding";
 
 export const dynamic = "force-dynamic";
 
@@ -11,7 +15,19 @@ export const dynamic = "force-dynamic";
 export async function GET() {
   const session = await getSessionOrNull();
   const branding = await getBranding(session?.organizationId);
-  return Response.json({ branding, accentSet: resolveAccentSet(branding.accent) });
+  // 019 — ¿el icono actual sirve para la app instalada? Se DERIVA de los bytes
+  // del archivo (PNG, cuadrado, ≥512) en vez de guardarse: una copia guardada
+  // puede quedar desincronizada del archivo real.
+  const iconoInstalable =
+    (await iconoInstalableDelNegocio(
+      session?.organizationId ?? null,
+      branding
+    )) !== null;
+  return Response.json({
+    branding,
+    accentSet: resolveAccentSet(branding.accent),
+    iconoInstalable,
+  });
 }
 
 const putSchema = z.object({

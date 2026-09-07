@@ -22,6 +22,7 @@
  * el reloj probaría el reloj falso, no la detección.
  */
 import { chromium } from "playwright";
+import { contextoConSesion } from "./e2e-sesion.mjs";
 
 const BASE = process.env.APP_BASE_URL ?? "http://localhost:3000";
 const PN = "PN-SSE-1";
@@ -71,26 +72,17 @@ async function esperarSinAviso(page, timeoutMs) {
 }
 
 const browser = await chromium.launch();
-const ctx = await browser.newContext({ viewport: { width: 1400, height: 900 } });
+// Sesión compartida entre arneses: el login de la app limita intentos a
+// propósito, y ese límite no se afloja para que pasen las pruebas.
+const { ctx, reutilizada } = await contextoConSesion(browser, BASE, {
+  viewport: { width: 1400, height: 900 },
+});
 const req = ctx.request;
 
 /* ─────────────────── Setup ─────────────────── */
 
 console.log("== Setup: operador, WhatsApp conectado y una conversación ==");
-let r = await req.post(`${BASE}/api/auth/sign-up/email`, {
-  headers: { origin: BASE },
-  data: {
-    email: "e2e@uniko.test",
-    password: "password-e2e-123",
-    name: "Operador E2E",
-  },
-});
-if (!r.ok())
-  r = await req.post(`${BASE}/api/auth/sign-in/email`, {
-    headers: { origin: BASE },
-    data: { email: "e2e@uniko.test", password: "password-e2e-123" },
-  });
-ok("login del operador", r.ok());
+ok(`operador dentro (${reutilizada ? "sesión reutilizada" : "login nuevo"})`, true);
 
 await req.put(`${BASE}/api/settings/whatsapp`, {
   data: { wabaId: "WABA-SSE", phoneNumberId: PN, token: "tok-sse" },
@@ -195,6 +187,27 @@ await page.route("**/api/conversations?*", frenarCatchUp);
 montadaEn = Date.now();
 await page.goto(`${BASE}/inbox`, { waitUntil: "domcontentloaded" });
 await page.getByText(NOMBRE).first().waitFor({ timeout: 30000 });
+
+/*
+ * 019: esta corrida es TAMBIÉN la prueba de no regresión del service worker.
+ *
+ * Se afirma antes de nada que el service worker está registrado y controlando
+ * la página. Sin esta línea, la corrida seguiría en verde el día que el service
+ * worker deje de instalarse — y estaríamos declarando "la 018 sigue bien con el
+ * service worker delante" cuando en realidad no había ninguno delante. Es la
+ * misma lección de las dos suscripciones: media prueba da verde sin probar.
+ */
+const swControla = await page
+  .waitForFunction(() => navigator.serviceWorker?.controller != null, null, {
+    timeout: 30000,
+  })
+  .then(() => true)
+  .catch(() => false);
+ok(
+  "el service worker está activo durante esta corrida (no regresión de la 019)",
+  swControla,
+  "sin service worker, esta corrida no prueba la convivencia con la 018"
+);
 await page.getByText(NOMBRE).first().click();
 await page
   .getByText("hola, ¿siguen abiertos?")
