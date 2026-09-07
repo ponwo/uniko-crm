@@ -112,46 +112,59 @@ Tras el merge a `main`, en `https://uniko.lanco.cloud`. Es la que estrena y la
 
 ## Registro de corridas
 
-### Pasada 1, Android — 2026-09-07 ✅ VERDE
+### Pasada 1, Android — 2026-09-07 ✅ VERDE (con matices de registro)
 
-| Dato | Valor |
-|---|---|
-| Dónde | túnel HTTPS (cloudflared) contra la app local, marca por defecto |
-| ¿Apareció NUESTRO botón? | **Sí** — sin pasar por el menú de Chrome (SC-001) |
-| Instalación | correcta desde el botón |
-| Abierta desde la pantalla de inicio | sin barra de direcciones |
-| ¿Reincide el aviso dentro de la app? | no |
-| Versión de Android | *no registrada* |
-| ¿El logo de fábrica se ve bien? | **nítido**, sin recorte raro ni máscara mal aplicada |
+Túnel HTTPS (cloudflared) contra la app local, marca por defecto.
 
-**Sobre el icono**: el dueño lo describió primero como "algo pobre" y, al
-distinguir las causas, quedó claro que **no es un problema de render**: se ve
-claro y correcto. Lo que falta es que sea SU logo, que es exactamente el
-degradado que la spec define a propósito (FR-426). Se resuelve subiendo un PNG
-cuadrado de 512 o más, como dice el aviso de Ajustes → Marca.
+| Dato | Valor | Cómo se obtuvo |
+|---|---|---|
+| ¿Apareció NUESTRO botón? | **Sí**, sin pasar por el menú de Chrome (SC-001) | **respuesta explícita** |
+| ¿El logo de fábrica se ve bien? | **"se ve claro y bien"** | **respuesta explícita**, tras preguntar por las tres causas posibles |
+| Instalación desde el botón | correcta | cubierto por un *"todo funcionó bien"*, **no confirmado punto por punto** |
+| Sin barra de direcciones | correcto | ídem |
+| El aviso no reincide dentro de la app | correcto | ídem |
+| Icono y nombre sin recortes feos | correcto | ídem |
+| Versión de Android | **no registrada** | no se preguntó a tiempo / no se dio |
 
-**Consecuencia**: la opción de **rasterizar SVG en el servidor sigue
-descartada**. No hizo falta, que era justo lo que esta pasada tenía que
-averiguar antes de meter una dependencia de imagen en el runtime.
+**Sobre el icono, con precisión**: se describió primero como "algo pobre" y
+después, tras separar las tres causas posibles (máscara de Android sobre un
+icono no `maskable`, borrosidad, o simplemente que no es la marca del negocio),
+como **"se ve claro y bien"**. De ahí se concluye que **no es un problema de
+render**. Conviene decir que esa conclusión sale de la descripción del dueño y
+**no de una captura**: no llegó ninguna imagen del icono en la pantalla de
+inicio.
+
+Lo que falta es que sea SU logo, que es el degradado que la spec define a
+propósito (FR-426), y se resuelve subiendo un PNG cuadrado de 512 o más.
+
+**Consecuencia**: **rasterizar SVG en el servidor sigue descartado**. Era justo
+lo que esta pasada tenía que averiguar antes de meter una dependencia de imagen
+en el runtime.
 
 **Pendiente operativo, no de código**: cada instancia sube su PNG antes de que
 sus operadores instalen la app. Con el actual se instala igual, con el logo de
 Uniko.
 
-### Pasada 1, iOS — 2026-09-07 ✅ VERDE
+### Pasada 1, iOS — 2026-09-07 ✅ VERDE (registro global, sin desglose)
 
-| Dato | Valor |
-|---|---|
-| Dónde | mismo túnel HTTPS, en Safari |
-| ¿Instrucciones en vez de botón? | **Sí** |
-| ¿Se pudo instalar siguiéndolas, sin ayuda? | **Sí** |
-| ¿Pidió entrar de nuevo? | Sí — y el texto de la pantalla lo explicó bien |
-| Abierta desde la pantalla de inicio | sin barra de direcciones |
-| Versión de iOS | *no registrada* |
+Mismo túnel, en Safari.
 
-**Lectura**: las dos mitades de US2 se comportaron como se escribieron. Las
-instrucciones sirvieron para instalar sin saber qué es una PWA, y el re-login
-—que es del sistema y no tiene arreglo— se leyó como lo que es y no como un
-fallo. Era lo único que esos dos textos tenían que conseguir.
+| Dato | Valor | Cómo se obtuvo |
+|---|---|---|
+| Instrucciones en vez de botón | correcto | cubierto por un *"todo bien en iOS también"*, **sin desglose** |
+| Se pudo instalar siguiéndolas, sin ayuda | correcto | ídem |
+| Pidió entrar de nuevo y el texto se entendió | correcto | ídem |
+| Sin barra de direcciones | correcto | ídem |
+| Versión de iOS | **no registrada** | no se dio |
+
+**Honestidad sobre esta fila de verdes**: en iOS el dueño confirmó la pasada
+entera con una frase, no punto por punto. La feature quedó ejercida —instalar en
+iPhone requiere seguir las instrucciones, así que si no se entendieran no habría
+app instalada— pero **el desglose de cada criterio no está registrado**, y esto
+no debe leerse como si lo estuviera.
+
+Lo que sí se puede afirmar sin matices, porque es consecuencia necesaria de que
+la app quedara instalada: las instrucciones bastaron para llegar hasta el final
+sin ayuda.
 
 ### Pasada 2, LanCo — pendiente (tras el merge a `main`)
