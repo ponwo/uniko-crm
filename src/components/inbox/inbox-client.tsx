@@ -10,6 +10,7 @@ import { CHANNEL_LABEL, type Channel } from "@/lib/channels";
 import { ChannelBadge } from "@/components/channel-badge";
 import { useEvents } from "@/components/use-events";
 import { ConnectionStatus } from "@/components/inbox/connection-status";
+import { InstallPrompt } from "@/components/pwa/install-prompt";
 import { ConversationList } from "./conversation-list";
 import { MessageThread } from "./message-thread";
 import { Composer } from "./composer";
@@ -284,6 +285,11 @@ export function InboxClient({ channels }: { channels: readonly Channel[] }) {
           se dice antes que cualquier otra cosa, y da igual en qué columna esté
           mirando el operador. */}
       <ConnectionStatus status={eventsStatus} />
+
+      {/* Instalar la app se ofrece aquí porque es la pantalla que el operador
+          tiene abierta. Va DEBAJO del estado de conexión: si la bandeja puede
+          no estar al día, eso importa más que instalar nada. */}
+      <InstallPrompt />
 
       <div className="flex min-h-0 flex-1">
       {/* Móvil: una columna a la vez. La lista cede la pantalla completa al

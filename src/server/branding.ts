@@ -5,6 +5,9 @@ import {
   normalizeBranding,
   type Branding,
 } from "@/lib/branding";
+import { FAVICON_ASSET } from "@/lib/favicon";
+import { iconoSirveParaInstalar } from "@/lib/png";
+import { readMediaFile } from "@/server/whatsapp/media";
 
 /** Marca guardada en organization.metadata (JSON de Better Auth). */
 
@@ -56,6 +59,35 @@ export async function getBranding(
   organizationId?: string | null
 ): Promise<Branding> {
   return (await getBrandingContext(organizationId)).branding;
+}
+
+/**
+ * El icono subido por el negocio, si existe y **sirve para instalar**.
+ *
+ * Devuelve los bytes para que quien pregunte no tenga que leerlos otra vez: la
+ * ruta del icono los necesita para servirlos, y el manifiesto solo necesita
+ * saber que están. Leer el archivo dos veces por petición sería tonto.
+ *
+ * Que "sirva" es exacto y se decide con los bytes (`lib/png`): PNG, cuadrado, y
+ * 512 px o más. Si el volumen de medios no está montado —el gotcha clásico de
+ * esta flota— esto devuelve `null` y todo cae al icono de fábrica, que vive en
+ * la imagen. Es una degradación mejor que la de hoy, no peor.
+ */
+export async function iconoInstalableDelNegocio(
+  organizationId: string | null,
+  branding: Branding
+): Promise<Buffer | null> {
+  if (!organizationId || !branding.favicon) return null;
+  if (branding.favicon.mime !== "image/png") return null;
+  try {
+    const buf = await readMediaFile(organizationId, FAVICON_ASSET);
+    return iconoSirveParaInstalar(branding.favicon.mime, new Uint8Array(buf))
+      ? buf
+      : null;
+  } catch {
+    // El archivo se perdió (volumen sin montar, restauración a medias).
+    return null;
+  }
 }
 
 export async function saveBranding(
