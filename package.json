@@ -7,18 +7,19 @@
   "private": true,
   "packageManager": "pnpm@11.5.0",
   "engines": {
-    "node": ">=20"
+    "node": "22.x"
   },
   "scripts": {
     "predev": "node scripts/check-real-path.mjs",
     "dev": "next dev",
+    "db:dev": "node scripts/dev-db.mjs",
     "prebuild": "node scripts/check-real-path.mjs",
     "build": "next build",
     "start": "next start",
     "lint": "eslint .",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
-    "test:e2e": "node --env-file=.env scripts/e2e-selftest.mjs",
+    "test:e2e": "node --env-file=.env scripts/e2e-selftest.mjs && node --env-file=.env scripts/e2e-sse-reconexion.mjs",
     "test:watch": "vitest",
     "db:generate": "drizzle-kit generate",
     "db:migrate": "drizzle-kit migrate",

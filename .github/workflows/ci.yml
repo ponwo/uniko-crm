@@ -70,9 +70,12 @@ jobs:
       # aquí: duplicarla es tenerla desactualizada en uno de los dos lados.
       - uses: pnpm/action-setup@v6
 
+      # La versión sale de `.nvmrc`, no escrita aquí: es el mismo truco que con
+      # pnpm. Un número repetido en dos sitios acaba desactualizado en uno de
+      # los dos, y entonces la CI prueba con un Node que nadie usa.
       - uses: actions/setup-node@v7
         with:
-          node-version: 22
+          node-version-file: .nvmrc
           cache: pnpm
 
       # `--frozen-lockfile` falla si el lockfile no cuadra con package.json,

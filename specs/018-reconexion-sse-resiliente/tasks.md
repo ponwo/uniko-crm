@@ -111,9 +111,11 @@ apoyarse.
 ### Poder probarlo en escritorio
 
 - [x] T015 [P] [US1] Simulador de muerte silenciosa en `src/app/api/dev/sse-mudo/route.ts`: stream SSE válido que deja de escribir sin cerrarse, tras el gate existente `src/lib/dev-guard.ts` (404 incondicional en producción) — con tests en `tests/unit/sse-mudo.test.ts` que fijan que **no** cierra el stream
-- [ ] T016 [US1] **DIFERIDA A LA FASE 4 y luego BLOQUEADA con T021 — ver quickstart.md.** Extender `scripts/e2e-selftest.mjs` con el camino completo: conectado → enmudece → se detecta → reconecta → catch-up → los mensajes del hueco están y no hay duplicados (FR-308)
+- [x] T016 [US1] Arnés del camino completo en `scripts/e2e-sse-reconexion.mjs` (escenario A), encadenado en `pnpm test:e2e`: conectado → enmudece → se detecta → reconecta → catch-up → los mensajes del hueco están y no hay duplicados (FR-308)
 
-  **Por qué se mueve**: su enunciado incluye "se detecta" en el sentido de *que el usuario lo ve*, y el aviso no existe hasta US2 (T017-T020). Escrita en la Fase 3 solo podría comprobar media cosa, y habría que volver a tocarla. Es un defecto de secuenciación de esta lista, detectado al implementar. Se ejecuta junto a T021, que ya vive en la Fase 4 y cubre el mismo camino.
+  **Por qué se movió**: su enunciado incluye "se detecta" en el sentido de *que el usuario lo ve*, y el aviso no existe hasta US2 (T017-T020). Escrita en la Fase 3 solo podría comprobar media cosa. Se ejecutó junto a T021, que ya vivía en la Fase 4 y cubre el mismo camino.
+
+  **Por qué en un guion aparte y no dentro de `e2e-selftest.mjs`**: lo que hay que mirar no es una respuesta HTTP sino lo que el operador VE mientras la conexión miente, y eso pide navegador —igual que `e2e-send-failure.mjs` o `e2e-responsive.mjs`—. `pnpm test:e2e` corre los dos, así que el arnés sigue siendo un solo comando. Desbloqueada el 2026-09-07 al montar el entorno local (`docs/desarrollo-local.md`).
 
 **Checkpoint**: la bandeja ya se recupera sola. Todavía no lo cuenta — eso es US2.
 
@@ -133,7 +135,9 @@ ser silencioso. Va después porque necesita el estado que expone T014.
 - [x] T018 [US2] Montarlo en `src/components/inbox/inbox-client.tsx` consumiendo el estado del hook (T014)
 - [x] T019 [US2] Retardar la aparición del aviso lo justo para que una reconexión limpia no produzca parpadeo (FR-312), en `src/components/inbox/connection-status.tsx`
 - [x] T020 [US2] Atar la desaparición del aviso al **fin del catch-up** y no a la reconexión (FR-311), en `src/components/inbox/inbox-client.tsx`
-- [ ] T021 [P] [US2] **BLOQUEADA — ver quickstart.md.** No hay entorno no-producción donde correr el arnés: la máquina de desarrollo no levanta la app y en LanCo el simulador da 404 por diseño constitucional. Deuda de infraestructura, no de la feature. Añadir al arnés de `scripts/e2e-selftest.mjs`: el aviso aparece durante la caída, no parpadea en una reconexión rápida, y se retira solo tras el refresco
+- [x] T021 [P] [US2] En `scripts/e2e-sse-reconexion.mjs`: el aviso aparece durante la caída (escenarios A y C), no parpadea en una reconexión limpia de ~200 ms (escenario B, FR-312), y se retira solo cuando el refresco TERMINA, no al reconectar (escenario A, FR-311)
+
+  **Estaba bloqueada** por falta de entorno no-producción: la máquina de desarrollo no levantaba la app, y en LanCo el simulador da 404 por diseño constitucional —y así se queda—. Se desbloqueó montando el entorno local (Node 22 + PostgreSQL 16 + `.env` con mocks), no aflojando el gate. Corrida verde el 2026-09-07: 25/25 checks.
 
 **Checkpoint**: el fallo silencioso deja de ser silencioso.
 

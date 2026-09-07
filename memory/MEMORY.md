@@ -16,3 +16,4 @@ Vacío al inicio; se irá poblando.
 
 - [Build rojo desde la unidad G:](build-rojo-desde-la-unidad-g.md) — entorno de la máquina de desarrollo: G: es un subst de C:\G; entra por la ruta real. No es Windows ni el código.
 - [Android sin vista móvil: era el navegador](android-sin-vista-movil.md) — RESUELTO: Chrome tenía "Versión para ordenador" activada. Descarta eso antes de diagnosticar cualquier problema de renderizado móvil.
+- [Probar la PWA en móvil necesita HTTPS](pwa-en-movil-necesita-https.md) — localhost desbloquea desarrollar el service worker de la 019, no probarlo instalado. Anotado antes de empezar.
