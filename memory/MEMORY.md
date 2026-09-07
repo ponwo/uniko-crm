@@ -15,4 +15,4 @@ Vacío al inicio; se irá poblando.
 -->
 
 - [Build rojo desde la unidad G:](build-rojo-desde-la-unidad-g.md) — entorno de la máquina de desarrollo: G: es un subst de C:\G; entra por la ruta real. No es Windows ni el código.
-- [Android sin vista móvil](android-sin-vista-movil.md) — escritorio encogido en Chrome/Android; NO es el meta viewport, que sí está. Sin diagnosticar y bloquea de facto a la 019.
+- [Android sin vista móvil: era el navegador](android-sin-vista-movil.md) — RESUELTO: Chrome tenía "Versión para ordenador" activada. Descarta eso antes de diagnosticar cualquier problema de renderizado móvil.
