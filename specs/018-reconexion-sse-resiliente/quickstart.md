@@ -110,11 +110,16 @@ navegador sí avisó del cierre, se ejerció el camino que ya funcionaba antes y
 corrida no dice nada: repite alargando el tiempo en segundo plano, o **anótalo
 como "no reproducido"**. Un verde sin fallo reproducido es ruido.
 
-### Android — comprobar que no se rompió nada
+### Android — reproducir el fallo, igual que en iOS
 
-El fallo silencioso no está reportado en Android y Chrome normalmente sí avisa
-del cierre. **No fuerces la narrativa**: si no se reproduce, es lo esperado y así
-se registra. Lo que hay que ver:
+*(Corregido 2026-09-07: aquí decía que el fallo "no está reportado en Android" y
+que la plataforma era solo criterio de no regresión. La corrida real lo desmintió
+—se reprodujo igual que en iOS—, y aquella afirmación no venía de ninguna fuente:
+era una deducción nuestra a partir de que el reporte de iOS 18 hablaba de iOS.)*
+
+Mismo procedimiento y mismo criterio que en iOS, incluido que **una corrida en la
+que el fallo no se reproduzca no cuenta**. Además, lo específico de esta
+plataforma:
 
 - el ciclo normal (segundo plano → mensaje → volver) deja la vista al día,
   **incluido el contador de no leídos** de la barra de navegación;

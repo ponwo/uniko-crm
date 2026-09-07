@@ -45,10 +45,13 @@ camino que ya funcionaba antes. Repetir alargando el tiempo en segundo plano, o
 registrarlo explícitamente como "no reproducido". Un verde sin fallo reproducido
 es ruido.
 
-### Android — comprobar no regresión
+### Android — reproducir el fallo, igual que en iOS
 
-El fallo silencioso **no está reportado** en Android. Si no se reproduce, es lo
-esperado: **no fuerces la narrativa**.
+*(Corregido 2026-09-07 con la corrida real: aquí decía que el fallo no estaba
+reportado en Android y que bastaba comprobar no regresión. Se reprodujo.)*
+
+Mismo criterio que en iOS: una corrida en la que el fallo **no** se reproduzca no
+cuenta como verificación. Además, lo propio de esta plataforma:
 
 - [ ] El ciclo normal (segundo plano → mensaje → volver) deja la vista al día.
 - [ ] El **contador de no leídos** de la barra coincide con la bandeja.
@@ -77,15 +80,27 @@ reproducido" y no contaría (SC-009).
 
 El fallo silencioso de iOS se reprodujo y la feature lo resolvió.
 
-### Android — pendiente
-
-Criterio de **no regresión**, no de reproducción. Ver la lista de arriba.
+### Android — 2026-09-07 ✅ VERDE, **y el fallo también se reprodujo**
 
 | Dato | Valor |
 |---|---|
-| Fecha | |
-| Commit desplegado en LanCo | |
-| ¿Ciclo normal deja la vista al día? | |
-| ¿Contador de no leídos coincide? | |
-| ¿Avisos espurios o parpadeo? | |
-| Versión de Android | |
+| Fecha | 2026-09-07 |
+| Commit desplegado en LanCo | `3838181` |
+| **¿Fallo reproducido?** | **Sí** — no se esperaba |
+| Tiempo en segundo plano | unos minutos |
+| Versión de Android | *no registrada* |
+| Qué entró durante el hueco | un mensaje de WhatsApp real, al número conectado de LanCo |
+| Qué se vio al volver | primero el aviso de **reconectando**, después el mensaje en la bandeja |
+
+**Esto contradice lo que habíamos escrito.** La spec asumía que Chrome en
+Android normalmente sí notifica el cierre, y por eso esta plataforma se planteó
+como criterio de *no regresión* y no de reproducción. En la práctica se comportó
+igual que iOS: la conexión murió en silencio y hubo que detectarla.
+
+La suposición era nuestra, no de una fuente. El reporte de iOS 18 documentaba
+iOS, y de ahí dedujimos —sin comprobarlo— que Android estaba a salvo. Corregido
+en la spec.
+
+**Consecuencia buena**: la feature sirve para más plataformas de las que
+creíamos. Vigilar el silencio protege en las dos, y eso refuerza la decisión de
+no apoyarse en `error` ni en `readyState` en ninguna.

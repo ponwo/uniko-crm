@@ -263,12 +263,26 @@ La definición de "Hecho" de esta feature **no puede ser un test en
    reproducido" en vez de darlo por bueno. Un verde sin fallo reproducido es
    ruido.
 
-   **Android — comprobar que no se rompió nada.** El fallo silencioso **no está
-   reportado en Android**, y Chrome normalmente sí notifica el cierre al
-   reanudar, así que la reconexión de `EventSource` probablemente ya funcionaba
-   ahí. No se espera reproducir nada, y **no hay que forzar la narrativa**: si
-   no se reproduce, eso es lo esperado y así se registra. El criterio es otro,
-   de no regresión:
+   **Android — el fallo TAMBIÉN se reproduce.** *(Corregido 2026-09-07 con la
+   corrida real; ver `tests/e2e/us-reconexion-sse.md`.)*
+
+   Aquí decía que el fallo silencioso "no está reportado en Android" y que
+   Chrome "normalmente sí notifica el cierre", así que esta plataforma era solo
+   criterio de no regresión. **Era falso**, y conviene dejar dicho de qué tipo
+   de error se trató: no venía de ninguna fuente. El reporte de iOS 18
+   documentaba iOS, y de ahí dedujimos —sin comprobarlo— que Android estaba a
+   salvo. Una ausencia de reportes se leyó como evidencia de ausencia.
+
+   En la corrida real, Android se comportó igual que iOS: la conexión murió en
+   silencio durante la suspensión y hubo que detectarla. Así que el nivel 3 en
+   Android es, como en iOS, **reproducir el fallo**, y aplica el mismo criterio:
+   una corrida en la que no se reproduzca no cuenta como verificación.
+
+   Esto es una buena noticia y refuerza el diseño: vigilar el silencio protege
+   en las dos plataformas, y confirma que no había que apoyarse en `error` ni en
+   `readyState` en ninguna.
+
+   Se comprueba además, en las dos:
    - el ciclo normal (segundo plano, mensaje entrante, volver) sigue poniendo la
      vista al día, ahora también en el contador de no leídos;
    - la vigilancia nueva **no** provoca reconexiones espurias ni parpadeo del
