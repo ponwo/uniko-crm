@@ -296,7 +296,7 @@ se instala con el logo de fábrica y su pantalla de marca lo dice; subir un PNG 
       instalación
 - [x] T034 Gate técnico completo desde la ruta real:
       `pnpm typecheck && pnpm lint && pnpm test && pnpm build`
-- [ ] T035 **Nivel 3, pasada 1 (túnel)**: instalar en un Android y en un iPhone
+- [x] T035 **Nivel 3, pasada 1 (túnel)** — VERDE en Android e iOS el 2026-09-07: instalar en un Android y en un iPhone
       reales contra la app local por HTTPS. Anotar en `tests/e2e/us-pwa.md`:
       versión del sistema, botón/instrucciones, icono y nombre, si abrió sin barra
       de direcciones, el recorte del `short_name`, y si el logo de fábrica se ve

@@ -66,26 +66,26 @@ No toca ninguna instancia de clientes.
 
 #### Android
 
-- [ ] Se abre la bandeja y aparece el **botón** de instalar dentro de la app (no
+- [x] Se abre la bandeja y aparece el **botón** de instalar dentro de la app (no
       hace falta el menú del navegador).
-- [ ] Al pulsarlo sale el diálogo del sistema y la app queda en la pantalla de
+- [x] Al pulsarlo sale el diálogo del sistema y la app queda en la pantalla de
       inicio.
-- [ ] El icono es el esperado y el nombre debajo **no se corta de forma fea**.
-- [ ] Abierta desde la pantalla de inicio, **no hay barra de direcciones**.
-- [ ] El aviso ya no vuelve a salir dentro de la app instalada.
+- [x] El icono es el esperado y el nombre debajo **no se corta de forma fea**.
+- [x] Abierta desde la pantalla de inicio, **no hay barra de direcciones**.
+- [x] El aviso ya no vuelve a salir dentro de la app instalada.
 
 #### iOS
 
-- [ ] Aparecen las **instrucciones**, no un botón.
-- [ ] Siguiendo lo que dicen —Compartir → Añadir a pantalla de inicio— la app
+- [x] Aparecen las **instrucciones**, no un botón.
+- [x] Siguiendo lo que dicen —Compartir → Añadir a pantalla de inicio— la app
       queda instalada, sin ayuda de nadie.
-- [ ] Al abrirla pide **iniciar sesión otra vez**, y el texto de esa pantalla se
+- [x] Al abrirla pide **iniciar sesión otra vez**, y el texto de esa pantalla se
       entiende sin sentirlo como un fallo.
-- [ ] Abierta desde la pantalla de inicio, no hay barra de direcciones.
+- [x] Abierta desde la pantalla de inicio, no hay barra de direcciones.
 
 #### Lo que hay que mirar con calma
 
-- [ ] ¿El logo de fábrica (el de Uniko) se ve **deliberado o pobre** en una
+- [x] ¿El logo de fábrica (el de Uniko) se ve **deliberado o pobre** en una
       instancia sin PNG propio? De esta respuesta depende si algún día hay que
       rasterizar en el servidor.
 
@@ -112,4 +112,46 @@ Tras el merge a `main`, en `https://uniko.lanco.cloud`. Es la que estrena y la
 
 ## Registro de corridas
 
-*(Pendiente: nivel 3. Lo ejecuta el dueño.)*
+### Pasada 1, Android — 2026-09-07 ✅ VERDE
+
+| Dato | Valor |
+|---|---|
+| Dónde | túnel HTTPS (cloudflared) contra la app local, marca por defecto |
+| ¿Apareció NUESTRO botón? | **Sí** — sin pasar por el menú de Chrome (SC-001) |
+| Instalación | correcta desde el botón |
+| Abierta desde la pantalla de inicio | sin barra de direcciones |
+| ¿Reincide el aviso dentro de la app? | no |
+| Versión de Android | *no registrada* |
+| ¿El logo de fábrica se ve bien? | **nítido**, sin recorte raro ni máscara mal aplicada |
+
+**Sobre el icono**: el dueño lo describió primero como "algo pobre" y, al
+distinguir las causas, quedó claro que **no es un problema de render**: se ve
+claro y correcto. Lo que falta es que sea SU logo, que es exactamente el
+degradado que la spec define a propósito (FR-426). Se resuelve subiendo un PNG
+cuadrado de 512 o más, como dice el aviso de Ajustes → Marca.
+
+**Consecuencia**: la opción de **rasterizar SVG en el servidor sigue
+descartada**. No hizo falta, que era justo lo que esta pasada tenía que
+averiguar antes de meter una dependencia de imagen en el runtime.
+
+**Pendiente operativo, no de código**: cada instancia sube su PNG antes de que
+sus operadores instalen la app. Con el actual se instala igual, con el logo de
+Uniko.
+
+### Pasada 1, iOS — 2026-09-07 ✅ VERDE
+
+| Dato | Valor |
+|---|---|
+| Dónde | mismo túnel HTTPS, en Safari |
+| ¿Instrucciones en vez de botón? | **Sí** |
+| ¿Se pudo instalar siguiéndolas, sin ayuda? | **Sí** |
+| ¿Pidió entrar de nuevo? | Sí — y el texto de la pantalla lo explicó bien |
+| Abierta desde la pantalla de inicio | sin barra de direcciones |
+| Versión de iOS | *no registrada* |
+
+**Lectura**: las dos mitades de US2 se comportaron como se escribieron. Las
+instrucciones sirvieron para instalar sin saber qué es una PWA, y el re-login
+—que es del sistema y no tiene arreglo— se leyó como lo que es y no como un
+fallo. Era lo único que esos dos textos tenían que conseguir.
+
+### Pasada 2, LanCo — pendiente (tras el merge a `main`)
