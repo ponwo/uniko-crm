@@ -126,6 +126,17 @@ Conduce la app real por las superficies de usuario con los mocks encendidos, y
 sale distinto de cero si algo falla. Es lo que el Principio IX pide antes de
 declarar "Hecho" cualquier feature con comportamiento observable.
 
+Encadena dos guiones:
+
+- `scripts/e2e-selftest.mjs` — por HTTP, sin navegador. Lo más rápido y lo más
+  ancho: ingesta, bot API, agenda, atribución, adjuntos.
+- `scripts/e2e-sse-reconexion.mjs` — con navegador (Playwright + Chromium), para
+  lo que solo se ve mirando la pantalla: la muerte silenciosa del canal SSE, el
+  aviso de conexión y el catch-up (feature 018). Tarda ~3 min a propósito: el
+  margen de silencio son 60 s de reloj de verdad.
+
+La primera vez, Chromium hay que bajarlo: `pnpm exec playwright install chromium`.
+
 ---
 
 ## Si algo falla

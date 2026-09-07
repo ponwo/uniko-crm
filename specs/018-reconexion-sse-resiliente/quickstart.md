@@ -28,38 +28,21 @@ No necesita servidor ni navegador: es la parte determinista.
 
 ## Nivel 2 — Escritorio, con muerte silenciosa simulada
 
-> ### ⚠️ BLOQUEADO: hoy no hay dónde correrlo
+> ### ✅ DESBLOQUEADO (2026-09-07)
 >
-> Este nivel necesita la app levantada **fuera de producción**, y ahora mismo no
-> existe ese entorno en ningún sitio:
+> Estuvo bloqueado por no tener dónde correrlo: la máquina de desarrollo no
+> levantaba la app, y en LanCo el simulador da **404 por diseño** —el gate
+> `isMockEnabled()` exige `WA_MOCK_ENABLED=true` **y**
+> `NODE_ENV !== "production"`, y aflojarlo sería abrir una superficie de
+> desarrollo en una instancia con datos reales (Restricciones de Plataforma y
+> Seguridad). **Eso no se tocó y no se toca.**
 >
-> - **En la máquina de desarrollo**, la app no arranca: no hay `.env`, no hay
->   PostgreSQL escuchando en 5432 y no hay Docker ni WSL instalados para
->   levantarlo. (Comprobado 2026-09-06.)
-> - **En LanCo, NO se puede**, y no es cuestión de poner una variable. El gate
->   `isMockEnabled()` exige `WA_MOCK_ENABLED=true` **y**
->   `NODE_ENV !== "production"`. LanCo corre el build standalone de producción,
->   así que `/api/dev/sse-mudo` devuelve **404 ahí pase lo que pase**.
->
->   Y así debe quedarse: "las rutas de mock/desarrollo devuelven 404
->   incondicional en producción" es una regla dura de la constitución
->   (Restricciones de Plataforma y Seguridad). Aflojar ese gate para poder
->   probar sería abrir una superficie de desarrollo en una instancia con datos
->   reales — y LanCo ya tiene número de WhatsApp conectado. **No se hace.**
->
-> **Consecuencia para esta feature**: la verificación determinista de la muerte
-> silenciosa se cubre hoy con los tests unitarios (`sse-watchdog.test.ts`,
-> `sse-mudo.test.ts`, `connection-status.test.ts`), y el camino de navegador
-> queda pendiente. El nivel 3 en dispositivo real **no lo sustituye pero sí lo
-> compensa**: prueba lo mismo con la causa real en vez de simulada.
->
-> **Esto no es deuda de esta feature, es de infraestructura**: falta un entorno
-> donde la app arranque fuera de producción. Se ataca aparte. Anotarlo aquí
-> porque la **019 (PWA) lo va a sufrir más**: un service worker no se puede
-> probar de ninguna forma sin navegador contra una app viva.
+> Lo que se hizo fue montar el entorno que faltaba: Node 22 + PostgreSQL 16 +
+> `.env` local con los mocks — [`docs/desarrollo-local.md`](../../docs/desarrollo-local.md).
+> Era deuda de infraestructura, no de esta feature, y la 019 (PWA) la habría
+> sufrido igual.
 
-Cuando exista ese entorno, esto es lo que hay que correr. Levanta la app con los
-mocks:
+Levanta la app con los mocks:
 
 ```bash
 WA_MOCK_ENABLED=true pnpm dev
@@ -70,6 +53,9 @@ y en otra terminal:
 ```bash
 pnpm test:e2e
 ```
+
+`pnpm test:e2e` encadena el arnés HTTP (`e2e-selftest.mjs`) y el de navegador
+(`e2e-sse-reconexion.mjs`), que es el que cubre esta historia.
 
 El guion usa el **simulador** (`src/app/api/dev/…`, tras `src/lib/dev-guard.ts`)
 que abre un stream SSE válido y **deja de escribir sin cerrarlo** — el síntoma
@@ -83,8 +69,29 @@ exacto que produce iOS. Camino que debe quedar verde:
 5. hace el catch-up y **el aviso desaparece solo entonces**, no antes;
 6. los mensajes que entraron durante el hueco están, sin duplicados.
 
-Camino infeliz a cubrir también: sin red, aparece *sin conexión*, no se reintenta
-en bucle apretado, y se recupera al volver la red.
+Camino infeliz cubierto también: sin red se avisa, no se reintenta en bucle
+apretado, y se recupera al volver la red.
+
+### Lo que se aprendió al automatizarlo
+
+Tres cosas que no estaban escritas y que cambian cómo se lee un verde aquí:
+
+1. **Hay que enmudecer TODAS las conexiones del arranque, no "la primera".** En
+   desarrollo React monta el efecto dos veces y la pantalla tiene dos
+   suscripciones vivas (la bandeja y el contador de la barra). Enmudeciendo una
+   sola, la conexión viva era la sana y el arnés pasaba por el camino bueno
+   creyendo que probaba el malo.
+2. **El aviso hay que darle tiempo a existir.** Sale con 2 s de retardo a
+   propósito (FR-312) y en `localhost` reconectar + refrescar tarda ~1 s: la
+   recuperación entera cabe dentro del retardo y no hay nada que ver. El arnés
+   frena el REFRESCO durante una ventana —no el reloj del vigilante— para poder
+   mirar el orden. En un teléfono con red móvil, que es donde se reportó el
+   fallo, ese refresco tarda de sobra.
+3. **"Sin conexión" no es lo que se ve al quedarse sin red con la pestaña
+   delante.** El navegador sigue reintentando por su cuenta (`readyState`
+   CONNECTING), así que el vigilante dice *Reconectando…* y deja que reintente
+   —que es lo correcto: no duplicar reconexiones—. *Sin conexión* queda para la
+   pestaña oculta. El aviso sale igual y el operador se entera igual.
 
 > El simulador responde **404 en producción**, incondicionalmente. Es el gate que
 > ya existe; no se añade otro.

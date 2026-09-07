@@ -1,27 +1,47 @@
 # E2E — 018: reconexión resiliente del SSE
 
-Guion de la historia. Los niveles 1 y 2 están (o estarán) automatizados en
-`scripts/e2e-selftest.mjs`; el nivel 3 es manual y **obligatorio** por el
-Principio IX: el fallo no se reproduce en `localhost`.
+Guion de la historia. El nivel 1 son los tests unitarios; el nivel 2 está
+automatizado en `scripts/e2e-sse-reconexion.mjs` (navegador real, encadenado en
+`pnpm test:e2e`); el nivel 3 es manual y **obligatorio** por el Principio IX: el
+fallo no se reproduce en `localhost`.
 
 > Trabaja desde `C:\G\gApps\LanCo\Uniko-CRM`, no desde el alias `G:\`.
 
-## Nivel 2 — escritorio, con muerte silenciosa simulada
+## Nivel 2 — escritorio, con muerte silenciosa simulada ✅ AUTOMATIZADO
 
 Con la app viva y los mocks encendidos, `pnpm test:e2e` conduce esto contra la
 app real usando el simulador (`/api/dev/sse-mudo`, tras `dev-guard`, 404 en
-producción).
+producción). Sale distinto de cero si algo falla.
 
-- [ ] La bandeja arranca conectada y sin aviso.
-- [ ] El stream enmudece **sin cerrarse**: no llega `error` y `readyState` sigue
-      en OPEN.
-- [ ] Pasado el margen de silencio, la app lo detecta y **muestra el aviso**.
-- [ ] Reconecta sola.
-- [ ] Hace el catch-up y el aviso **desaparece solo entonces**, no al reconectar.
-- [ ] Los mensajes que entraron durante el hueco están, **sin duplicados**.
-- [ ] Camino infeliz: sin red aparece *sin conexión*, no se reintenta en bucle
-      apretado, y se recupera al volver la red.
-- [ ] Una reconexión limpia y rápida **no** produce parpadeo del aviso.
+- [x] La bandeja arranca conectada y sin aviso.
+- [x] El stream enmudece **sin cerrarse**: no llega `error` y `readyState` sigue
+      en OPEN — se comprueba por sus consecuencias: el navegador no reconecta por
+      su cuenta y el mensaje del hueco no aparece.
+- [x] Pasado el margen de silencio, la app lo detecta y **muestra el aviso**.
+- [x] Reconecta sola.
+- [x] Hace el catch-up y el aviso **desaparece solo entonces**, no al reconectar.
+- [x] Los mensajes que entraron durante el hueco están, **sin duplicados** (en
+      pantalla y en la base).
+- [x] Camino infeliz: sin red se avisa, no se reintenta en bucle apretado, y se
+      recupera al volver la red trayendo lo del hueco.
+- [x] Una reconexión limpia y rápida (~200 ms) **no** produce parpadeo del aviso.
+
+> Matiz encontrado al automatizarlo: sin red y con la pestaña delante el aviso
+> dice *Reconectando…*, no *Sin conexión*. El navegador sigue reintentando solo
+> (`readyState` CONNECTING) y el vigilante lo deja —no duplicar reconexiones es
+> deliberado (research R4)—. *Sin conexión* corresponde a la pestaña oculta. El
+> operador se entera igual, que es lo que la historia pedía.
+
+### Corrida — 2026-09-07 ✅ VERDE (25/25)
+
+| Dato | Valor |
+|---|---|
+| Dónde | máquina de desarrollo, `localhost:3000` con `WA_MOCK_ENABLED=true` |
+| Commit | rama `infra/desarrollo-local` |
+| Detección de la muerte silenciosa | a los **71 s** del hueco (margen 60 s + pasada del vigilante) |
+| Qué se vio | *Poniendo al día…* durante el refresco, y el aviso retirándose al terminar |
+| Mensaje del hueco | recuperado, **una sola vez** en pantalla y en la base |
+| Sin red | *Reconectando…* a los ~3 s; ~1 reintento cada 3 s por suscripción |
 
 ## Nivel 3 — dispositivo real (OBLIGATORIO)
 
