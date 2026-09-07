@@ -183,15 +183,15 @@ implementar aparece necesidad de servidor, es que el alcance se ensanchó:
 ## Phase 6: Pulido y verificación en vivo
 
 - [ ] T027 Alinear documentación y código sobre el catch-up: el contrato y el comentario de `use-events.ts` dicen `since=` mientras la bandeja hace refetch completo. Decidir que gana el refetch completo y corregir `specs/001-uniko-core/contracts/sse.md` y el comentario del hook
-- [ ] T028 Gate técnico completo desde la ruta real: `pnpm typecheck && pnpm lint && pnpm test && pnpm build`
+- [x] T028 Gate técnico completo desde la ruta real: `pnpm typecheck && pnpm lint && pnpm test && pnpm build`
 - [ ] T029 PR de la Entrega 2 con el Constitution Check escrito, mencionando que el contrato SSE se amplió de forma aditiva
-- [ ] T030 Desplegar a LanCo (merge a `main`) y esperar el redespliegue; verificar por `/api/health` que corre el commit
+- [x] T030 Desplegar a LanCo (merge a `main`) y esperar el redespliegue; verificar por `/api/health` que corre el commit
 
 ### Nivel 3 — dispositivo real (OBLIGATORIO, Principio IX)
 
-- [ ] T031 **iOS**: reproducir el fallo en un iPhone contra LanCo — segundo plano varios minutos, mensaje entrante durante el hueco, volver a primer plano. Registrar **si el fallo se reprodujo**; si no, repetir alargando el tiempo o anotarlo como "no reproducido" (SC-009). Un verde sin fallo reproducido no cuenta
+- [x] T031 ✅ VERDE (2026-09-06, fallo reproducido) **iOS**: reproducir el fallo en un iPhone contra LanCo — segundo plano varios minutos, mensaje entrante durante el hueco, volver a primer plano. Registrar **si el fallo se reprodujo**; si no, repetir alargando el tiempo o anotarlo como "no reproducido" (SC-009). Un verde sin fallo reproducido no cuenta
 - [ ] T032 **Android**: comprobar no regresión en Chrome contra LanCo — el ciclo normal deja la vista al día incluido el contador, no hay reconexiones espurias ni parpadeo (FR-312), y el aviso sale y se va con la red. **No forzar la narrativa**: si el fallo no se reproduce, es lo esperado y así se registra
-- [ ] T033 Anotar en el PR y en `tests/e2e/us-reconexion-sse.md` lo observado: si se reprodujo en iOS, cuánto tiempo en segundo plano, versiones de iOS y Android, y qué se vio al volver
+- [~] T033 (iOS registrado; Android pendiente) Anotar en el PR y en `tests/e2e/us-reconexion-sse.md` lo observado: si se reprodujo en iOS, cuánto tiempo en segundo plano, versiones de iOS y Android, y qué se vio al volver
 
 ---
 
