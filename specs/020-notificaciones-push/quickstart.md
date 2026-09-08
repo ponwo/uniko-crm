@@ -16,7 +16,22 @@ Esta feature toca `drizzle/`. La constitución exige ensayar la migración
 seed:demo` no cuenta: contra una base vacía o de juguete, una migración siempre
 pasa; lo que rompe es la forma de los datos que ya existen.
 
-**El procedimiento no existía.** Se escribe aquí por primera vez.
+**El procedimiento no existía.** Se escribió aquí por primera vez, y el
+2026-09-08 se recorrió de verdad: lo que sigue está corregido con lo que pasó.
+
+> ### ⚠️ Lo que este ensayo NO prueba: el volumen
+>
+> Los volcados de la flota pesan hoy **~85 KB** (LanCo 86 KB, ILTU 86 KB,
+> NuriaAndrea 80 KB). Son instancias de semanas, con pocas conversaciones.
+>
+> Eso significa que el ensayo ejercita **la FORMA de los datos reales** —que es
+> exactamente lo que pide el Principio X, y lo que `seed:demo` no da— pero **no
+> el volumen**. Una migración que tarda un segundo aquí puede tardar minutos, y
+> bloquear, contra una instancia con un año de conversaciones.
+>
+> **No confundas un ensayo rápido con una migración barata.** El día que un
+> volcado pese cientos de megas, este mismo procedimiento dirá cosas nuevas — y
+> habrá que mirar el tiempo, no solo el "sin errores".
 
 ## Lo primero, y es un hallazgo incómodo
 
@@ -57,7 +72,14 @@ respaldo, no descargarlo.**
 
 **Opción 1 — desde Coolify** (la más simple): proyecto de la instancia → su base
 **Postgres** → pestaña **Backups** → **Back up now**. Coolify ejecuta el volcado
-y lo deja en el propio VPS, con su entrada en el historial de ejecuciones.
+y lo deja en el propio VPS, con su entrada en el historial.
+
+Desde el 2026-09-08 hay además **programación diaria** en las cuatro bases
+(`docs/respaldos-flota.md`), así que normalmente ya habrá un volcado reciente y
+este paso se reduce a **elegir cuál**.
+
+Los archivos viven en el VPS, en
+`/data/coolify/backups/databases/root-team-0/<base>-<uuid>/pg-dump-<base>-<epoch>.dmp`.
 
 **Opción 2 — directa por SSH al VPS**, que es lo mismo sin intermediario:
 
@@ -73,9 +95,19 @@ Los UUID de las bases de la flota están en
 
 ### 2. Traerlo a la máquina, fuera del repositorio
 
-```bash
-scp <vps>:/tmp/uniko-<instancia>-<fecha>.dump "$TEMP/uniko-ensayo/"
-```
+> **Corregido el 2026-09-08.** Aquí decía `scp` y **no funciona desde esta
+> máquina**: no hay claves SSH (`~/.ssh` vacío) y `root@` pide autenticación.
+> Se probó también bajarlo por la API de Coolify con el token del MCP: **no hay
+> endpoint de descarga** (404 en las rutas de `/api/v1/...`), y la ruta web
+> `/download/backup/<uuid>` responde 302 a login porque el token Bearer no
+> autentica sesiones web.
+
+**La vía que sí funciona**: descargarlo desde el **panel de Coolify** —pestaña
+Backups de la base → la ejecución → descargar— y guardarlo en una carpeta
+temporal **fuera del repositorio**.
+
+Si algún día esta máquina tiene clave SSH en el VPS, `scp` desde la ruta de
+arriba vuelve a ser la vía más corta.
 
 ### 3. Crear la base desechable, aparte de la de desarrollo
 
@@ -84,8 +116,13 @@ es una **base desechable** en el PostgreSQL 16 local, con un nombre que no se
 pueda confundir con nada:
 
 ```bash
-"/c/Program Files/PostgreSQL/16/bin/createdb" -U postgres uniko_ensayo_x_20260907
+export PGPASSWORD=<la contraseña local de postgres>
+"/c/Program Files/PostgreSQL/16/bin/createdb" -U postgres -h localhost uniko_ensayo_x_20260908
 ```
+
+> **Corregido**: sin `PGPASSWORD` y sin `-h localhost`, `createdb` y `psql` se
+> quedan esperando una contraseña que nadie va a teclear, y el comando parece
+> colgado. Comprobado.
 
 > Si algún día hay Docker en la máquina, un contenedor efímero es estrictamente
 > mejor: aísla también el servidor, no solo la base. Mientras tanto, el
