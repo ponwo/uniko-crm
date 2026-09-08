@@ -254,13 +254,21 @@ con el mock caído, la escalación se guarda igual.
       en 61 archivos**. El nivel 2 se corrió verde antes (31 checks del guion de
       push) y desde entonces **no ha cambiado ni una línea de código**: lo único
       que entró es documentación
-- [ ] T037 **Nivel 3 en dispositivo real**: app instalada, permiso concedido y
+- [x] T037 **Nivel 3 en dispositivo real**: app instalada, permiso concedido y
       escalación real (escribir "quiero hablar con alguien" al número de la
       instancia). Responder las cuatro preguntas del quickstart, incluida si iOS
-      **reemplaza o apila** el segundo aviso de la misma conversación
-- [ ] T038 Registrar la corrida del nivel 3 en `tests/e2e/us-push.md`, diciendo
+      **reemplaza o apila** el segundo aviso de la misma conversación.
+      **Hecho el 2026-09-08** contra LanCo desplegada en `c2829ed` con `PUSH=on`,
+      en Android e iOS 26.6.1: llega con la app cerrada a los dos dispositivos,
+      el toque abre esa conversación y el texto degradado sale al cerrar sesión.
+      Dos de las cuatro preguntas quedan **sin respuesta y así se registran**: la
+      de la `tag` en iOS (lo observado no discrimina) y la del Laboratorio (no
+      ejercido, por decisión con su razón)
+- [x] T038 Registrar la corrida del nivel 3 en `tests/e2e/us-push.md`, diciendo
       **si llegó la notificación**. Si no llegó, se repite o se anota como *no
-      reproducida*: un verde sin notificación no cuenta
+      reproducida*: un verde sin notificación no cuenta. **Registrado** con
+      columna de procedencia por dato, con las casillas no reportadas sin marcar
+      y con los dos huecos dichos en voz alta en vez de rellenados
 
 ---
 

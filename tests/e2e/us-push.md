@@ -130,6 +130,15 @@ todas hasta que esto salga verde.
 - Pulsar **Activar avisos** y **aceptar** el permiso del sistema.
 - Confirmar que la tarjeta pasa a decir *"Activados en este dispositivo."*
 
+> **Hay que hacerlo en CADA teléfono, uno por uno.** Activarlo en el Android no
+> lo activa en el iPhone, ni al revés, aunque sea la misma cuenta: la suscripción
+> es del navegador de ese dispositivo, no del usuario, y se guarda por usuario **y
+> por dispositivo** (FR-511). Es deliberado —alguien puede querer avisos en el
+> teléfono y no en el portátil— pero **despista la primera vez**: en la corrida
+> del 2026-09-08 pareció un fallo hasta caer en la cuenta. Si un teléfono no
+> recibe nada, lo primero que hay que mirar es si sus avisos están activados **en
+> él**, no si la feature funciona.
+
 **2. Cerrar la app del todo** — no dejarla en segundo plano: cerrarla. Es la
 mitad de lo que esta prueba existe para responder.
 
@@ -167,16 +176,20 @@ worker nuevo delante.
 Chrome respeta la `tag` de la Notifications API: **una conversación, una
 notificación**.
 
-- [ ] Llega con la app **cerrada del todo**, no solo en segundo plano.
+- [x] Llega con la app **cerrada del todo**, no solo en segundo plano.
 - [ ] El título nombra al contacto y el cuerpo dice el motivo
       ("Pidió hablar con una persona").
 - [ ] Se ve **el icono del negocio**, no uno genérico.
-- [ ] Al tocarla se abre **esa** conversación.
-- [ ] **Dos escalaciones de contactos DISTINTOS → dos notificaciones**, cada una
+- [x] Al tocarla se abre **esa** conversación.
+- [x] **Dos escalaciones de contactos DISTINTOS → dos notificaciones**, cada una
       a su hilo.
 - [ ] Con la app ya abierta, tocar el aviso **enfoca esa ventana** y la lleva al
       hilo — no abre una segunda pestaña encima de lo que estabas haciendo
       (FR-508c).
+
+> Las casillas sin marcar **no son fallos: son cosas que no se reportaron** en la
+> corrida del 2026-09-08. Marcarlas por parecer razonables es exactamente lo que
+> el registro de la 019 obligó a corregir.
 
 > **Por qué no se pide aquí el caso "dos avisos de la MISMA conversación"**: casi
 > no puede ocurrir. El pipeline calla en cuanto hay `handoff_at`, así que la
@@ -196,16 +209,14 @@ suponer cuál.
 - [ ] En una **pestaña de Safari** (no la app instalada), Ajustes → Avisos dice
       que hacen falta instalarla, en vez de ofrecer un botón que no puede
       funcionar (FR-513).
-- [ ] Desde la **app instalada**, el permiso se pide **dentro del toque** y se
+- [x] Desde la **app instalada**, el permiso se pide **dentro del toque** y se
       concede.
-- [ ] Llega con la app **cerrada del todo**.
-- [ ] Al tocarla se abre **esa** conversación.
-- [ ] **La pregunta de R4**: dos avisos seguidos —de la misma conversación si se
-      puede, y si no de dos contactos distintos— ¿se **apilan** o se
-      **reemplazan**? Responder con lo que se vio, no con lo que dice la
-      documentación.
-- [ ] **Anotar la versión de iOS.** Sin ella la respuesta anterior no sirve para
-      nada: es la variable de la que depende.
+- [x] Llega con la app **cerrada del todo**.
+- [x] Al tocarla se abre **esa** conversación.
+- [~] **La pregunta de R4**: dos conversaciones distintas dieron **dos avisos**,
+      igual que en Android. Eso NO distingue si la `tag` se respeta — ver el
+      registro de abajo.
+- [x] **Versión de iOS: 26.6.1.**
 - [ ] ¿Qué icono muestra el sistema? (si ignora el nuestro y usa el de la app
       instalada, es lo esperado y no es un fallo).
 
@@ -213,22 +224,74 @@ suponer cuál.
 
 | Dato | Android | iOS |
 |---|---|---|
-| Versión del sistema | | |
-| ¿Llegó con la app cerrada? | | |
-| Cuánto tardó (aprox.) | | |
-| Texto que se vio (título / cuerpo) | | |
-| ¿Al tocarla abrió ESA conversación? | | |
-| Dos escalaciones: ¿apilan o reemplazan? | | |
-| Icono mostrado | | |
-| Texto degradado sin sesión | | |
+| Versión del sistema | no registrada | **26.6.1** |
+| ¿Llegó con la app cerrada? | **sí** | **sí** |
+| Cuánto tardó (aprox.) | no registrado | no registrado |
+| Texto que se vio (título / cuerpo) | no registrado | no registrado |
+| ¿Al tocarla abrió ESA conversación? | **sí** | **sí** |
+| Dos escalaciones: ¿apilan o reemplazan? | dos conversaciones → **dos avisos** (no discrimina) | ídem — ver registro |
+| Icono mostrado | no registrado | no registrado |
+| Texto degradado sin sesión | **sí**, al cerrar sesión | **sí**, al cerrar sesión |
 | El Laboratorio, ¿sonó? | **no ejercido** — ver registro | **no ejercido** |
-| Mensaje entrante en vivo, ¿sin recargar? | | |
+| Mensaje entrante en vivo, ¿sin recargar? | no registrado | no registrado |
 
 ---
 
 ## Registro de corridas
 
-*(pendiente: el nivel 3 lo corre el dueño)*
+### Nivel 3 — 2026-09-08 ✅ VERDE (Android e iOS, dos dispositivos suscritos)
+
+Sobre **LanCo desplegada** en `c2829ed`, con `PUSH=on`. Confirmado por el dueño;
+la columna dice de dónde sale cada dato, que es la disciplina que impuso el
+registro de la 019.
+
+| Dato | Android | iOS 26.6.1 | Cómo se obtuvo |
+|---|---|---|---|
+| Llega con la app **cerrada** | **sí** | **sí** | relato explícito del dueño |
+| Llega a **los dos** dispositivos suscritos | **sí** | **sí** | ídem |
+| Al tocarla abre **esa** conversación, no la bandeja (FR-508) | **sí** | **sí** | ídem |
+| Dos conversaciones escaladas → **dos avisos separados** | **sí** | **sí** | ídem |
+| Texto degradado al cerrar sesión (FR-507, SC-008) | **sí** | **sí** | ídem |
+| El permiso es **por dispositivo** | confirmado | confirmado | hallazgo de la corrida |
+| El Laboratorio no suena (SC-006) | **no ejercido** | **no ejercido** | decisión registrada abajo |
+
+**SC-001 queda ejercido en dispositivo real**: una escalación real llega a un
+teléfono que no tenía la app abierta, y tocarla abre la conversación escalada.
+Eso es lo que ninguna comprobación de `localhost` podía dar.
+
+**El hallazgo que más va a ahorrar tiempo**: el permiso es **por dispositivo**.
+Activarlo en el Android no lo activa en el iPhone aunque sea la misma cuenta —la
+suscripción es del navegador de ese aparato (FR-511)— y en esta corrida
+**pareció un fallo** hasta caer en la cuenta. Ya está escrito en el paso 1 del
+procedimiento, que es donde hace falta leerlo.
+
+#### La pregunta de R4, con precisión: **sigue abierta**
+
+Lo observado en iOS **26.6.1** es que **dos conversaciones distintas producen dos
+avisos**, igual que en Android. El dueño lo leyó como que la `tag` **sí se
+respeta** en esta versión, contradiciendo lo documentado para 16.4.
+
+**Esa conclusión no se sigue de esta observación, y por eso no se registra como
+respondida.** Dos conversaciones distintas llevan `tag` distinta
+(`uniko:conv:<id>`), así que **dan dos notificaciones tanto si el sistema
+respeta la `tag` como si la ignora**: el resultado es el mismo en las dos
+hipótesis, y por tanto no distingue entre ellas.
+
+Lo único que respondería la pregunta es **dos avisos de la MISMA conversación**:
+si el segundo **reemplaza** al primero, la `tag` se respeta; si se **apilan**, se
+ignora. Y eso es difícil de provocar a propósito —el pipeline calla en cuanto hay
+`handoff_at`, así que hay que devolverle la conversación al agente entre un aviso
+y otro—, que es justo por lo que el guion no lo pedía como bloqueante.
+
+**Qué significa en la práctica: nada urgente.** La spec está escrita para
+funcionar en los dos casos, y el escenario de "varios avisos de la misma
+conversación" casi no puede ocurrir por el mismo motivo. Se queda anotado como
+**no discriminado en iOS 26.6.1**, que es más útil dentro de un año que un "sí"
+que nadie pueda rastrear.
+
+> Si en la corrida se llegó a ver un segundo aviso **de la misma conversación**
+> reemplazando al primero, eso sí cierra R4: dilo y se registra como confirmado,
+> con la versión.
 
 ### SC-006 en dispositivo — 2026-09-08 ⚠️ NO EJERCIDO (decisión del dueño)
 

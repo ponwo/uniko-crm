@@ -109,6 +109,15 @@ atención"*, que sigue siendo útil.
 siga roto en iOS 26, ni que lo arreglaron. Va al nivel 3 como comprobación
 explícita, y la spec debe funcionar en los dos casos.
 
+> **Actualización tras el nivel 3 (2026-09-08, iOS 26.6.1): sigue abierta.** La
+> corrida vio que **dos conversaciones distintas producen dos avisos**, igual que
+> en Android. Eso **no discrimina**: dos conversaciones llevan `tag` distinta, así
+> que dan dos notificaciones tanto si el sistema respeta la `tag` como si la
+> ignora. Lo único que respondería es un segundo aviso **de la misma
+> conversación**, y eso casi no se puede provocar por lo que dice la sección de
+> abajo. Queda anotado como **no discriminado en 26.6.1** —no como resuelto— en
+> [`tests/e2e/us-push.md`](../../tests/e2e/us-push.md).
+
 ### El hallazgo que hace pequeño el problema
 
 Al leer el código aparece algo que cambia el tamaño del asunto: **el escenario
