@@ -61,7 +61,7 @@ paso es **elegir un volcado reciente**, no fabricarlo.
 
 ## Paso a paso
 
-### 1. Producir el respaldo — **a mano, porque no hay programaciones**
+### 1. Elegir el respaldo (ya hay programación diaria)
 
 **Opción 1 — desde Coolify** (la más simple): proyecto de la instancia → su base
 **Postgres** → pestaña **Backups** → **Back up now**. Coolify ejecuta el volcado
@@ -141,6 +141,11 @@ restauración vacía es el mismo verde inútil que la constitución quiere evita
   -c "select count(*) from conversation;" -c "select count(*) from message;"
 ```
 
+> **Corregido el 2026-09-08**: en Windows, `psql -c` con literales **acentuados**
+> falla con `secuencia de bytes no válida para codificación «UTF8»: 0xfa` — la
+> consola entrega el literal en cp1252. Exporta `PGCLIENTENCODING=UTF8` y, más
+> simple, escribe las consultas del ensayo **sin acentos**.
+
 ### 5. Correr la migración contra esa copia
 
 Solo las migraciones. **No** `pnpm db:dev` (crea y siembra), **no** `seed:demo`:
@@ -149,10 +154,12 @@ Solo las migraciones. **No** `pnpm db:dev` (crea y siembra), **no** `seed:demo`:
 DATABASE_URL="postgresql://postgres:<clave>@localhost:5432/uniko_ensayo_x_20260908" pnpm db:migrate
 ```
 
-> **Ruido esperado, no un fallo**: si la copia ya tuviera la migración aplicada,
+> **Ruido esperado, no un fallo** (corregido tras la corrida del 2026-09-08):
 > `drizzle-kit` imprime un objeto de error con `routine: 'transformCreateStmt'` y
-> **acto seguido dice `migrations applied successfully`**. Da susto y no es nada.
-> Contra una copia que va por detrás —el caso del ensayo— aplica limpio.
+> **acto seguido dice `migrations applied successfully`**. Aquí decía que eso solo
+> pasaba si la copia ya tenía la migración: **es falso, aparece siempre**. Es el
+> `NOTICE` de PostgreSQL «la relación `__drizzle_migrations` ya existe,
+> omitiendo». Da susto y no es nada.
 
 Qué hay que mirar, y qué se anota en el PR:
 
@@ -188,6 +195,77 @@ que borrar nada a mano.
 En el PR: **qué instancia**, **de qué fecha** era el respaldo, qué hizo la
 migración, cuánto tardó y que la app arrancó contra la copia. La puerta de
 promoción va a pedir exactamente eso, y sin las dos primeras no cuenta.
+
+---
+
+## Cómo salió de verdad — la corrida del 2026-09-08
+
+Registrado tal como pasó, no como estaba escrito.
+
+**Contra qué datos**: el respaldo de **LanCo** —instancia real, en producción—,
+ejecución `pg-dump-uniko-1788880720.dmp` del 2026-09-08, **86.590 bytes**
+(tamaño verificado contra lo que reportó Coolify **antes** de restaurar nada).
+La copia traía **1 conversación, 18 mensajes, 1 contacto, 1 lead, 1 usuario y 1
+organización**, y venía **por detrás de la migración**: 0 tablas de push y 13
+filas en el diario de Drizzle, es decir en la 0012 del 2026-09-01. Eso es justo
+lo que el ensayo necesita: contra una copia ya migrada no se prueba nada.
+
+**Base desechable**: `uniko_ensayo_lanco_20260908` en el PostgreSQL 16 local.
+Nunca `uniko_dev`, nunca una instancia de la flota. **Borrada al terminar**, y
+comprobado con `psql -l`: solo queda `uniko_dev`.
+
+| Paso | Resultado | Tiempo |
+|---|---|---|
+| `pg_restore` del volcado | limpio, sin errores | **981 ms** |
+| `pnpm db:migrate` (solo migraciones) | `migrations applied successfully` | **6.233 ms**, arranque de drizzle-kit incluido |
+| `pnpm start` contra la copia | `/api/health` → `{"ok":true,"version":"1.0.0"}` | — |
+
+**Que la migración es aditiva, medido y no supuesto.** Inventario de la misma
+base antes y después:
+
+| | Antes | Después |
+|---|---|---|
+| Tablas | 30 | 32 (`push_subscription`, `push_key`) |
+| Columnas | 318 | 331 (las 13 nuevas, todas en las dos tablas nuevas) |
+| Índices | 74 | 79 |
+| **Filas de dominio** | 20 | **20** |
+| Diario de Drizzle | 13 | 14 |
+
+`conversation` sigue con 14 columnas y `user` con 7: no se tocó nada existente,
+que es exactamente lo que el plan prometía. Las dos tablas nuevas quedaron
+creadas y vacías.
+
+Y la app arrancó contra esa copia sirviendo **la marca real de LanCo**
+(`LanCo — CRM de WhatsApp`, acento `#3f6b66`) en `/api/branding/manifest`: no
+era una base genérica con otro nombre encima.
+
+### Lo que no estaba donde el quickstart decía
+
+1. **La descarga del volcado.** El procedimiento decía `scp`. No hay claves SSH
+   en esta máquina, la API de Coolify **no expone descarga** (404 en las rutas de
+   `/api/v1/...`) y la ruta web `/download/backup/<uuid>` responde 302 a login
+   porque el token Bearer no autentica sesiones web. La única vía fue **el dueño
+   bajándolo del panel a mano**. Ya está corregido en el paso 2 — pero conste
+   aquí: fue el paso que costó, no la migración.
+2. **La nota del "ruido esperado" estaba mal.** Decía que el objeto de error de
+   `transformCreateStmt` solo sale si la copia ya tiene la migración; salió
+   **contra una copia que iba por detrás**. Es un `NOTICE` que se imprime
+   siempre. Corregido en el paso 5.
+3. **`psql -c` con acentos revienta en Windows** (`0xfa`). Corregido en el paso 4.
+
+### Qué haría distinto
+
+- **Conseguir el volcado sin descarga manual.** Es el único paso que necesita a
+  una persona, y por eso es el que hará que algún día el ensayo se salte. Un
+  usuario SSH acotado —lectura del directorio de respaldos y nada más, no acceso
+  al servidor— convierte el paso 2 en un `scp` y el ensayo entero en algo que se
+  corre sin pedirle nada a nadie.
+- **Inventariar antes y después, siempre.** "La migración es aditiva" es una
+  afirmación comprobable, y comprobarla cuesta dos consultas. Sin eso, "corrió
+  sin errores" es la mitad del ensayo.
+- **No leer 7 segundos como "migración barata".** El volcado son 85 KB. El aviso
+  del principio de esta parte sigue en pie: esta corrida no lo contradice, lo
+  confirma.
 
 ---
 

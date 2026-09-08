@@ -80,11 +80,14 @@ Lo que **sigue faltando**, dicho sin adornos:
    mal y de una tabla corrupta — **no protege de perder la máquina**. Si el VPS
    desaparece, se van las bases y los respaldos juntos. Se resuelve a fin de mes
    activando el destino externo en el mismo panel.
-2. **El simulacro de restauración sigue pendiente.** Un respaldo que nadie ha
-   restaurado nunca no es un respaldo, es un archivo. El procedimiento está
-   escrito en
-   [`specs/020-notificaciones-push/quickstart.md`](../specs/020-notificaciones-push/quickstart.md)
-   y su primer uso será el ensayo del Principio X de la 020.
+2. **~~El simulacro de restauración sigue pendiente~~ — hecho el 2026-09-08.**
+   El respaldo de LanCo de ese día (86.590 B) se restauró en una base desechable
+   y aguantó la migración 0013: restauración en 981 ms, 1 conversación y 18
+   mensajes recuperados, y la app arrancó contra la copia. Ya no es un archivo
+   que nadie ha abierto. El procedimiento —corregido con lo que pasó de verdad—
+   está en
+   [`specs/020-notificaciones-push/quickstart.md`](../specs/020-notificaciones-push/quickstart.md).
+   Lo que sigue pendiente es **repetirlo**: un simulacro mensual, no uno solo.
 3. **Los snapshots del VPS siguen sin verificar.** Solo se ven en el panel del
    proveedor, y no sustituyen a esto (sección 2).
 

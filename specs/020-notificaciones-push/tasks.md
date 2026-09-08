@@ -232,12 +232,17 @@ con el mock caído, la escalación se guarda igual.
 > **T033 bloquea el merge a `main`.** No es una tarea de documentación: es la
 > condición 4 de la puerta de promoción.
 
-- [ ] T033 **Ensayo del Principio X** siguiendo la Parte 1 del
-      [quickstart](quickstart.md): producir el volcado a mano (no hay respaldos
-      programados), restaurarlo en una base **desechable**, correr solo las
-      migraciones contra esa copia, comprobar que la app arranca, y **borrar la
-      base y el volcado**. Anotar instancia, fecha del respaldo, duración y
-      resultado
+- [x] T033 **Ensayo del Principio X** siguiendo la Parte 1 del
+      [quickstart](quickstart.md): elegir un volcado de la programación diaria,
+      restaurarlo en una base **desechable**, correr solo las migraciones contra
+      esa copia, comprobar que la app arranca, y **borrar la base y el volcado**.
+      Anotar instancia, fecha del respaldo, duración y resultado.
+      **Hecho el 2026-09-08** contra el respaldo de LanCo del mismo día (86.590 B,
+      `pg-dump-uniko-1788880720.dmp`) restaurado en `uniko_ensayo_lanco_20260908`,
+      borrada al terminar. Restauración 981 ms, migración 6.233 ms, carácter
+      aditivo comprobado por inventario (30→32 tablas, 20→20 filas de dominio) y
+      app arrancando con la marca real de LanCo. La corrida está registrada en el
+      [quickstart](quickstart.md)
 - [ ] T034 [P] Escribir el guion de la historia en `tests/e2e/us-push.md` con los
       tres niveles y el hueco para registrar las corridas, incluida la regla de
       la 018: **una corrida sin notificación recibida no cuenta**
