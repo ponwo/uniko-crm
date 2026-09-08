@@ -46,7 +46,17 @@ describe("el service worker con la bandera PUSH encendida", () => {
     process.env.PUSH = "on";
     const js = await cuerpo();
     expect(js).toContain("Alguien necesita atención");
-    expect(js).toContain("Ábrela para ver cuál");
+    expect(js).toContain("Abre la bandeja para ver quién");
+  });
+
+  it("y ese texto está escrito para la vigésima vez, no para la primera", async () => {
+    // Mismo filtro que FR-423 en la 019: quien lo lee ya sabe qué es esta app.
+    // Explicarle el mecanismo —"el agente derivó la conversación"— a la
+    // vigésima es ruido; lo que necesita es saber qué hacer.
+    process.env.PUSH = "on";
+    const js = await cuerpo();
+    expect(js).not.toMatch(/bienvenid|primera vez|acabas de/i);
+    expect(js).not.toContain("El agente pasó una conversación a un humano");
   });
 
   it("marca la notificación con su conversación, para poder reemplazarla", async () => {

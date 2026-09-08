@@ -166,8 +166,14 @@ self.addEventListener("push", (event) => {
   event.waitUntil(
     (async () => {
       // Por defecto, lo único que se puede decir sin saber nada.
+      //
+      // Escrito para la vigésima vez, no para la primera (mismo filtro que
+      // FR-423): quien lo lee ya sabe qué es esta app. No se le explica el
+      // mecanismo —"el agente derivó la conversación"— porque a la vigésima eso
+      // es ruido; se le dice qué hacer. Y no dice de quién es porque en este
+      // caso no se pudo saber: fingirlo sería peor.
       let titulo = "Alguien necesita atención";
-      let cuerpo = "El agente pasó una conversación a un humano. Ábrela para ver cuál.";
+      let cuerpo = "Abre la bandeja para ver quién.";
       let conversationId = null;
 
       try {

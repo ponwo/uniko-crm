@@ -137,7 +137,21 @@ por el mismo camino que ya protege el token de WhatsApp.
   notificación DEBE mostrarse igualmente con un texto que sirva sin decir de
   quién es, y que no parezca un error.
 - **FR-508** Al tocar la notificación, la app DEBE abrirse **en la conversación
-  escalada**. Si no se supo cuál era, DEBE abrirse en la bandeja.
+  escalada**, no en una bandeja genérica donde haya que buscarla.
+- **FR-508b** Cuando el aviso no pudo saber de quién era, tocar la notificación
+  DEBE llevar a la bandeja, donde la escalación está arriba y marcada. **NO DEBE
+  parecer que la app perdió información**: no se muestra un error, ni una
+  pantalla vacía, ni un "no se pudo cargar". El operador llega a un sitio donde
+  puede resolver lo que le acaban de avisar.
+- **FR-508c** Si ya hay una ventana de la app abierta, tocar la notificación
+  DEBE llevarla a esa conversación en vez de abrir una segunda: abrir otra
+  pestaña es la forma más rápida de que el operador pierda lo que tenía a
+  medias.
+- **FR-507b** Los textos de la notificación —el normal y el degradado— DEBEN
+  estar escritos **para la vigésima vez, no para la primera**. Mismo criterio
+  que FR-423 de la 019: **NO DEBEN** explicar qué es la app ni cómo funciona el
+  agente ("el agente ha derivado la conversación"), porque a la vigésima eso es
+  ruido. Dicen **a qué entra** el operador y **qué hacer**.
 
 ### Quién los recibe, y cómo se activan
 

@@ -207,6 +207,173 @@ if (lab.ok()) {
   console.log("     (no se pudo lanzar una corrida del Laboratorio en este entorno)");
 }
 
+/* ═════════ C2: el texto que se ve, y a dónde lleva (US1) ═════════ */
+
+console.log("\n== C2: qué dice el aviso y a dónde lleva (FR-506/507b/508) ==");
+
+const pendiente = await (await req.get(`${BASE}/api/push/pendiente`)).json();
+ok(
+  "la instancia sabe decir de quién es la escalación",
+  !!pendiente.pendiente,
+  JSON.stringify(pendiente)
+);
+ok(
+  "el título nombra a quien espera",
+  (pendiente.pendiente?.titulo ?? "").includes(NOMBRE),
+  pendiente.pendiente?.titulo
+);
+ok(
+  "el cuerpo dice A QUÉ ENTRA, no cómo funciona el producto (FR-507b)",
+  /pidió hablar|24 horas|no supo|falló|esperando/i.test(
+    pendiente.pendiente?.cuerpo ?? ""
+  ),
+  pendiente.pendiente?.cuerpo
+);
+ok(
+  "y no explica el mecanismo por vigésima vez",
+  !/el agente (pas[óo]|deriv[óo]|transfiri[óo])/i.test(
+    pendiente.pendiente?.cuerpo ?? ""
+  ),
+  pendiente.pendiente?.cuerpo
+);
+
+const swTexto = await (await req.get(`${BASE}/sw.js`)).text();
+ok(
+  "el texto degradado tampoco explica el mecanismo",
+  swTexto.includes("Abre la bandeja para ver quién") &&
+    !swTexto.includes("El agente pasó una conversación a un humano"),
+  "degradado"
+);
+ok(
+  "ni suena a estreno: nada de bienvenidas ni primeras veces",
+  !/bienvenid|primera vez|acabas de/i.test(swTexto),
+  "degradado"
+);
+
+// Y el destino: la bandeja tiene que abrir ESA conversación, no la genérica.
+const paginaAviso = await ctx.newPage();
+const idEscalada = pendiente.pendiente?.conversationId;
+
+// Primero se calienta la ruta: en desarrollo, la primera visita a /inbox la
+// compila Next al vuelo y tarda segundos. Medir sobre eso es medir el
+// compilador, no la feature.
+await paginaAviso.goto(`${BASE}/inbox`, { waitUntil: "load" });
+await paginaAviso.goto(`${BASE}/inbox?conversation=${idEscalada}`, {
+  waitUntil: "load",
+});
+
+// Y se espera a la condición, no a un reloj.
+const hiloAbierto = await paginaAviso
+  .locator(".thread-bg")
+  .getByText("quiero hablar con una persona")
+  .first()
+  .waitFor({ state: "visible", timeout: 20000 })
+  .then(() => true)
+  .catch(() => false);
+ok(
+  "tocar el aviso abre ESA conversación, no la bandeja genérica (FR-508)",
+  hiloAbierto,
+  `conversation=${idEscalada}`
+);
+await paginaAviso.close();
+
+/* ═════════ C3: caducidad y caminos infelices (US3) ═════════ */
+
+console.log("\n== C3: un teléfono que ya no está, y un servicio que falla ==");
+
+// Un endpoint que el servicio declara caducado (410).
+await req.post(`${BASE}/api/push/suscripcion`, {
+  data: { endpoint: `https://push.example.test/caducado-${S}` },
+});
+// Y otro que rechaza con 500: no debe costar nada.
+await req.post(`${BASE}/api/push/suscripcion`, {
+  data: { endpoint: `https://push.example.test/rechaza-${S}` },
+});
+
+const NOMBRE2 = `Escala2${S}`;
+await fetch(`${BASE}/api/dev/wa-mock/inbound`, {
+  method: "POST",
+  headers: { "content-type": "application/json" },
+  body: JSON.stringify({
+    phoneNumberId: PN,
+    from: `521477${Math.floor(Math.random() * 9e6) + 1e6}`,
+    name: NOMBRE2,
+    text: "quiero hablar con una persona",
+    waMessageId: `wamid.push.${S}.2`,
+  }),
+});
+
+const envioCaducado = await esperarEnvio(req, BASE, `caducado-${S}`);
+ok("se intentó enviar al endpoint caducado", !!envioCaducado);
+await esperarQuietud(req, BASE);
+
+const baja = await req.post(`${BASE}/api/push/suscripcion`, {
+  data: { endpoint: `https://push.example.test/caducado-${S}` },
+});
+const rehecha = baja.ok() ? (await baja.json()).nueva : null;
+ok(
+  "la suscripción caducada se borró sola (410 → fuera)",
+  rehecha === true,
+  "si siguiera viva, volver a darla de alta no sería 'nueva'"
+);
+
+// La escalación de este segundo caso tiene que existir igual, con dos
+// endpoints fallando: el aviso no puede costar la conversación.
+const convs = (await (await req.get(`${BASE}/api/conversations`)).json())
+  .conversations;
+const escalada2 = convs.find((c) => c.contact.name === NOMBRE2);
+ok(
+  "con endpoints caducados y rechazando, la escalación SE GUARDÓ igual (FR-504)",
+  !!escalada2?.handoffAt,
+  JSON.stringify(escalada2?.handoffAt)
+);
+
+await req.delete(`${BASE}/api/push/suscripcion`, {
+  data: { endpoint: `https://push.example.test/caducado-${S}` },
+});
+await req.delete(`${BASE}/api/push/suscripcion`, {
+  data: { endpoint: `https://push.example.test/rechaza-${S}` },
+});
+
+/* ═════════ C4: activar y desactivar desde la app (US2) ═════════ */
+
+console.log("\n== C4: la tarjeta de Ajustes (US2) ==");
+
+const ajustes = await ctx.newPage();
+await ajustes.goto(`${BASE}/settings/avisos`, { waitUntil: "load" });
+await sleep(1500);
+ok(
+  "con la bandera encendida, Ajustes → Avisos existe",
+  (await ajustes.locator("text=Avisos en este dispositivo").count()) === 1
+);
+ok(
+  "y dice que suena solo al escalar, no por cada mensaje",
+  (await ajustes.locator("body").innerText()).includes("solo"),
+  "el encuadre importa: es lo que evita que lo apaguen"
+);
+await ajustes.close();
+
+// La idempotencia de la suscripción, por la ruta real.
+const e1 = `https://push.example.test/idem-${S}`;
+const alta1 = await req.post(`${BASE}/api/push/suscripcion`, { data: { endpoint: e1 } });
+const alta2 = await req.post(`${BASE}/api/push/suscripcion`, { data: { endpoint: e1 } });
+ok("la primera alta crea la suscripción", (await alta1.json()).nueva === true);
+ok(
+  "volver a activar el MISMO teléfono no crea otra (Principio IV)",
+  (await alta2.json()).nueva === false
+);
+const bajaIdem = await req.delete(`${BASE}/api/push/suscripcion`, {
+  data: { endpoint: e1 },
+});
+ok("desactivar la borra", (await bajaIdem.json()).borradas === 1);
+const bajaOtraVez = await req.delete(`${BASE}/api/push/suscripcion`, {
+  data: { endpoint: e1 },
+});
+ok(
+  "y desactivar dos veces no es un error",
+  bajaOtraVez.ok() && (await bajaOtraVez.json()).borradas === 0
+);
+
 /* ═════════ D: las DOS MITADES de la 019, con PUSH ENCENDIDA ═════════ */
 
 console.log("\n== D: la exclusión de /api/events sigue viva con push (FR-521/522) ==");

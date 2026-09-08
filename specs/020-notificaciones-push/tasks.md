@@ -179,7 +179,7 @@ quitarlos igual.
 activar, la suscripción existe; al desactivar, desaparece. Con la bandera
 apagada, la tarjeta no existe.
 
-- [ ] T023 [P] [US2] Crear `src/app/api/push/clave-publica/route.ts`: devuelve la
+- [x] T023 [P] [US2] Crear `src/app/api/push/clave-publica/route.ts`: devuelve la
       clave pública de la instancia, generando el par si aún no existe
 - [x] T024 [US2] Crear `src/app/api/push/suscripcion/route.ts` con alta (POST) y
       baja (DELETE), idempotentes por `endpoint` (FR-511, Principio IV)
@@ -189,14 +189,14 @@ apagada, la tarjeta no existe.
       de pruebas habría sido inventar una superficie para no reordenar dos
       tareas. La parte de US2 que sigue pendiente es la de verdad: la tarjeta de
       Ajustes, el permiso en el clic y el texto de iOS.
-- [ ] T025 [P] [US2] Crear `src/components/settings/avisos-card.tsx` con los tres
+- [x] T025 [P] [US2] Crear `src/components/settings/avisos-card.tsx` con los tres
       estados, decididos con `lib/platform` de la 019: se puede / hace falta
       instalar la app / ya están activados (FR-513)
-- [ ] T026 [US2] Pedir el permiso **dentro del manejador de clic** (FR-509): en
+- [x] T026 [US2] Pedir el permiso **dentro del manejador de clic** (FR-509): en
       iOS no vale pedirlo al cargar. Y ofrecer desactivarlos (FR-510)
-- [ ] T027 [US2] Montar la tarjeta en la pantalla de Ajustes, visible **solo** con
+- [x] T027 [US2] Montar la tarjeta en la pantalla de Ajustes, visible **solo** con
       la bandera encendida
-- [ ] T028 [US2] Añadir a `scripts/e2e-push.mjs`: la tarjeta no existe con la
+- [x] T028 [US2] Añadir a `scripts/e2e-push.mjs`: la tarjeta no existe con la
       bandera apagada; con ella encendida, suscribirse crea **una** fila y
       repetir la suscripción del mismo endpoint **no crea otra**; desactivar la
       borra
@@ -213,14 +213,14 @@ servicio cueste una escalación.
 **Independent Test**: con el mock respondiendo 410, la suscripción desaparece;
 con el mock caído, la escalación se guarda igual.
 
-- [ ] T029 [US3] Borrar la suscripción cuando el adaptador devuelve `caducada`
+- [x] T029 [US3] Borrar la suscripción cuando el adaptador devuelve `caducada`
       (410), en el sitio y sin ceremonia (FR-514)
-- [ ] T030 [US3] Registrar los `fallo` sin ruido de alarma y **sin reintentos**
+- [x] T030 [US3] Registrar los `fallo` sin ruido de alarma y **sin reintentos**
       (contrato), sellando `last_ok_at` solo en las entregadas
-- [ ] T031 [US3] Añadir a `scripts/e2e-push.mjs`: con 410 la fila desaparece; con
+- [x] T031 [US3] Añadir a `scripts/e2e-push.mjs`: con 410 la fila desaparece; con
       el mock caído, lento y rechazando, **la conversación queda escalada igual**
       y la bandeja lo enseña
-- [ ] T032 [US3] Añadir a `scripts/e2e-push.mjs`: rotar las claves invalida las
+- [x] T032 [US3] Añadir a `scripts/e2e-push.mjs`: rotar las claves invalida las
       suscripciones y la app lo dice donde se rota (FR-517)
 
 **Checkpoint**: las tres historias funcionan por separado.
