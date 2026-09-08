@@ -1,7 +1,11 @@
-# Respaldos de la flota — PROPUESTA (no implementada)
+# Respaldos de la flota
 
-**Estado**: propuesta, esperando decisión. **Nada de esto está aplicado.**
-**Fecha**: 2026-09-07.
+**Estado (2026-09-08)**: la propuesta está **decidida**. La configuración exacta
+a aplicar está en la sección **6-bis**, y **la aplica el dueño en Coolify** — no
+un agente: es infraestructura viva de dos clientes.
+
+Hasta que él la aplique y quede verificada por el MCP, **sigue sin haber ningún
+respaldo programado**. Este documento se actualiza cuando eso cambie.
 
 Escrita porque al preparar el ensayo del Principio X de la feature 020 apareció
 un hallazgo que es más grave que la feature.
@@ -110,9 +114,9 @@ migraciones.
 | Qué | Valor | Por qué |
 |---|---|---|
 | Frecuencia | **Diaria**, de madrugada (03:00 hora local) | Perder hasta un día de conversaciones es malo pero sobrevivible; cada hora es fácil de activar después si el volumen crece |
-| Retención local | **7 copias** | Cubre "me di cuenta el lunes de algo que pasó el martes" sin llenar el disco |
+| Retención local | ~~7 copias~~ → **14 días** (ver 6-bis) | Decidido en 14 días: cubre "me di cuenta la semana pasada" y estas bases son pequeñas |
 | Retención en S3 | **30 días** | Un mes es el horizonte razonable para descubrir un daño silencioso |
-| Alcance | Las **tres** bases de Uniko, por separado | Una por instancia: restaurar una no debe tocar a las otras |
+| Alcance | ~~Las tres de Uniko~~ → **las cuatro** (ver 6-bis) | Kosmo entra: comparte disco y comparte agujero |
 
 ## 6. Cómo se verifica que un respaldo sirve
 
@@ -143,6 +147,65 @@ y al implementar esto conviene moverlo aquí, que es su sitio.
 instancia de la flota ni sobre la base de desarrollo habitual, y borrado del
 volcado y de la base al terminar (Principios I y X a la vez).
 
+## 6-bis. LO ACORDADO — configuración a aplicar (2026-09-08)
+
+**Estado**: decidido por el dueño; **lo aplica él en Coolify**. Nada de esto lo
+aplica un agente: es infraestructura viva de dos clientes, misma línea que el
+merge a `production` y el redespliegue.
+
+**Cadencia diaria, no semanal.** Semanal deja un hueco de hasta siete días de
+conversaciones de WhatsApp de un negocio real, y eso no se reconstruye: no hay
+de dónde sacarlo. Estas bases son pequeñas, así que catorce volcados diarios
+ocupan poco.
+
+### Las cuatro bases (estado leído por el MCP el 2026-09-08)
+
+| Base | UUID | Base a respaldar | Estado | Programaciones hoy |
+|---|---|---|---|---|
+| `uniko-lanco-db` | `mdculd8ymchlpqapypxolr86` | `uniko` | running:healthy | **0** |
+| `uniko-iltu-db` | `opmzwkjlw7vnfpnq2oydohyo` | `uniko` | running:healthy | **0** |
+| `uniko-nuriaandrea-db` | `l3rfxifjouusbob12omrrnve` | `uniko` | running:healthy | **0** |
+| `kosmo-db` | `aqohlfzulnpabqvjlle1z81a` | `kosmo` | running:healthy | **0** |
+
+Las cuatro son `postgres:16-alpine`, usuario `postgres`, **en el mismo
+servidor**. Kosmo es otro producto y entra aquí porque comparte disco y agujero.
+
+### Qué poner en cada campo
+
+Igual en las cuatro, salvo la hora y la base a respaldar:
+
+| Campo | Valor | Por qué |
+|---|---|---|
+| Enabled | **sí** | |
+| Frequency | **`0 3 * * *`** (y ver escalonado) | Diaria, de madrugada, hora del servidor |
+| Database(s) to backup | `uniko` — en Kosmo, `kosmo` | La base de la app, no las del sistema |
+| Backup all databases | **NO** | Volcar todo mete las bases internas de Postgres y engorda cada restauración sin comprar nada |
+| Retención local — días | **14** | Lo acordado |
+| Retención local — número de copias | **0** (sin límite) o, si el panel exige un número, **20** | Que mande la regla de días y no la de conteo; con 20 sobra margen para respaldos manuales |
+| Destino S3 / "Save to S3" | **apagado por ahora** | Se enciende a fin de mes; es un campo de este mismo panel |
+| Retención S3 | — | Cuando se encienda el destino externo |
+| Timeout | **el que traiga por defecto** | El MCP no expone ese campo; con estas bases un volcado tarda segundos |
+
+### El escalonado de la hora, que no es cosmético
+
+Las cuatro bases viven **en el mismo disco**, junto a n8n, Waha, ChatWoot y los
+sitios. Cuatro volcados simultáneos a las 03:00 compiten por E/S entre ellos y
+con lo demás. Quince minutos de separación lo evitan y no cuestan nada:
+
+| Base | Frequency |
+|---|---|
+| `uniko-lanco-db` | `0 3 * * *` |
+| `uniko-iltu-db` | `15 3 * * *` |
+| `uniko-nuriaandrea-db` | `30 3 * * *` |
+| `kosmo-db` | `45 3 * * *` |
+
+### Justo después de aplicarlo
+
+**Lanzar un "Back up now" en cada base.** Una programación que nunca ha corrido
+no es un respaldo: es una intención. Con eso se comprueba que el volcado sale,
+se ve su tamaño real, y —de paso— queda el archivo que necesita el ensayo del
+Principio X de la 020.
+
 ## 7. Recomendación
 
 **Opción B**, con esta secuencia:
@@ -157,6 +220,24 @@ volcado y de la base al terminar (Principios I y X a la vez).
 4. **Aparte**: comprobar en el panel del proveedor si hay snapshots del VPS y
    activarlos si no cuestan mucho — como complemento, y sabiendo lo que no
    resuelven.
+
+## 7-bis. Qué queda pendiente después de esto
+
+Con la configuración de arriba aplicada, el agujero grande se cierra a medias.
+Lo que **sigue faltando**, dicho sin adornos:
+
+1. **El destino sigue siendo LOCAL.** Los volcados quedan en el mismo disco que
+   las bases. Eso protege de un borrado accidental, de una migración que salió
+   mal y de una tabla corrupta — **no protege de perder la máquina**. Si el VPS
+   desaparece, se van las bases y los respaldos juntos. Se resuelve a fin de mes
+   activando el destino externo en el mismo panel.
+2. **El simulacro de restauración sigue pendiente.** Un respaldo que nadie ha
+   restaurado nunca no es un respaldo, es un archivo. El procedimiento está
+   escrito en
+   [`specs/020-notificaciones-push/quickstart.md`](../specs/020-notificaciones-push/quickstart.md)
+   y su primer uso será el ensayo del Principio X de la 020.
+3. **Los snapshots del VPS siguen sin verificar.** Solo se ven en el panel del
+   proveedor, y no sustituyen a esto (sección 2).
 
 ## 8. Lo que NO pude verificar desde aquí
 
