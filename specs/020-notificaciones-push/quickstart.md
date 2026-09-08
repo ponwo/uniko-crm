@@ -33,16 +33,15 @@ pasa; lo que rompe es la forma de los datos que ya existen.
 > volcado pese cientos de megas, este mismo procedimiento dirá cosas nuevas — y
 > habrá que mirar el tiempo, no solo el "sin errores".
 
-## Lo primero, y es un hallazgo incómodo
+## De dónde sale el respaldo (resuelto el 2026-09-08)
 
-**Ninguna de las tres bases de la flota tiene respaldos programados.**
-Comprobado el 2026-09-07 contra Coolify: las tres devuelven cero
-programaciones.
+Cuando se escribió esto, **ninguna base de la flota tenía respaldos
+programados**: había que producir el volcado a mano. Ya no.
 
-Es decir: hoy no hay de dónde sacar "el último respaldo", y si una base se
-perdiera no habría nada que restaurar. Eso excede esta feature y está reportado
-aparte, pero cambia el primer paso de este procedimiento: **hay que producir el
-respaldo, no descargarlo.**
+Desde el 2026-09-08 las cuatro bases tienen **programación diaria con 14 días de
+retención**, y la primera ejecución de cada una terminó en verde
+([`docs/respaldos-flota.md`](../../docs/respaldos-flota.md)). Así que el primer
+paso es **elegir un volcado reciente**, no fabricarlo.
 
 ## Reglas que no se negocian
 
@@ -63,12 +62,6 @@ respaldo, no descargarlo.**
 ## Paso a paso
 
 ### 1. Producir el respaldo — **a mano, porque no hay programaciones**
-
-> **Este paso es más largo de lo que será.** Hoy no existe ningún respaldo
-> programado (ver [`docs/respaldos-flota.md`](../../docs/respaldos-flota.md)), así
-> que **no hay "último respaldo" que descargar: hay que producirlo**. Cuando el
-> dueño configure las programaciones, este paso se reduce a *bajar la última
-> ejecución del historial* y todo lo demás sigue igual.
 
 **Opción 1 — desde Coolify** (la más simple): proyecto de la instancia → su base
 **Postgres** → pestaña **Backups** → **Back up now**. Coolify ejecuta el volcado
