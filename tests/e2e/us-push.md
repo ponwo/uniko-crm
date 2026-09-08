@@ -199,12 +199,16 @@ notificación**.
 
 ### Qué se comprueba en iOS
 
-Aquí hay una pregunta **abierta** que este nivel existe para responder (research
-R4): está documentado que **Safari ignora la `tag`** y crea una notificación
-nueva por cada push, y que **ignora el `icon`** (usa el de la app). El reporte es
-de iOS 16.4 y el issue sigue abierto; no hay fuente que confirme que se arregló
-ni que sigue roto. **La spec funciona en los dos casos** — lo que no vale es
-suponer cuál.
+Está documentado que **Safari ignora la `tag`** y crea una notificación nueva por
+cada push, y que **ignora el `icon`** (usa el de la app). El reporte es de iOS
+16.4 y el issue sigue abierto; no hay fuente que confirme que se arregló ni que
+sigue roto. **La spec funciona en los dos casos.**
+
+> **Esto era la pregunta abierta de research R4, y quedó cerrada el 2026-09-08 —
+> por incomprobable, no por respondida.** En uso normal nunca hay un segundo
+> aviso de la misma conversación, que es el único caso que distinguiría. No se
+> vuelve a intentar en las siguientes corridas; el razonamiento está en el
+> registro.
 
 - [ ] En una **pestaña de Safari** (no la app instalada), Ajustes → Avisos dice
       que hacen falta instalarla, en vez de ofrecer un botón que no puede
@@ -213,9 +217,11 @@ suponer cuál.
       concede.
 - [x] Llega con la app **cerrada del todo**.
 - [x] Al tocarla se abre **esa** conversación.
-- [~] **La pregunta de R4**: dos conversaciones distintas dieron **dos avisos**,
-      igual que en Android. Eso NO distingue si la `tag` se respeta — ver el
-      registro de abajo.
+- [x] **La pregunta de R4**: cerrada, y no por haberla respondido. Dos
+      conversaciones distintas dan dos avisos —lo que no distingue nada— y el
+      caso que sí distinguiría, dos avisos de la MISMA conversación, **no ocurre
+      en uso normal**: el pipeline calla mientras haya `handoff_at`. Ver el
+      registro de abajo. **No hay que volver a intentarlo en la próxima corrida.**
 - [x] **Versión de iOS: 26.6.1.**
 - [ ] ¿Qué icono muestra el sistema? (si ignora el nuestro y usa el de la app
       instalada, es lo esperado y no es un fallo).
@@ -265,7 +271,7 @@ suscripción es del navegador de ese aparato (FR-511)— y en esta corrida
 **pareció un fallo** hasta caer en la cuenta. Ya está escrito en el paso 1 del
 procedimiento, que es donde hace falta leerlo.
 
-#### La pregunta de R4, con precisión: **sigue abierta**
+#### La pregunta de R4: **cerrada por incomprobable, no por respondida**
 
 Lo observado en iOS **26.6.1** es que **dos conversaciones distintas producen dos
 avisos**, igual que en Android. El dueño lo leyó como que la `tag` **sí se
@@ -279,19 +285,25 @@ hipótesis, y por tanto no distingue entre ellas.
 
 Lo único que respondería la pregunta es **dos avisos de la MISMA conversación**:
 si el segundo **reemplaza** al primero, la `tag` se respeta; si se **apilan**, se
-ignora. Y eso es difícil de provocar a propósito —el pipeline calla en cuanto hay
-`handoff_at`, así que hay que devolverle la conversación al agente entre un aviso
-y otro—, que es justo por lo que el guion no lo pedía como bloqueante.
+ignora.
 
-**Qué significa en la práctica: nada urgente.** La spec está escrita para
-funcionar en los dos casos, y el escenario de "varios avisos de la misma
-conversación" casi no puede ocurrir por el mismo motivo. Se queda anotado como
-**no discriminado en iOS 26.6.1**, que es más útil dentro de un año que un "sí"
-que nadie pueda rastrear.
+**Y ese segundo aviso no existe en uso normal.** Al escalar, `applyHandoff()`
+fija `handoff_at`, y el pipeline arranca callándose mientras eso esté puesto: la
+conversación no vuelve a producir turnos —ni escalaciones— hasta que **una
+persona la reactive a mano**. El sistema, por sí solo, nunca manda dos avisos de
+la misma conversación.
 
-> Si en la corrida se llegó a ver un segundo aviso **de la misma conversación**
-> reemplazando al primero, eso sí cierra R4: dilo y se registra como confirmado,
-> con la versión.
+**Lo que hace innecesaria la agrupación es exactamente lo mismo que hace
+incomprobable si la `tag` se respeta.** Así que R4 no se queda "pendiente de
+probar en la próxima corrida": se cierra aquí, diciendo que **no es comprobable
+en uso normal y que no hace falta que lo sea**. Un pendiente que nadie va a poder
+cerrar nunca es peor que un cierre razonado — vuelve cada vez que alguien lee el
+guion y cuesta lo mismo redescubrirlo.
+
+Se podría forzar a mano —reactivar la IA sobre esa conversación y volver a
+escalarla— pero eso mediría el comportamiento de iOS, no el del producto. **La
+`tag` se queda porque no cuesta nada y ayuda donde el sistema la respeta; el
+producto no depende de ella.**
 
 ### SC-006 en dispositivo — 2026-09-08 ⚠️ NO EJERCIDO (decisión del dueño)
 
