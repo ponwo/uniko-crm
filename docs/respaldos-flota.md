@@ -4,27 +4,40 @@
 a aplicar está en la sección **6-bis**, y **la aplica el dueño en Coolify** — no
 un agente: es infraestructura viva de dos clientes.
 
-**El dueño la aplicó el 2026-09-08** en las cuatro bases, y lanzó además un
-respaldo manual en cada una.
+**PROGRAMADAS Y VERIFICADAS el 2026-09-08.** Las cuatro bases tienen su
+programación diaria, creada por MCP y leída de vuelta una por una.
 
-> ⚠️ **La verificación por MCP quedó SIN CONCLUIR, y no se disfraza.**
-> `database_backups/list_schedules` sigue devolviendo lista vacía en las cuatro
-> después de aplicarlas, y `list_executions` exige un `backup_uuid` que solo se
-> obtiene de esa misma lista: la cadena se corta y desde aquí no se puede
-> enumerar nada.
->
-> Quedan dos posibilidades y **no se pueden separar desde el MCP**: que las
-> programaciones no llegaran a guardarse, o que este endpoint no las reporte en
-> esta versión. Se confirma mirando la pestaña **Backups** de cualquier base en
-> Coolify —si aparece la programación y una ejecución en verde, están— o pasando
-> el `backup_uuid` que sale en la URL, con el que `get_schedule` responde
-> directo.
->
-> **Consecuencia incómoda y honesta**: el hallazgo original de este documento
-> —"ninguna base tiene respaldos programados"— salió de **ese mismo endpoint**.
-> Si el endpoint es ciego, aquella lectura tampoco era de fiar. Lo que sí
-> sostiene el diagnóstico por otro lado es que nunca se había sacado un respaldo
-> de ninguna instancia, y eso lo sabemos sin herramientas.
+| Base | UUID de la programación | Frecuencia | Base | Retención |
+|---|---|---|---|---|
+| `uniko-lanco-db` | `8rsztyk88fbd4g7wwcpufeip` | `0 3 * * *` | `uniko` | 14 días |
+| `uniko-iltu-db` | `fauudbtdjg5otbqbo5ohdgj2` | `15 3 * * *` | `uniko` | 14 días |
+| `uniko-nuriaandrea-db` | `t4y0oznkzh2f4a1sjazbcxa5` | `30 3 * * *` | `uniko` | 14 días |
+| `kosmo-db` | `m7dhvivvxjhtzrkmpatdzutr` | `45 3 * * *` | `kosmo` | 14 días |
+
+En las cuatro: habilitadas, `dump_all` en **false**, S3 apagado, retención por
+número en 0 (manda la de días), `timeout` 3600 (el que pone el panel). **Una sola
+programación por base**: no hay duplicados.
+
+### Qué pasó con el intento anterior, y qué aprendimos del MCP
+
+El dueño aplicó las cuatro por el panel y no llegaron a guardarse: al crear la
+primera por MCP, el listado —que hasta entonces devolvía vacío— empezó a
+responder con ella. **El listado no estaba ciego: de verdad no había nada.** El
+hallazgo original de este documento se sostiene.
+
+Lo que sí está roto en este MCP es `get_schedule` por uuid: devuelve *Not found*
+para un uuid que el listado muestra. Para verificar, usar **`list_schedules`**.
+
+### ⚠️ El respaldo manual NO se pudo lanzar
+
+Este MCP **no expone ninguna acción para ejecutar un respaldo ahora**: tiene
+crear, listar, actualizar y borrar, pero no "run". No se forzó por otra vía —
+habría significado tocar cosas fuera de la configuración de respaldo.
+
+Por tanto, a esta fecha las cuatro programaciones tienen **cero ejecuciones**, y
+sigue siendo cierto lo de siempre: **una programación que nunca ha corrido es una
+intención, no un respaldo.** Hace falta un "Back up now" desde el panel en cada
+base — o esperar a las 03:00 y mirar el historial al día siguiente.
 
 Escrita porque al preparar el ensayo del Principio X de la feature 020 apareció
 un hallazgo que es más grave que la feature.
@@ -245,17 +258,19 @@ Principio X de la 020.
 Con la configuración de arriba aplicada, el agujero grande se cierra a medias.
 Lo que **sigue faltando**, dicho sin adornos:
 
-1. **El destino sigue siendo LOCAL.** Los volcados quedan en el mismo disco que
+1. **Ninguna programación ha corrido todavía.** Sin una ejecución en verde no
+   hay respaldo, solo un cron esperando. Primer "Back up now" pendiente.
+2. **El destino sigue siendo LOCAL.** Los volcados quedan en el mismo disco que
    las bases. Eso protege de un borrado accidental, de una migración que salió
    mal y de una tabla corrupta — **no protege de perder la máquina**. Si el VPS
    desaparece, se van las bases y los respaldos juntos. Se resuelve a fin de mes
    activando el destino externo en el mismo panel.
-2. **El simulacro de restauración sigue pendiente.** Un respaldo que nadie ha
+3. **El simulacro de restauración sigue pendiente.** Un respaldo que nadie ha
    restaurado nunca no es un respaldo, es un archivo. El procedimiento está
    escrito en
    [`specs/020-notificaciones-push/quickstart.md`](../specs/020-notificaciones-push/quickstart.md)
    y su primer uso será el ensayo del Principio X de la 020.
-3. **Los snapshots del VPS siguen sin verificar.** Solo se ven en el panel del
+4. **Los snapshots del VPS siguen sin verificar.** Solo se ven en el panel del
    proveedor, y no sustituyen a esto (sección 2).
 
 ## 8. Lo que NO pude verificar desde aquí
