@@ -1,4 +1,5 @@
 import { SW_RUTAS_EXCLUIDAS } from "@/lib/sw-scope";
+import { APP_VERSION, resolveBuildCommit } from "@/lib/version";
 
 export const dynamic = "force-dynamic";
 
@@ -146,18 +147,35 @@ self.addEventListener("fetch", (event) => {
 }
 
 export function GET() {
-  const version =
-    process.env.NEXT_PUBLIC_APP_VERSION ??
-    process.env.npm_package_version ??
-    "dev";
-  const commit = process.env.NEXT_PUBLIC_BUILD_COMMIT ?? "";
+  /*
+   * La versión se resuelve por el MISMO camino que `/api/health`, no leyendo
+   * `NEXT_PUBLIC_BUILD_COMMIT` a mano.
+   *
+   * Leerla a mano tenía una consecuencia que solo se vio en LanCo desplegada:
+   * Coolify publica `SOURCE_COMMIT` en el contenedor pero no siempre lo inyecta
+   * como build-arg, así que la variable congelada al construir venía vacía. El
+   * health sí enseñaba el commit —usa el respaldo de runtime— y este archivo
+   * no. Resultado: **el cuerpo del service worker salía idéntico entre
+   * despliegues**.
+   *
+   * Y eso importa más de lo que parece: el navegador decide si hay versión
+   * nueva **comparando los bytes** de este archivo. Con un cuerpo constante, el
+   * worker instalado en el teléfono de un cliente se queda ahí con las reglas
+   * de enrutado estático que registró el día que se instaló — y el día que esa
+   * lista cambie (la 020 va a tocarla), nadie se enteraría de que no cambió.
+   * Un worker pegado en un móvil ajeno es de lo más difícil de diagnosticar.
+   */
+  const commit = resolveBuildCommit();
 
-  return new Response(cuerpoDelServiceWorker(commit ? `${version}+${commit}` : version), {
-    headers: {
-      "content-type": "application/javascript; charset=utf-8",
-      // Un service worker cacheado con fuerza es una versión vieja que ya nadie
-      // puede desalojar.
-      "cache-control": "no-cache",
-    },
-  });
+  return new Response(
+    cuerpoDelServiceWorker(commit ? `${APP_VERSION}+${commit}` : APP_VERSION),
+    {
+      headers: {
+        "content-type": "application/javascript; charset=utf-8",
+        // Un service worker cacheado con fuerza es una versión vieja que ya
+        // nadie puede desalojar.
+        "cache-control": "no-cache",
+      },
+    }
+  );
 }

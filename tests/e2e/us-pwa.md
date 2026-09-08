@@ -113,18 +113,18 @@ Tras el merge a `main`, en `https://uniko.lanco.cloud`.
 
 **Instalación con la marca real**
 
-- [ ] Android: el botón instala y en la pantalla de inicio aparece **el logo del
+- [x] Android: el botón instala y en la pantalla de inicio aparece **el logo del
       negocio**, no el de Uniko, con el nombre del negocio debajo.
-- [ ] iOS: lo mismo por Compartir → Añadir a pantalla de inicio.
-- [ ] El `short_name` real del negocio **no se corta de forma fea** — esto solo
+- [x] iOS: lo mismo por Compartir → Añadir a pantalla de inicio.
+- [x] El `short_name` real del negocio **no se corta de forma fea** — esto solo
       se puede ver aquí: en la pasada 1 el nombre era "Uniko", que cabe en
       cualquier sitio.
 
 **Lo que cierra la feature**
 
-- [ ] **La no regresión del SSE en dispositivo**: con la app instalada, entra un
+- [x] **La no regresión del SSE en dispositivo**: con la app instalada, entra un
       mensaje real de WhatsApp y **aparece solo**, sin recargar (SC-007).
-- [ ] Y si además se deja la app en segundo plano unos minutos antes de que
+- [x] Y si además se deja la app en segundo plano unos minutos antes de que
       entre, se ejerce de paso el fallo que arregló la 018, ahora con el service
       worker delante.
 
@@ -218,9 +218,36 @@ Esto es lo que la pasada 1 no podía probar: **el camino completo del cliente**
 —aviso, subida, aviso que se retira solo, manifiesto con su icono— ejercido en
 una instancia real y no en un test.
 
-**Instalación con marca real** — pendiente (en curso)
+**Instalación con marca real** ✅
 
-**No regresión del SSE en dispositivo (SC-007)** — pendiente
+| Dato | Valor | Cómo se obtuvo |
+|---|---|---|
+| Android: instalada, con el icono y el nombre del negocio | correcto | **confirmación global del dueño**, sin desglose criterio por criterio |
+| iOS: instalada por Compartir → Añadir a pantalla de inicio | correcto | ídem |
+| `short_name` "LanCo" sin recortes | correcto | ídem |
+| Versiones de Android e iOS | **no registradas** | no se dieron |
+
+**No regresión del SSE en dispositivo (SC-007)** ✅ — **el que cierra la feature**
+
+| Dato | Valor | Cómo se obtuvo |
+|---|---|---|
+| App instalada en la pantalla de inicio, y **en segundo plano** | sí | **relato explícito del dueño** |
+| Entró un **mensaje real de WhatsApp** durante ese rato | sí | ídem |
+| Al volver, **apareció sin recargar** | sí | ídem |
+
+**Lectura**: esto es la 018 volviendo a funcionar con el service worker delante,
+en un teléfono real y con un mensaje real — no en un arnés. Es lo que ninguna
+comprobación de `localhost` podía dar, y la razón por la que la 019 se planificó
+con ciclo completo: el service worker se pone delante del canal que la 018 acaba
+de arreglar.
+
+**Nivel 3 CERRADO** (SC-001, SC-002, SC-003, SC-007 y FR-428 ejercidos en
+dispositivo real).
+
+> **Sobre el desglose**: en las dos plataformas de esta pasada el dueño confirmó
+> el conjunto, no criterio por criterio — igual que en la pasada 1, y aquí queda
+> dicho tal cual. Lo único con detalle propio es SC-007, que sí se relató paso a
+> paso, y el paso 0 del icono, que además se verificó por HTTP desde fuera.
 
 ### Hallazgo menor, anotado durante esta pasada
 
