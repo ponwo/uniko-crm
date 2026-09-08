@@ -15,6 +15,7 @@ import {
   type AgentActionType,
 } from "@/server/ai/actions";
 import { matchesHandoffIntent } from "@/server/ai/handoff";
+import { avisarDeEscalacion } from "@/server/push/avisar";
 import { buildAgentSystemPrompt } from "@/server/ai/prompts";
 import { agendaEnabled } from "@/server/agenda/flag";
 import { bookSlot, offerSlots } from "@/server/agenda/agent";
@@ -316,6 +317,20 @@ export async function applyHandoff(
     data: {
       conversation: { id: conversationId, handoffReason: reason },
     },
+  });
+
+  /*
+   * 020 — El aviso fuera de la app, para quien no la tiene delante.
+   *
+   * Va DESPUÉS de que la escalación esté guardada y publicada, y **no se
+   * espera**: el handoff no puede depender de que un servicio de terceros
+   * conteste (FR-504). `avisarDeEscalacion` nunca lanza, y corta por `is_test`
+   * en su primera línea — el Laboratorio escala por aquí mismo.
+   */
+  void avisarDeEscalacion({
+    conversationId,
+    organizationId,
+    esConversacionDePrueba: updated[0].isTest,
   });
 }
 

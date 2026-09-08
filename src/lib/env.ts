@@ -33,6 +33,15 @@ const envSchema = z.object({
   // 015: motor de agenda. Apagado por defecto — sin el, toda la superficie de
   // agenda responde 404 y la UI no la menciona. Ej.: AGENDA=on
   AGENDA: z.string().optional(),
+  // 020: notificaciones push cuando el agente escala. Apagadas por defecto
+  // (ADR-003): Web Push se entrega por FCM/APNs, que es un tercero en runtime,
+  // y el Principio II solo lo permite como conector opcional. Sin esta
+  // variable, la instancia no registra manejador de push, no pide permiso, no
+  // genera claves y sus rutas responden 404. Ej.: PUSH=on
+  PUSH: z.string().optional(),
+  // 020: a donde se mandan los avisos. Vacia en produccion (se usa el endpoint
+  // que dio el navegador); en pruebas apunta al mock de esta misma app.
+  PUSH_SERVICE_BASE_URL: z.string().optional(),
   // 016: atribucion de anuncios y reporte a la Conversions API de Meta.
   // Apagada por defecto: sin ella no se captura de que anuncio vino una
   // conversacion, no se le reporta nada a Meta y la superficie da 404.

@@ -56,23 +56,23 @@ caso barato.
 
 **Purpose**: la bandera y la migración aditiva.
 
-- [ ] T001 [P] Crear `src/server/push/flag.ts` siguiendo el patrón de
+- [x] T001 [P] Crear `src/server/push/flag.ts` siguiendo el patrón de
       `src/server/agenda/flag.ts`: `parsePushFlag`, `pushEnabled()` leyendo
       `process.env.PUSH` directo (no por `getEnv()`), y el helper de respuesta
       404 para superficies apagadas (FR-518)
-- [ ] T002 [P] Tests en `tests/unit/push-flag.test.ts`: valores que cuentan como
+- [x] T002 [P] Tests en `tests/unit/push-flag.test.ts`: valores que cuentan como
       encendida, cualquier otra cosa apagada, y que la ausencia de la variable no
       lanza
-- [ ] T003 Añadir a `src/lib/db/schema.ts` las **dos tablas nuevas** del
+- [x] T003 Añadir a `src/lib/db/schema.ts` las **dos tablas nuevas** del
       [data-model](data-model.md): `push_subscription` (id `ps_`,
       `organization_id` NOT NULL, `user_id` NOT NULL, `endpoint` UNIQUE,
       `created_at`, `last_ok_at`) y `push_key` (id `pk_`, `organization_id`
       UNIQUE, `public_key`, `private_cipher/iv/tag`, `created_at`), con índice
       org-first en ambas
-- [ ] T004 Generar la migración con `pnpm db:generate` y revisar
+- [x] T004 Generar la migración con `pnpm db:generate` y revisar
       `drizzle/0013_*.sql` **línea por línea**: solo `CREATE TABLE` e `INDEX`.
       Si aparece un `ALTER` sobre algo existente, **parar** (regla 3)
-- [ ] T005 Declarar `PUSH` en `src/lib/env.ts` con su documentación, y añadirla a
+- [x] T005 Declarar `PUSH` en `src/lib/env.ts` con su documentación, y añadirla a
       `.env.example` con guía inline
 
 **Checkpoint**: la bandera existe y la migración está escrita. Nada visible aún.
@@ -86,42 +86,42 @@ particular T012.
 
 ### Las claves de la instancia
 
-- [ ] T006 [P] Crear `src/server/push/claves.ts`: generar el par P-256 con
+- [x] T006 [P] Crear `src/server/push/claves.ts`: generar el par P-256 con
       `node:crypto`, guardar la privada cifrada con `encryptSecret` (mismo
       formato `cipher/iv/tag` que el token de WhatsApp), y leerla descifrando.
       Se crea sola la primera vez que hace falta (FR-515)
-- [ ] T007 [P] Tests en `tests/unit/push-claves.test.ts`: se genera una sola vez
+- [x] T007 [P] Tests en `tests/unit/push-claves.test.ts`: se genera una sola vez
       por organización; la privada **nunca** aparece en el objeto devuelto al
       llamador que solo pide la pública; y descifrar con clave equivocada lanza
-- [ ] T008 [P] Crear `src/server/push/vapid.ts`: firmar el JWT ES256 con
+- [x] T008 [P] Crear `src/server/push/vapid.ts`: firmar el JWT ES256 con
       `node:crypto`, incluida la conversión DER → R‖S de la firma
-- [ ] T009 [P] Tests en `tests/unit/push-vapid.test.ts`: el JWT tiene tres
+- [x] T009 [P] Tests en `tests/unit/push-vapid.test.ts`: el JWT tiene tres
       partes, el header dice ES256, la firma son 64 bytes, y `aud` sale del
       origen del endpoint
 
 ### El adaptador y su mock
 
-- [ ] T010 Crear `src/server/push/enviar.ts` con el contrato de
+- [x] T010 Crear `src/server/push/enviar.ts` con el contrato de
       [contracts/push.md](contracts/push.md): `enviarAviso(suscripcion)` →
       `entregada | caducada | fallo`, con **cuerpo vacío** (FR-505) y sin
       reintentos
-- [ ] T011 Crear el mock del servicio de entrega en `src/app/api/dev/push-mock/`
+- [x] T011 Crear el mock del servicio de entrega en `src/app/api/dev/push-mock/`
       tras `dev-guard`, con sus caminos infelices: acepta, responde **410**,
       rechaza con 500, y tarda más de la cuenta
 
 ### El guardarraíl, ANTES de que exista el disparador
 
-- [ ] T012 Crear `src/server/push/avisar.ts` —la capacidad de dominio— con el
+- [x] T012 Crear `src/server/push/avisar.ts` —la capacidad de dominio— con el
       orden del contrato: **`is_test` corta en la primera línea** (FR-503),
       después la bandera, después los destinatarios. **Nunca lanza** (FR-504)
-- [ ] T013 Tests en `tests/unit/push-destinatarios.test.ts`: una conversación de
+- [x] T013 Tests en `tests/unit/push-destinatarios.test.ts`: una conversación de
       prueba **no avisa a nadie**; con la bandera apagada tampoco; con todo
       encendido avisan a los usuarios con suscripción viva; y un fallo del
       adaptador **no propaga excepción**
 
 ### La comprobación que protege a la 019
 
-- [ ] T014 Extender `scripts/e2e-pwa.mjs` (o el guion de push, según dónde
+- [x] T014 Extender `scripts/e2e-pwa.mjs` (o el guion de push, según dónde
       quede más limpio) para que **las dos mitades de la exclusión de
       `/api/events` se comprueben también con `PUSH=on`**: el service worker
       controla la página, y el handler **nunca ve** el canal de eventos. Añadir
@@ -141,29 +141,29 @@ delante, y que al tocarla se abra esa conversación.
 **Independent Test**: con la bandera encendida y el mock, una escalación produce
 un envío con cuerpo vacío; una del Laboratorio no produce ninguno.
 
-- [ ] T015 [US1] Cablear el aviso en `applyHandoff()` de
+- [x] T015 [US1] Cablear el aviso en `applyHandoff()` de
       `src/server/ai/pipeline.ts`: **una línea**, después de que la escalación
       esté guardada y sin esperarla (FR-501, FR-504)
-- [ ] T016 [P] [US1] Crear `src/app/api/push/pendiente/route.ts`: devuelve la
+- [x] T016 [P] [US1] Crear `src/app/api/push/pendiente/route.ts`: devuelve la
       conversación escalada más reciente y su nombre, para que el service worker
       sepa qué mostrar (FR-506). Detrás de la bandera y de sesión
-- [ ] T017 [US1] Añadir a `src/app/api/sw/route.ts` el bloque de `push` y
+- [x] T017 [US1] Añadir a `src/app/api/sw/route.ts` el bloque de `push` y
       `notificationclick` **solo cuando `pushEnabled()`** (FR-519), sin tocar el
       `install` con el enrutado estático ni la salida temprana del `fetch`
-- [ ] T018 [US1] En ese bloque: pedir el detalle a la propia instancia, mostrar
+- [x] T018 [US1] En ese bloque: pedir el detalle a la propia instancia, mostrar
       la notificación, y si la petición falla mostrar el **texto degradado**
       "Alguien necesita atención · El agente pasó una conversación a un humano.
       Ábrela para ver cuál." (FR-507)
-- [ ] T019 [US1] `notificationclick`: enfocar una pestaña abierta si la hay, o
+- [x] T019 [US1] `notificationclick`: enfocar una pestaña abierta si la hay, o
       abrir `/inbox?conversation=<id>`; sin id conocido, abrir la bandeja
       (FR-508)
-- [ ] T020 [US1] Tests en `tests/unit/sw-push.test.ts`: con la bandera apagada el
+- [x] T020 [US1] Tests en `tests/unit/sw-push.test.ts`: con la bandera apagada el
       cuerpo **no contiene** `push` ni `notificationclick`; con ella encendida sí,
       y **siguen estando** las reglas de exclusión y la salida temprana
-- [ ] T021 [US1] Crear `scripts/e2e-push.mjs`: con `PUSH=on`, una escalación
+- [x] T021 [US1] Crear `scripts/e2e-push.mjs`: con `PUSH=on`, una escalación
       produce un envío al mock y **su cuerpo va vacío**; una del Laboratorio no
       produce ninguno; con la bandera apagada las rutas dan 404
-- [ ] T022 [US1] Encadenar `e2e-push.mjs` en `test:e2e` de `package.json`
+- [x] T022 [US1] Encadenar `e2e-push.mjs` en `test:e2e` de `package.json`
 
 **Checkpoint**: US1 completa. El aviso llega (contra el mock) y el Laboratorio no
 despierta a nadie.
@@ -181,8 +181,14 @@ apagada, la tarjeta no existe.
 
 - [ ] T023 [P] [US2] Crear `src/app/api/push/clave-publica/route.ts`: devuelve la
       clave pública de la instancia, generando el par si aún no existe
-- [ ] T024 [US2] Crear `src/app/api/push/suscripcion/route.ts` con alta (POST) y
+- [x] T024 [US2] Crear `src/app/api/push/suscripcion/route.ts` con alta (POST) y
       baja (DELETE), idempotentes por `endpoint` (FR-511, Principio IV)
+
+      **Adelantada desde la Fase 4**, y conviene decir por qué: el arnés de US1
+      no puede probar nada sin un dispositivo suscrito, y meterlo por una puerta
+      de pruebas habría sido inventar una superficie para no reordenar dos
+      tareas. La parte de US2 que sigue pendiente es la de verdad: la tarjeta de
+      Ajustes, el permiso en el clic y el texto de iOS.
 - [ ] T025 [P] [US2] Crear `src/components/settings/avisos-card.tsx` con los tres
       estados, decididos con `lib/platform` de la 019: se puede / hace falta
       instalar la app / ya están activados (FR-513)
