@@ -104,11 +104,11 @@ Tras el merge a `main`, en `https://uniko.lanco.cloud`.
 
 **Paso 0 — el icono, antes de instalar nada**
 
-- [ ] En Ajustes → Marca hay un aviso diciendo que el icono actual no sirve para
+- [x] En Ajustes → Marca hay un aviso diciendo que el icono actual no sirve para
       la app instalada.
-- [ ] Se sube un **PNG cuadrado de 512×512 o más**.
-- [ ] **El aviso desaparece solo**, sin recargar a mano (FR-428).
-- [ ] `/api/branding/manifest` pasa a declarar **una sola entrada** de icono, la
+- [x] Se sube un **PNG cuadrado de 512×512 o más**.
+- [x] **El aviso desaparece solo**, sin recargar a mano (FR-428).
+- [x] `/api/branding/manifest` pasa a declarar **una sola entrada** de icono, la
       del negocio, con `sizes: "192x192 512x512"` (FR-425, FR-426).
 
 **Instalación con la marca real**
@@ -197,4 +197,36 @@ Lo que sí se puede afirmar sin matices, porque es consecuencia necesaria de que
 la app quedara instalada: las instrucciones bastaron para llegar hasta el final
 sin ayuda.
 
-### Pasada 2, LanCo — pendiente (tras el merge a `main`)
+### Pasada 2, LanCo — 2026-09-07, en curso
+
+**Despliegue**: LanCo pasó de `822b7f0` a **`e5337a4`**; `/sw.js` y el manifiesto
+pasaron de 404 a 200. Antes del despliegue la instancia no era instalable, que es
+lo que hace que esta pasada signifique algo.
+
+**Paso 0 — el icono, ANTES de instalar** ✅
+
+| Dato | Valor | Cómo se obtuvo |
+|---|---|---|
+| Punto de partida | `favicon: null`, `iconoInstalable: false`, manifiesto con los dos PNG de fábrica | **verificado desde fuera** por HTTP |
+| Se subió un PNG del negocio | sí | acción del dueño |
+| **El aviso desapareció solo, sin recargar** (FR-428) | **Sí** | **confirmación explícita del dueño** |
+| El manifiesto quedó con **una sola entrada** | `/api/branding/icon?v=u1788830785540`, `sizes: "192x192 512x512"`, `image/png` | **verificado desde fuera** |
+| El icono servido es el del negocio | **512×512, cuadrado, PNG**, y distinto byte a byte del de fábrica | **verificado leyendo los bytes**, no el JSON |
+| Marca en el manifiesto | `name` "LanCo — CRM de WhatsApp", `short_name` "LanCo", `theme_color` `#3f6b66` | **verificado desde fuera** |
+
+Esto es lo que la pasada 1 no podía probar: **el camino completo del cliente**
+—aviso, subida, aviso que se retira solo, manifiesto con su icono— ejercido en
+una instancia real y no en un test.
+
+**Instalación con marca real** — pendiente (en curso)
+
+**No regresión del SSE en dispositivo (SC-007)** — pendiente
+
+### Hallazgo menor, anotado durante esta pasada
+
+`GET /api/settings/branding` devuelve `iconoInstalable: false` a cualquier
+llamada **sin sesión**: esa ruta es pública (el login necesita la marca) y sin
+sesión no resuelve la organización, así que el campo cae a `false` aunque el
+icono sí sirva. En la pantalla de Ajustes, con sesión, el dato es correcto — y el
+manifiesto, que resuelve la organización por otro camino, ve el icono bien. **No
+afecta a la feature**; queda apuntado para limpiar.
