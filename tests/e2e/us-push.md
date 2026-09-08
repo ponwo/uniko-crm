@@ -153,9 +153,10 @@ sesión, así que el aviso sigue llegando— y provocar otra escalación: el wor
 pregunta el detalle, recibe un 401 y debe enseñar *"Alguien necesita atención /
 Abre la bandeja para ver quién"*. **Volver a entrar después.**
 
-**8. El Laboratorio no suena (SC-006).** Con los avisos ya activados, lanzar una
-evaluación del Laboratorio desde la app y comprobar que **no llega nada**. Es un
-guardarraíl de datos de clientes, y verlo en el teléfono cuesta un minuto.
+**8. El Laboratorio no suena (SC-006) — NO se ejerce en dispositivo.** Decidido
+el 2026-09-08, con su razón, y **no se da por verde**: ver abajo, en el registro
+de corridas. El guardarraíl queda cubierto por el nivel 1 y el nivel 2; lo que
+NO hay es una confirmación en teléfono real, y así se dice.
 
 **9. La 018 y la 019 siguen vivas.** Con la app abierta, que entre un mensaje y
 aparezca **solo**, sin recargar. Si esto se rompió, se rompió con el service
@@ -220,7 +221,7 @@ suponer cuál.
 | Dos escalaciones: ¿apilan o reemplazan? | | |
 | Icono mostrado | | |
 | Texto degradado sin sesión | | |
-| El Laboratorio, ¿sonó? (debe ser **no**) | | |
+| El Laboratorio, ¿sonó? | **no ejercido** — ver registro | **no ejercido** |
 | Mensaje entrante en vivo, ¿sin recargar? | | |
 
 ---
@@ -228,6 +229,46 @@ suponer cuál.
 ## Registro de corridas
 
 *(pendiente: el nivel 3 lo corre el dueño)*
+
+### SC-006 en dispositivo — 2026-09-08 ⚠️ NO EJERCIDO (decisión del dueño)
+
+**No se corrió el Laboratorio en LanCo, y esto no cuenta como verificación.**
+
+**Por qué.** Correr el Laboratorio hoy es correr **las seis personas o ninguna**:
+`POST /api/lab/runs` no acepta parámetros y `startRun()` inserta los seis casos
+de golpe. Y esa corrida **no se puede borrar desde el producto** —no existe
+`DELETE` de corridas, casos ni conversaciones—, así que quedaría para siempre en
+el historial del Laboratorio con un **score que mide el desajuste entre los
+guiones y el negocio**, no la calidad del agente: cuatro de las seis personas
+preguntan por taladros, martillos, clavos y pintura
+(`src/server/lab/personas.ts`), y el juez evalúa contra el knowledge base de
+LanCo, donde eso no puede estar. Ensuciar el historial con un número que engaña
+cuesta más que lo que aporta esta confirmación.
+
+**Qué SÍ cubre el guardarraíl, y hasta dónde llega esa cobertura:**
+
+- **Nivel 1**: el aviso construido para una conversación `is_test` no se manda a
+  nadie — función pura, sin red.
+- **Nivel 2, escenario C del arnés**: una escalación real del Laboratorio contra
+  la app viva **no produce ningún envío**, comprobado tras esperar a que el canal
+  quede en silencio (la ventana de agrupación del agente son 6 s; mirar antes es
+  la receta exacta para atribuirle al Laboratorio un envío del escenario
+  anterior — pasó, y por eso el guion sondea en vez de dormir).
+- **Falsificado a propósito**: la protección se rompió a mano para ver el arnés
+  ponerse rojo antes de darla por buena, y resultó estar en dos capas
+  independientes (el corte por `is_test` en `avisarDeEscalacion` y el filtro de
+  `/api/push/pendiente`).
+
+**Lo que sigue sin comprobarse**: que en un **teléfono real**, con permiso
+concedido y la app instalada, una evaluación del Laboratorio tampoco haga sonar
+nada. Es una confirmación, no la prueba —`applyHandoff()` es el único escritor de
+escalaciones y de ahí sale el aviso, así que el corte es el mismo camino que el
+arnés recorre—, pero **no está hecha y no se declara verde**.
+
+**Cuándo dejaría de costar esto**: el día que el Laboratorio permita elegir qué
+personas correr, o que los guiones salgan del negocio en vez de estar fijos en el
+repo. Cualquiera de las dos convierte esta comprobación en un minuto sin
+residuo.
 
 <!--
 Plantilla, para que la corrida se registre con la misma honestidad que la 019:
