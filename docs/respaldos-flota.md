@@ -4,8 +4,27 @@
 a aplicar está en la sección **6-bis**, y **la aplica el dueño en Coolify** — no
 un agente: es infraestructura viva de dos clientes.
 
-Hasta que él la aplique y quede verificada por el MCP, **sigue sin haber ningún
-respaldo programado**. Este documento se actualiza cuando eso cambie.
+**El dueño la aplicó el 2026-09-08** en las cuatro bases, y lanzó además un
+respaldo manual en cada una.
+
+> ⚠️ **La verificación por MCP quedó SIN CONCLUIR, y no se disfraza.**
+> `database_backups/list_schedules` sigue devolviendo lista vacía en las cuatro
+> después de aplicarlas, y `list_executions` exige un `backup_uuid` que solo se
+> obtiene de esa misma lista: la cadena se corta y desde aquí no se puede
+> enumerar nada.
+>
+> Quedan dos posibilidades y **no se pueden separar desde el MCP**: que las
+> programaciones no llegaran a guardarse, o que este endpoint no las reporte en
+> esta versión. Se confirma mirando la pestaña **Backups** de cualquier base en
+> Coolify —si aparece la programación y una ejecución en verde, están— o pasando
+> el `backup_uuid` que sale en la URL, con el que `get_schedule` responde
+> directo.
+>
+> **Consecuencia incómoda y honesta**: el hallazgo original de este documento
+> —"ninguna base tiene respaldos programados"— salió de **ese mismo endpoint**.
+> Si el endpoint es ciego, aquella lectura tampoco era de fiar. Lo que sí
+> sostiene el diagnóstico por otro lado es que nunca se había sacado un respaldo
+> de ninguna instancia, y eso lo sabemos sin herramientas.
 
 Escrita porque al preparar el ensayo del Principio X de la feature 020 apareció
 un hallazgo que es más grave que la feature.
