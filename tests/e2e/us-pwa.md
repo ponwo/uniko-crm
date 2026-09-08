@@ -89,14 +89,44 @@ No toca ninguna instancia de clientes.
       instancia sin PNG propio? De esta respuesta depende si algún día hay que
       rasterizar en el servidor.
 
-### Pasada 2 — LanCo desplegada
+### Pasada 2 — LanCo desplegada, **con marca real**
 
-Tras el merge a `main`, en `https://uniko.lanco.cloud`. Es la que estrena y la
-única con la marca de un negocio real.
+Tras el merge a `main`, en `https://uniko.lanco.cloud`.
 
-- [ ] Se repite lo de arriba en las dos plataformas.
-- [ ] **El que cierra la no regresión del SSE**: con la app instalada, entra un
+> **Qué prueba esta pasada, y qué NO.** El degradado —instancia sin PNG propio,
+> app instalada con el logo de Uniko— **ya quedó ejercido en la pasada 1** y no
+> hace falta repetirlo. Lo que aquí se prueba, y en ningún otro sitio se ha
+> probado fuera de los tests, es **el camino que van a recorrer los clientes**:
+> subir su icono y ver que la app instalada pasa a llevar el suyo.
+>
+> Por eso el primer paso es **subir el PNG**. Instalar antes de subirlo
+> convertiría esta pasada en una repetición de la anterior.
+
+**Paso 0 — el icono, antes de instalar nada**
+
+- [ ] En Ajustes → Marca hay un aviso diciendo que el icono actual no sirve para
+      la app instalada.
+- [ ] Se sube un **PNG cuadrado de 512×512 o más**.
+- [ ] **El aviso desaparece solo**, sin recargar a mano (FR-428).
+- [ ] `/api/branding/manifest` pasa a declarar **una sola entrada** de icono, la
+      del negocio, con `sizes: "192x192 512x512"` (FR-425, FR-426).
+
+**Instalación con la marca real**
+
+- [ ] Android: el botón instala y en la pantalla de inicio aparece **el logo del
+      negocio**, no el de Uniko, con el nombre del negocio debajo.
+- [ ] iOS: lo mismo por Compartir → Añadir a pantalla de inicio.
+- [ ] El `short_name` real del negocio **no se corta de forma fea** — esto solo
+      se puede ver aquí: en la pasada 1 el nombre era "Uniko", que cabe en
+      cualquier sitio.
+
+**Lo que cierra la feature**
+
+- [ ] **La no regresión del SSE en dispositivo**: con la app instalada, entra un
       mensaje real de WhatsApp y **aparece solo**, sin recargar (SC-007).
+- [ ] Y si además se deja la app en segundo plano unos minutos antes de que
+      entre, se ejerce de paso el fallo que arregló la 018, ahora con el service
+      worker delante.
 
 ### Qué anotar
 
