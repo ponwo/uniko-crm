@@ -243,13 +243,17 @@ con el mock caído, la escalación se guarda igual.
       aditivo comprobado por inventario (30→32 tablas, 20→20 filas de dominio) y
       app arrancando con la marca real de LanCo. La corrida está registrada en el
       [quickstart](quickstart.md)
-- [ ] T034 [P] Escribir el guion de la historia en `tests/e2e/us-push.md` con los
+- [x] T034 [P] Escribir el guion de la historia en `tests/e2e/us-push.md` con los
       tres niveles y el hueco para registrar las corridas, incluida la regla de
       la 018: **una corrida sin notificación recibida no cuenta**
-- [ ] T035 [P] Actualizar `docs/desarrollo-local.md` (los guiones del arnés) y
+- [x] T035 [P] Actualizar `docs/desarrollo-local.md` (los guiones del arnés) y
       `.env.example` con `PUSH`
-- [ ] T036 Gate técnico completo desde la ruta real:
-      `pnpm typecheck && pnpm lint && pnpm test && pnpm build`
+- [x] T036 Gate técnico completo desde la ruta real:
+      `pnpm typecheck && pnpm lint && pnpm test && pnpm build` — **verde el
+      2026-09-08**: los cuatro encadenados salieron con código 0, con **524 tests
+      en 61 archivos**. El nivel 2 se corrió verde antes (31 checks del guion de
+      push) y desde entonces **no ha cambiado ni una línea de código**: lo único
+      que entró es documentación
 - [ ] T037 **Nivel 3 en dispositivo real**: app instalada, permiso concedido y
       escalación real (escribir "quiero hablar con alguien" al número de la
       instancia). Responder las cuatro preguntas del quickstart, incluida si iOS
