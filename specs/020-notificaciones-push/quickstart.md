@@ -132,16 +132,19 @@ export PGPASSWORD=<la contraseña local de postgres>
 ### 4. Restaurar
 
 ```bash
-"/c/Program Files/PostgreSQL/16/bin/pg_restore" -U postgres \
-  -d uniko_ensayo_x_20260907 --no-owner --no-privileges \
-  "$TEMP/uniko-ensayo/uniko-<instancia>-<fecha>.dump"
+"/c/Program Files/PostgreSQL/16/bin/pg_restore" -U postgres -h localhost \
+  -d uniko_ensayo_x_20260908 --no-owner --no-privileges \
+  "$TEMP/uniko-ensayo/pg-dump-uniko-<epoch>.dmp"
 ```
+
+El volcado de Coolify viene en formato **custom** (`.dmp`), que es justo lo que
+`pg_restore` espera. Mecánica probada el 2026-09-08.
 
 Comprueba que llegaron datos de verdad antes de seguir — un ensayo contra una
 restauración vacía es el mismo verde inútil que la constitución quiere evitar:
 
 ```bash
-"/c/Program Files/PostgreSQL/16/bin/psql" -U postgres -d uniko_ensayo_x_20260907 \
+"/c/Program Files/PostgreSQL/16/bin/psql" -U postgres -h localhost -d uniko_ensayo_x_20260908 \
   -c "select count(*) from conversation;" -c "select count(*) from message;"
 ```
 
@@ -150,8 +153,13 @@ restauración vacía es el mismo verde inútil que la constitución quiere evita
 Solo las migraciones. **No** `pnpm db:dev` (crea y siembra), **no** `seed:demo`:
 
 ```bash
-DATABASE_URL="postgresql://postgres:<clave>@localhost:5432/uniko_ensayo_x_20260907" pnpm db:migrate
+DATABASE_URL="postgresql://postgres:<clave>@localhost:5432/uniko_ensayo_x_20260908" pnpm db:migrate
 ```
+
+> **Ruido esperado, no un fallo**: si la copia ya tuviera la migración aplicada,
+> `drizzle-kit` imprime un objeto de error con `routine: 'transformCreateStmt'` y
+> **acto seguido dice `migrations applied successfully`**. Da susto y no es nada.
+> Contra una copia que va por detrás —el caso del ensayo— aplica limpio.
 
 Qué hay que mirar, y qué se anota en el PR:
 
@@ -166,11 +174,21 @@ Qué hay que mirar, y qué se anota en el PR:
 ### 6. Tirarlo todo
 
 ```bash
-"/c/Program Files/PostgreSQL/16/bin/dropdb" -U postgres uniko_ensayo_x_20260907
+"/c/Program Files/PostgreSQL/16/bin/dropdb" -U postgres -h localhost uniko_ensayo_x_20260908
 rm -rf "$TEMP/uniko-ensayo"
 ```
 
-Y en el VPS, borrar el volcado que quedó en `/tmp`.
+Y comprobar que no queda nada, que es la parte que se olvida:
+
+```bash
+"/c/Program Files/PostgreSQL/16/bin/psql" -U postgres -h localhost -l
+```
+
+Solo debe aparecer `uniko_dev`. Si sale cualquier `*ensayo*`, el borrado no
+corrió.
+
+El volcado en el VPS lo gestiona la retención de Coolify (14 días): ahí no hay
+que borrar nada a mano.
 
 ### 7. Dejarlo escrito
 
