@@ -29,6 +29,9 @@ const prefixes = {
   adAttribution: "att",
   conversionEvent: "cve",
   capiSettings: "capi",
+  // 020 — notificaciones push
+  pushSubscription: "ps",
+  pushKey: "pk",
 } as const;
 
 export type IdKind = keyof typeof prefixes;

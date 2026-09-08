@@ -1,5 +1,6 @@
 import { SW_RUTAS_EXCLUIDAS } from "@/lib/sw-scope";
 import { APP_VERSION, resolveBuildCommit } from "@/lib/version";
+import { pushEnabled } from "@/server/push/flag";
 
 export const dynamic = "force-dynamic";
 
@@ -41,7 +42,7 @@ export const dynamic = "force-dynamic";
  * verdad en el camino (`workerStart > 0` en la navegación) y que aun así el
  * canal de eventos no pasa por él (`workerStart === 0`).
  */
-function cuerpoDelServiceWorker(version: string): string {
+function cuerpoDelServiceWorker(version: string, conPush: boolean): string {
   return `/*
  * Uniko — service worker. Generado por src/app/api/sw/route.ts.
  * Versión: ${version}
@@ -143,8 +144,89 @@ self.addEventListener("fetch", (event) => {
 
   // 3. Todo lo demás se deja pasar tal cual.
 });
-`;
+${conPush ? BLOQUE_PUSH : ""}`;
 }
+
+/**
+ * 020 — El manejador de push, que solo se emite con la bandera encendida.
+ *
+ * **No toca nada de lo de arriba, y no puede tocarlo**: `push` y `fetch` son
+ * eventos distintos del mismo worker, así que un manejador de push no
+ * intercepta peticiones. El enrutado estático del `install` y la salida temprana
+ * del `fetch` siguen intactos, y el arnés lo comprueba con la bandera
+ * ENCENDIDA — porque el riesgo aquí no es técnico sino humano: alguien que abra
+ * este archivo para añadir push y reescriba el `fetch` de paso.
+ *
+ * El aviso llega VACÍO (FR-505): el detalle se le pide a la propia instancia. Si
+ * esa petición falla —sin red, sesión caducada— se muestra el texto degradado,
+ * que sirve sin decir de quién es y no parece un error (FR-507).
+ */
+const BLOQUE_PUSH = `
+self.addEventListener("push", (event) => {
+  event.waitUntil(
+    (async () => {
+      // Por defecto, lo único que se puede decir sin saber nada.
+      //
+      // Escrito para la vigésima vez, no para la primera (mismo filtro que
+      // FR-423): quien lo lee ya sabe qué es esta app. No se le explica el
+      // mecanismo —"el agente derivó la conversación"— porque a la vigésima eso
+      // es ruido; se le dice qué hacer. Y no dice de quién es porque en este
+      // caso no se pudo saber: fingirlo sería peor.
+      let titulo = "Alguien necesita atención";
+      let cuerpo = "Abre la bandeja para ver quién.";
+      let conversationId = null;
+
+      try {
+        const res = await fetch("/api/push/pendiente", { credentials: "include" });
+        if (res.ok) {
+          const data = await res.json();
+          if (data && data.pendiente) {
+            titulo = data.pendiente.titulo;
+            cuerpo = data.pendiente.cuerpo;
+            conversationId = data.pendiente.conversationId;
+          }
+        }
+      } catch (e) {
+        // Sin red: se queda el texto degradado. Mostrar algo es obligatorio.
+      }
+
+      await self.registration.showNotification(titulo, {
+        body: cuerpo,
+        // Una conversación, una notificación: donde el sistema lo respete, la
+        // nueva REEMPLAZA a la anterior. iOS lo ignora y apila; funciona igual.
+        tag: conversationId ? "uniko:conv:" + conversationId : "uniko:escalacion",
+        data: { conversationId },
+      });
+    })()
+  );
+});
+
+self.addEventListener("notificationclick", (event) => {
+  event.notification.close();
+  const id = event.notification.data && event.notification.data.conversationId;
+  const destino = id ? "/inbox?conversation=" + id : "/inbox";
+
+  event.waitUntil(
+    (async () => {
+      const clientes = await self.clients.matchAll({
+        type: "window",
+        includeUncontrolled: true,
+      });
+      // Si ya hay una ventana abierta se enfoca y se la lleva al hilo: abrir una
+      // segunda pestaña de la misma app es la forma más rápida de que el
+      // operador pierda lo que tenía a medias.
+      for (const cliente of clientes) {
+        if ("focus" in cliente) {
+          await cliente.focus();
+          if ("navigate" in cliente) await cliente.navigate(destino);
+          return;
+        }
+      }
+      await self.clients.openWindow(destino);
+    })()
+  );
+});
+`;
 
 export function GET() {
   /*
@@ -168,7 +250,10 @@ export function GET() {
   const commit = resolveBuildCommit();
 
   return new Response(
-    cuerpoDelServiceWorker(commit ? `${APP_VERSION}+${commit}` : APP_VERSION),
+    cuerpoDelServiceWorker(
+      commit ? `${APP_VERSION}+${commit}` : APP_VERSION,
+      pushEnabled()
+    ),
     {
       headers: {
         "content-type": "application/javascript; charset=utf-8",

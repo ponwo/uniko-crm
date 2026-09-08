@@ -58,6 +58,22 @@ describe("el commit va DENTRO del cuerpo (es lo que dispara la actualización)",
 });
 
 describe("el service worker servido: lo que NO hace", () => {
+  /*
+   * La bandera se apaga A PROPÓSITO en el segundo test, y eso es la mitad de
+   * lo que dice.
+   *
+   * Escrito en la 019, cuando `PUSH` no existía, este bloque daba por hecho
+   * que el entorno no la traía. En cuanto la 020 la metió en la matriz de CI
+   * —configuración "completo", todas las banderas encendidas— el test se cayó:
+   * el worker SÍ lleva push ahí, que es justo lo que la 020 promete. Lo que
+   * hay que afirmar no es "nunca hay push", es "sin la bandera no hay push".
+   */
+  const original = process.env.PUSH;
+  afterEach(() => {
+    if (original === undefined) delete process.env.PUSH;
+    else process.env.PUSH = original;
+  });
+
   it("no cachea nada", async () => {
     const js = await cuerpo();
     expect(js).not.toContain("caches.open");
@@ -65,7 +81,8 @@ describe("el service worker servido: lo que NO hace", () => {
     expect(js).not.toContain("cache.put");
   });
 
-  it("no registra nada de push (eso es la 020, tras su bandera)", async () => {
+  it("sin la bandera PUSH no registra nada de push (eso es la 020)", async () => {
+    delete process.env.PUSH;
     const js = await cuerpo();
     expect(js).not.toContain('"push"');
     expect(js).not.toContain("notificationclick");

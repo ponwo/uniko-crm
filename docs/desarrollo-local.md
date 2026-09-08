@@ -77,6 +77,11 @@ WA_MOCK_ENABLED=true
 META_GRAPH_BASE_URL=http://localhost:3000/api/dev/wa-mock/graph
 OPENROUTER_BASE_URL=http://localhost:3000/api/dev/ai-mock
 BOT_API_KEY=desarrollo-local-bot-key
+
+# El agente, contra el ai-mock local. El token es de mentira a propósito: lo
+# único que hace es encender el agente, y las llamadas van al mock de arriba.
+OPENROUTER_API_TOKEN=sk-or-mock-local
+OPENROUTER_MODEL=mock/modelo
 ```
 
 Tres avisos sobre esos valores:
@@ -89,10 +94,13 @@ Tres avisos sobre esos valores:
   puede hacer daño ahí: el gate exige además `NODE_ENV !== "production"`, así
   que en producción los mocks dan 404 pase lo que pase.
 
-Lo que **no** hace falta: `OPENROUTER_API_TOKEN` (sin él la app funciona como
-CRM sin agente), y `CHANNELS`, `AGENDA` y `ATRIBUCION` (los tres módulos
-opcionales van apagados y sus superficies responden 404). Todo lo demás del
-esquema tiene valor por defecto.
+Sobre el agente: la app funciona como CRM sin `OPENROUTER_API_TOKEN`, pero
+**el arnés de la 020 lo necesita** — sin agente no hay escalaciones, y sin
+escalaciones no hay nada que avisar. De ahí que esté en la plantilla.
+
+Lo que **no** hace falta: `CHANNELS`, `AGENDA`, `ATRIBUCION` y `PUSH` (los
+módulos opcionales van apagados y sus superficies responden 404). Todo lo demás
+del esquema tiene valor por defecto.
 
 ---
 
@@ -126,7 +134,7 @@ Conduce la app real por las superficies de usuario con los mocks encendidos, y
 sale distinto de cero si algo falla. Es lo que el Principio IX pide antes de
 declarar "Hecho" cualquier feature con comportamiento observable.
 
-Encadena tres guiones:
+Encadena cuatro guiones:
 
 - `scripts/e2e-selftest.mjs` — por HTTP, sin navegador. Lo más rápido y lo más
   ancho: ingesta, bot API, agenda, atribución, adjuntos.
@@ -138,6 +146,10 @@ Encadena tres guiones:
   la instancia, el botón de instalar, las instrucciones de iOS, y la
   comprobación de que el service worker **no** se pone delante del canal SSE
   (feature 019).
+- `scripts/e2e-push.mjs` — los avisos de escalación (feature 020): que el envío
+  al servicio de push **va vacío**, que el Laboratorio no avisa a nadie, que un
+  endpoint caducado se borra solo, y que la exclusión del SSE sigue en pie **con
+  el manejador de push presente**.
 
 La primera vez, Chromium hay que bajarlo: `pnpm exec playwright install chromium`.
 
@@ -147,6 +159,30 @@ guarda la sesión en `.e2e-session.json` (gitignorado) y la reutiliza: una tanda
 entera gasta un login en vez de uno por guion. Si aun así ves un 429, espera un
 par de minutos; no aflojes el límite.
 
+### El arnés de la 020 se corre dos veces
+
+`scripts/e2e-push.mjs` mira la bandera `PUSH` y se adapta, así que las dos
+configuraciones dicen cosas distintas y las dos hacen falta:
+
+- **Sin `PUSH`** —lo que trae la plantilla de arriba— comprueba que la feature
+  **no existe**: rutas en 404 y un service worker sin nada de push. Es la
+  configuración de fábrica de toda la flota, y hay que verla apagada.
+- **Con la bandera encendida** corre los cuatro escenarios. Añade al `.env`,
+  **reinicia la app** (la bandera se lee en el servidor) y vuelve a correr:
+
+```bash
+PUSH=on
+PUSH_SERVICE_BASE_URL=http://localhost:3000/api/dev/push-mock
+```
+
+`PUSH_SERVICE_BASE_URL` es lo que desvía los envíos al mock local en vez de a
+Google o Apple. **En una instancia real va vacía**: el endpoint lo da el
+navegador de cada teléfono.
+
+Tarda más que los otros: el agente agrupa ráfagas 6 s antes de contestar, y el
+guion espera al envío y luego al silencio en vez de dormir un rato fijo. Esa
+espera fija fue justo el falso negativo que hubo que arreglar.
+
 ### Probar la instalación en un teléfono
 
 Necesita HTTPS, y `localhost` no lo da. Levanta un túnel con certificado hacia el
@@ -154,6 +190,12 @@ puerto 3000 y arranca la app con `APP_BASE_URL` puesto a la URL del túnel: el
 manifiesto y el registro del service worker tienen que salir del mismo origen que
 visita el teléfono. El guion completo está en
 [`tests/e2e/us-pwa.md`](../tests/e2e/us-pwa.md).
+
+Los **avisos push no se pueden probar por el túnel**: hacen falta la app
+instalada, el permiso concedido y una escalación real del agente. Su nivel 3 se
+corre contra la instancia desplegada y está en
+[`tests/e2e/us-push.md`](../tests/e2e/us-push.md), con la regla heredada de la
+018: **una corrida en la que la notificación no llegó no cuenta**.
 
 ---
 

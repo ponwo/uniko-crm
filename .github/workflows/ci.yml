@@ -30,20 +30,26 @@ jobs:
     name: ${{ matrix.config.name }} · typecheck · lint · test · build
     runs-on: ubuntu-latest
 
-    # Los módulos opcionales (canales, agenda, atribución) se encienden con
-    # variables de despliegue, así que el código que viaja en main tiene que
-    # servir en las dos configuraciones — y eso no se sabe corriendo solo una.
+    # Los módulos opcionales (canales, agenda, atribución, avisos push) se
+    # encienden con variables de despliegue, así que el código que viaja en main
+    # tiene que servir en las dos configuraciones — y eso no se sabe corriendo
+    # solo una.
     #
-    # `default` es lo que instala la mayoría: sin canales extra, sin agenda y
-    # sin atribución. `completo` es todo encendido. Entre las dos se cubre lo
-    # que las banderas prometen: que apagadas no estorban y encendidas
-    # funcionan.
+    # `default` es lo que instala la mayoría: sin canales extra, sin agenda,
+    # sin atribución y sin avisos push. `completo` es todo encendido. Entre las
+    # dos se cubre lo que las banderas prometen: que apagadas no estorban y
+    # encendidas funcionan.
     #
-    # Las tres banderas de despliegue del producto van aquí, las tres: la
-    # puerta de promoción a producción exige "CI en verde en todas las
-    # configuraciones de la matriz", y esa condición solo vale lo que cubra
-    # esta matriz. Una bandera que exista en `.env.example` y no aquí es una
-    # configuración que llega a un cliente sin que nadie la haya construido.
+    # TODAS las banderas de despliegue del producto van aquí: la puerta de
+    # promoción a producción exige "CI en verde en todas las configuraciones de
+    # la matriz", y esa condición solo vale lo que cubra esta matriz. Una
+    # bandera que exista en `.env.example` y no aquí es una configuración que
+    # llega a un cliente sin que nadie la haya construido.
+    #
+    # `PUSH` entró en la 020 y esta regla se cobró su primera pieza el mismo
+    # día: un test de la 019 afirmaba que el service worker no lleva push, sin
+    # decir que hablaba de la bandera apagada. Con la matriz completa se cayó a
+    # la primera. Corriendo solo `default` habría seguido verde y mintiendo.
     strategy:
       fail-fast: false
       matrix:
@@ -52,15 +58,18 @@ jobs:
             channels: ""
             agenda: ""
             atribucion: ""
+            push: ""
           - name: completo
             channels: "whatsapp,instagram,messenger"
             agenda: "on"
             atribucion: "on"
+            push: "on"
 
     env:
       CHANNELS: ${{ matrix.config.channels }}
       AGENDA: ${{ matrix.config.agenda }}
       ATRIBUCION: ${{ matrix.config.atribucion }}
+      PUSH: ${{ matrix.config.push }}
 
     steps:
       - uses: actions/checkout@v7

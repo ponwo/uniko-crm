@@ -1020,3 +1020,84 @@ export const capiSettings = pgTable(
   },
   (t) => [uniqueIndex("capi_settings_org_uq").on(t.organizationId)]
 );
+
+/* ============================================================
+ * 020 — Notificaciones push
+ *
+ * Dos tablas nuevas y NADA más: la migración es aditiva pura (ver
+ * specs/020-notificaciones-push/data-model.md). El disparador —el handoff— ya
+ * se guarda en `conversation`, y no hace falta marca de "ya avisé" porque el
+ * pipeline calla con handoff activo: no hay segundo aviso que deduplicar.
+ *
+ * Con la bandera `PUSH` apagada estas tablas existen VACÍAS en toda la flota.
+ * Es el patrón de siempre: la migración se aplica igual, las tablas inertes no
+ * molestan a nadie.
+ * ============================================================ */
+
+/**
+ * Un teléfono que quiere recibir avisos. **Por usuario, no por instancia**
+ * (FR-511): así, el día que haga falta "avisar solo a estos", es añadir un
+ * filtro y no rehacer el modelo.
+ *
+ * NO se guardan las claves `p256dh` y `auth` que devuelve el navegador: solo
+ * sirven para CIFRAR CONTENIDO, y esta feature manda el aviso vacío. No guardar
+ * lo que no se usa es la versión barata del Principio I.
+ */
+export const pushSubscription = pgTable(
+  "push_subscription",
+  {
+    id: text("id").primaryKey(),
+    organizationId: text("organization_id")
+      .notNull()
+      .references(() => organization.id, { onDelete: "cascade" }),
+    userId: text("user_id")
+      .notNull()
+      .references(() => user.id, { onDelete: "cascade" }),
+    /**
+     * Lo que devuelve el navegador al suscribirse. Es la identidad del
+     * dispositivo: el navegador no da ninguna otra, y reactivar los avisos en el
+     * mismo teléfono devuelve el MISMO endpoint. Por eso la unicidad va aquí, y
+     * es lo que hace idempotente el alta (Principio IV).
+     */
+    endpoint: text("endpoint").notNull(),
+    createdAt: timestamp("created_at").notNull().defaultNow(),
+    /** Último envío aceptado. Sirve para depurar, nunca para decidir. */
+    lastOkAt: timestamp("last_ok_at"),
+  },
+  (t) => [
+    uniqueIndex("push_subscription_endpoint_uq").on(t.endpoint),
+    index("push_subscription_org_user_idx").on(t.organizationId, t.userId),
+  ]
+);
+
+/**
+ * El par de claves VAPID de la instancia. Las genera ella misma la primera vez
+ * que hacen falta (FR-515): no hay cuenta de tercero que dar de alta ni secreto
+ * que pegar en ningún panel.
+ *
+ * **Por qué una tabla y no `organization.metadata`**: ese JSON se lee en CADA
+ * render y su contenido viaja a la marca del cliente. Una clave privada ahí está
+ * a un descuido de salir al navegador.
+ *
+ * La privada va cifrada con el mismo mecanismo que el token de WhatsApp
+ * (`cipher/iv/tag`, AES-256-GCM de `lib/crypto`).
+ *
+ * OJO al rotar: regenerar esta fila invalida TODAS las suscripciones de la
+ * organización — el navegador las ató a la pública anterior (FR-517).
+ */
+export const pushKey = pgTable(
+  "push_key",
+  {
+    id: text("id").primaryKey(),
+    organizationId: text("organization_id")
+      .notNull()
+      .references(() => organization.id, { onDelete: "cascade" }),
+    /** Viaja al navegador al suscribirse: no es secreto. */
+    publicKey: text("public_key").notNull(),
+    privateCipher: text("private_cipher").notNull(),
+    privateIv: text("private_iv").notNull(),
+    privateTag: text("private_tag").notNull(),
+    createdAt: timestamp("created_at").notNull().defaultNow(),
+  },
+  (t) => [uniqueIndex("push_key_org_uq").on(t.organizationId)]
+);

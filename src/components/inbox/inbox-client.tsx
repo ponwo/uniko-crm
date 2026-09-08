@@ -118,6 +118,25 @@ export function InboxClient({ channels }: { channels: readonly Channel[] }) {
     if (match) select(match.id);
   }, [contactParam, conversations, select]);
 
+  /*
+   * 020 — Enlace directo desde una notificación: /inbox?conversation=<id>
+   *
+   * Sin esto, tocar el aviso abría la bandeja genérica y el operador tenía que
+   * buscar a mano la conversación por la que le acababan de avisar — que es
+   * exactamente la sensación de "la app perdió lo que me estaba diciendo".
+   *
+   * Cuando el aviso no supo de quién era —el service worker no pudo pedir el
+   * detalle— no hay parámetro y se abre la bandeja: ahí la escalación está
+   * arriba, con su insignia de Atención humana. Es un sitio útil, no un premio
+   * de consolación.
+   */
+  const conversationParam = searchParams.get("conversation");
+  useEffect(() => {
+    if (!conversationParam || selectedIdRef.current) return;
+    const match = conversations?.find((c) => c.id === conversationParam);
+    if (match) select(match.id);
+  }, [conversationParam, conversations, select]);
+
   const eventsStatus = useEvents({
     onMessageNew: ({ conversationId, message }) => {
       if (selectedIdRef.current === conversationId) {
