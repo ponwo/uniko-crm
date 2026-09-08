@@ -130,6 +130,15 @@ todas hasta que esto salga verde.
 - Pulsar **Activar avisos** y **aceptar** el permiso del sistema.
 - Confirmar que la tarjeta pasa a decir *"Activados en este dispositivo."*
 
+> **Hay que hacerlo en CADA teléfono, uno por uno.** Activarlo en el Android no
+> lo activa en el iPhone, ni al revés, aunque sea la misma cuenta: la suscripción
+> es del navegador de ese dispositivo, no del usuario, y se guarda por usuario **y
+> por dispositivo** (FR-511). Es deliberado —alguien puede querer avisos en el
+> teléfono y no en el portátil— pero **despista la primera vez**: en la corrida
+> del 2026-09-08 pareció un fallo hasta caer en la cuenta. Si un teléfono no
+> recibe nada, lo primero que hay que mirar es si sus avisos están activados **en
+> él**, no si la feature funciona.
+
 **2. Cerrar la app del todo** — no dejarla en segundo plano: cerrarla. Es la
 mitad de lo que esta prueba existe para responder.
 
@@ -153,9 +162,10 @@ sesión, así que el aviso sigue llegando— y provocar otra escalación: el wor
 pregunta el detalle, recibe un 401 y debe enseñar *"Alguien necesita atención /
 Abre la bandeja para ver quién"*. **Volver a entrar después.**
 
-**8. El Laboratorio no suena (SC-006).** Con los avisos ya activados, lanzar una
-evaluación del Laboratorio desde la app y comprobar que **no llega nada**. Es un
-guardarraíl de datos de clientes, y verlo en el teléfono cuesta un minuto.
+**8. El Laboratorio no suena (SC-006) — NO se ejerce en dispositivo.** Decidido
+el 2026-09-08, con su razón, y **no se da por verde**: ver abajo, en el registro
+de corridas. El guardarraíl queda cubierto por el nivel 1 y el nivel 2; lo que
+NO hay es una confirmación en teléfono real, y así se dice.
 
 **9. La 018 y la 019 siguen vivas.** Con la app abierta, que entre un mensaje y
 aparezca **solo**, sin recargar. Si esto se rompió, se rompió con el service
@@ -166,16 +176,20 @@ worker nuevo delante.
 Chrome respeta la `tag` de la Notifications API: **una conversación, una
 notificación**.
 
-- [ ] Llega con la app **cerrada del todo**, no solo en segundo plano.
+- [x] Llega con la app **cerrada del todo**, no solo en segundo plano.
 - [ ] El título nombra al contacto y el cuerpo dice el motivo
       ("Pidió hablar con una persona").
 - [ ] Se ve **el icono del negocio**, no uno genérico.
-- [ ] Al tocarla se abre **esa** conversación.
-- [ ] **Dos escalaciones de contactos DISTINTOS → dos notificaciones**, cada una
+- [x] Al tocarla se abre **esa** conversación.
+- [x] **Dos escalaciones de contactos DISTINTOS → dos notificaciones**, cada una
       a su hilo.
 - [ ] Con la app ya abierta, tocar el aviso **enfoca esa ventana** y la lleva al
       hilo — no abre una segunda pestaña encima de lo que estabas haciendo
       (FR-508c).
+
+> Las casillas sin marcar **no son fallos: son cosas que no se reportaron** en la
+> corrida del 2026-09-08. Marcarlas por parecer razonables es exactamente lo que
+> el registro de la 019 obligó a corregir.
 
 > **Por qué no se pide aquí el caso "dos avisos de la MISMA conversación"**: casi
 > no puede ocurrir. El pipeline calla en cuanto hay `handoff_at`, así que la
@@ -185,26 +199,30 @@ notificación**.
 
 ### Qué se comprueba en iOS
 
-Aquí hay una pregunta **abierta** que este nivel existe para responder (research
-R4): está documentado que **Safari ignora la `tag`** y crea una notificación
-nueva por cada push, y que **ignora el `icon`** (usa el de la app). El reporte es
-de iOS 16.4 y el issue sigue abierto; no hay fuente que confirme que se arregló
-ni que sigue roto. **La spec funciona en los dos casos** — lo que no vale es
-suponer cuál.
+Está documentado que **Safari ignora la `tag`** y crea una notificación nueva por
+cada push, y que **ignora el `icon`** (usa el de la app). El reporte es de iOS
+16.4 y el issue sigue abierto; no hay fuente que confirme que se arregló ni que
+sigue roto. **La spec funciona en los dos casos.**
+
+> **Esto era la pregunta abierta de research R4, y quedó cerrada el 2026-09-08 —
+> por incomprobable, no por respondida.** En uso normal nunca hay un segundo
+> aviso de la misma conversación, que es el único caso que distinguiría. No se
+> vuelve a intentar en las siguientes corridas; el razonamiento está en el
+> registro.
 
 - [ ] En una **pestaña de Safari** (no la app instalada), Ajustes → Avisos dice
       que hacen falta instalarla, en vez de ofrecer un botón que no puede
       funcionar (FR-513).
-- [ ] Desde la **app instalada**, el permiso se pide **dentro del toque** y se
+- [x] Desde la **app instalada**, el permiso se pide **dentro del toque** y se
       concede.
-- [ ] Llega con la app **cerrada del todo**.
-- [ ] Al tocarla se abre **esa** conversación.
-- [ ] **La pregunta de R4**: dos avisos seguidos —de la misma conversación si se
-      puede, y si no de dos contactos distintos— ¿se **apilan** o se
-      **reemplazan**? Responder con lo que se vio, no con lo que dice la
-      documentación.
-- [ ] **Anotar la versión de iOS.** Sin ella la respuesta anterior no sirve para
-      nada: es la variable de la que depende.
+- [x] Llega con la app **cerrada del todo**.
+- [x] Al tocarla se abre **esa** conversación.
+- [x] **La pregunta de R4**: cerrada, y no por haberla respondido. Dos
+      conversaciones distintas dan dos avisos —lo que no distingue nada— y el
+      caso que sí distinguiría, dos avisos de la MISMA conversación, **no ocurre
+      en uso normal**: el pipeline calla mientras haya `handoff_at`. Ver el
+      registro de abajo. **No hay que volver a intentarlo en la próxima corrida.**
+- [x] **Versión de iOS: 26.6.1.**
 - [ ] ¿Qué icono muestra el sistema? (si ignora el nuestro y usa el de la app
       instalada, es lo esperado y no es un fallo).
 
@@ -212,22 +230,120 @@ suponer cuál.
 
 | Dato | Android | iOS |
 |---|---|---|
-| Versión del sistema | | |
-| ¿Llegó con la app cerrada? | | |
-| Cuánto tardó (aprox.) | | |
-| Texto que se vio (título / cuerpo) | | |
-| ¿Al tocarla abrió ESA conversación? | | |
-| Dos escalaciones: ¿apilan o reemplazan? | | |
-| Icono mostrado | | |
-| Texto degradado sin sesión | | |
-| El Laboratorio, ¿sonó? (debe ser **no**) | | |
-| Mensaje entrante en vivo, ¿sin recargar? | | |
+| Versión del sistema | no registrada | **26.6.1** |
+| ¿Llegó con la app cerrada? | **sí** | **sí** |
+| Cuánto tardó (aprox.) | no registrado | no registrado |
+| Texto que se vio (título / cuerpo) | no registrado | no registrado |
+| ¿Al tocarla abrió ESA conversación? | **sí** | **sí** |
+| Dos escalaciones: ¿apilan o reemplazan? | dos conversaciones → **dos avisos** (no discrimina) | ídem — ver registro |
+| Icono mostrado | no registrado | no registrado |
+| Texto degradado sin sesión | **sí**, al cerrar sesión | **sí**, al cerrar sesión |
+| El Laboratorio, ¿sonó? | **no ejercido** — ver registro | **no ejercido** |
+| Mensaje entrante en vivo, ¿sin recargar? | no registrado | no registrado |
 
 ---
 
 ## Registro de corridas
 
-*(pendiente: el nivel 3 lo corre el dueño)*
+### Nivel 3 — 2026-09-08 ✅ VERDE (Android e iOS, dos dispositivos suscritos)
+
+Sobre **LanCo desplegada** en `c2829ed`, con `PUSH=on`. Confirmado por el dueño;
+la columna dice de dónde sale cada dato, que es la disciplina que impuso el
+registro de la 019.
+
+| Dato | Android | iOS 26.6.1 | Cómo se obtuvo |
+|---|---|---|---|
+| Llega con la app **cerrada** | **sí** | **sí** | relato explícito del dueño |
+| Llega a **los dos** dispositivos suscritos | **sí** | **sí** | ídem |
+| Al tocarla abre **esa** conversación, no la bandeja (FR-508) | **sí** | **sí** | ídem |
+| Dos conversaciones escaladas → **dos avisos separados** | **sí** | **sí** | ídem |
+| Texto degradado al cerrar sesión (FR-507, SC-008) | **sí** | **sí** | ídem |
+| El permiso es **por dispositivo** | confirmado | confirmado | hallazgo de la corrida |
+| El Laboratorio no suena (SC-006) | **no ejercido** | **no ejercido** | decisión registrada abajo |
+
+**SC-001 queda ejercido en dispositivo real**: una escalación real llega a un
+teléfono que no tenía la app abierta, y tocarla abre la conversación escalada.
+Eso es lo que ninguna comprobación de `localhost` podía dar.
+
+**El hallazgo que más va a ahorrar tiempo**: el permiso es **por dispositivo**.
+Activarlo en el Android no lo activa en el iPhone aunque sea la misma cuenta —la
+suscripción es del navegador de ese aparato (FR-511)— y en esta corrida
+**pareció un fallo** hasta caer en la cuenta. Ya está escrito en el paso 1 del
+procedimiento, que es donde hace falta leerlo.
+
+#### La pregunta de R4: **cerrada por incomprobable, no por respondida**
+
+Lo observado en iOS **26.6.1** es que **dos conversaciones distintas producen dos
+avisos**, igual que en Android. El dueño lo leyó como que la `tag` **sí se
+respeta** en esta versión, contradiciendo lo documentado para 16.4.
+
+**Esa conclusión no se sigue de esta observación, y por eso no se registra como
+respondida.** Dos conversaciones distintas llevan `tag` distinta
+(`uniko:conv:<id>`), así que **dan dos notificaciones tanto si el sistema
+respeta la `tag` como si la ignora**: el resultado es el mismo en las dos
+hipótesis, y por tanto no distingue entre ellas.
+
+Lo único que respondería la pregunta es **dos avisos de la MISMA conversación**:
+si el segundo **reemplaza** al primero, la `tag` se respeta; si se **apilan**, se
+ignora.
+
+**Y ese segundo aviso no existe en uso normal.** Al escalar, `applyHandoff()`
+fija `handoff_at`, y el pipeline arranca callándose mientras eso esté puesto: la
+conversación no vuelve a producir turnos —ni escalaciones— hasta que **una
+persona la reactive a mano**. El sistema, por sí solo, nunca manda dos avisos de
+la misma conversación.
+
+**Lo que hace innecesaria la agrupación es exactamente lo mismo que hace
+incomprobable si la `tag` se respeta.** Así que R4 no se queda "pendiente de
+probar en la próxima corrida": se cierra aquí, diciendo que **no es comprobable
+en uso normal y que no hace falta que lo sea**. Un pendiente que nadie va a poder
+cerrar nunca es peor que un cierre razonado — vuelve cada vez que alguien lee el
+guion y cuesta lo mismo redescubrirlo.
+
+Se podría forzar a mano —reactivar la IA sobre esa conversación y volver a
+escalarla— pero eso mediría el comportamiento de iOS, no el del producto. **La
+`tag` se queda porque no cuesta nada y ayuda donde el sistema la respeta; el
+producto no depende de ella.**
+
+### SC-006 en dispositivo — 2026-09-08 ⚠️ NO EJERCIDO (decisión del dueño)
+
+**No se corrió el Laboratorio en LanCo, y esto no cuenta como verificación.**
+
+**Por qué.** Correr el Laboratorio hoy es correr **las seis personas o ninguna**:
+`POST /api/lab/runs` no acepta parámetros y `startRun()` inserta los seis casos
+de golpe. Y esa corrida **no se puede borrar desde el producto** —no existe
+`DELETE` de corridas, casos ni conversaciones—, así que quedaría para siempre en
+el historial del Laboratorio con un **score que mide el desajuste entre los
+guiones y el negocio**, no la calidad del agente: cuatro de las seis personas
+preguntan por taladros, martillos, clavos y pintura
+(`src/server/lab/personas.ts`), y el juez evalúa contra el knowledge base de
+LanCo, donde eso no puede estar. Ensuciar el historial con un número que engaña
+cuesta más que lo que aporta esta confirmación.
+
+**Qué SÍ cubre el guardarraíl, y hasta dónde llega esa cobertura:**
+
+- **Nivel 1**: el aviso construido para una conversación `is_test` no se manda a
+  nadie — función pura, sin red.
+- **Nivel 2, escenario C del arnés**: una escalación real del Laboratorio contra
+  la app viva **no produce ningún envío**, comprobado tras esperar a que el canal
+  quede en silencio (la ventana de agrupación del agente son 6 s; mirar antes es
+  la receta exacta para atribuirle al Laboratorio un envío del escenario
+  anterior — pasó, y por eso el guion sondea en vez de dormir).
+- **Falsificado a propósito**: la protección se rompió a mano para ver el arnés
+  ponerse rojo antes de darla por buena, y resultó estar en dos capas
+  independientes (el corte por `is_test` en `avisarDeEscalacion` y el filtro de
+  `/api/push/pendiente`).
+
+**Lo que sigue sin comprobarse**: que en un **teléfono real**, con permiso
+concedido y la app instalada, una evaluación del Laboratorio tampoco haga sonar
+nada. Es una confirmación, no la prueba —`applyHandoff()` es el único escritor de
+escalaciones y de ahí sale el aviso, así que el corte es el mismo camino que el
+arnés recorre—, pero **no está hecha y no se declara verde**.
+
+**Cuándo dejaría de costar esto**: el día que el Laboratorio permita elegir qué
+personas correr, o que los guiones salgan del negocio en vez de estar fijos en el
+repo. Cualquiera de las dos convierte esta comprobación en un minuto sin
+residuo.
 
 <!--
 Plantilla, para que la corrida se registre con la misma honestidad que la 019:

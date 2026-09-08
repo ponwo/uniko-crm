@@ -109,6 +109,32 @@ atención"*, que sigue siendo útil.
 siga roto en iOS 26, ni que lo arreglaron. Va al nivel 3 como comprobación
 explícita, y la spec debe funcionar en los dos casos.
 
+> **Cerrada tras el nivel 3 (2026-09-08), y no por haberla comprobado:
+> NO ES COMPROBABLE EN USO NORMAL — y da igual.**
+>
+> La corrida en iOS 26.6.1 vio que dos conversaciones **distintas** producen dos
+> avisos, igual que en Android. Eso no distingue nada: llevan `tag` distinta, así
+> que dan dos notificaciones tanto si el sistema respeta la `tag` como si la
+> ignora. Lo único que respondería la pregunta es un segundo aviso **de la misma
+> conversación**.
+>
+> Y ese segundo aviso **no llega a existir nunca en uso normal**. Al escalar,
+> `applyHandoff()` fija `handoff_at`; el pipeline arranca callándose mientras eso
+> esté puesto, así que la conversación no vuelve a producir turnos —ni, por tanto,
+> escalaciones— hasta que **una persona la reactive a mano**. No hay camino por el
+> que el sistema, solo, mande dos avisos de la misma conversación.
+>
+> **Lo que hace innecesaria la agrupación es exactamente lo mismo que hace
+> incomprobable si la `tag` se respeta.** La sección de abajo, escrita antes de la
+> implementación, ya apuntaba a la primera mitad; la corrida real cerró la
+> segunda. No es una pregunta pendiente de responder: es una pregunta que el
+> diseño del pipeline deja sin objeto.
+>
+> Se podría forzar artificialmente —reactivar la IA y volver a escalar la misma
+> conversación— pero eso mediría el comportamiento de iOS, no el del producto, y
+> ningún operador va a llegar ahí. **La `tag` se queda porque no cuesta nada y
+> ayuda donde el sistema la respeta; el producto no depende de ella.**
+
 ### El hallazgo que hace pequeño el problema
 
 Al leer el código aparece algo que cambia el tamaño del asunto: **el escenario
