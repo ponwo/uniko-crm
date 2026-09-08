@@ -89,14 +89,44 @@ No toca ninguna instancia de clientes.
       instancia sin PNG propio? De esta respuesta depende si algún día hay que
       rasterizar en el servidor.
 
-### Pasada 2 — LanCo desplegada
+### Pasada 2 — LanCo desplegada, **con marca real**
 
-Tras el merge a `main`, en `https://uniko.lanco.cloud`. Es la que estrena y la
-única con la marca de un negocio real.
+Tras el merge a `main`, en `https://uniko.lanco.cloud`.
 
-- [ ] Se repite lo de arriba en las dos plataformas.
-- [ ] **El que cierra la no regresión del SSE**: con la app instalada, entra un
+> **Qué prueba esta pasada, y qué NO.** El degradado —instancia sin PNG propio,
+> app instalada con el logo de Uniko— **ya quedó ejercido en la pasada 1** y no
+> hace falta repetirlo. Lo que aquí se prueba, y en ningún otro sitio se ha
+> probado fuera de los tests, es **el camino que van a recorrer los clientes**:
+> subir su icono y ver que la app instalada pasa a llevar el suyo.
+>
+> Por eso el primer paso es **subir el PNG**. Instalar antes de subirlo
+> convertiría esta pasada en una repetición de la anterior.
+
+**Paso 0 — el icono, antes de instalar nada**
+
+- [x] En Ajustes → Marca hay un aviso diciendo que el icono actual no sirve para
+      la app instalada.
+- [x] Se sube un **PNG cuadrado de 512×512 o más**.
+- [x] **El aviso desaparece solo**, sin recargar a mano (FR-428).
+- [x] `/api/branding/manifest` pasa a declarar **una sola entrada** de icono, la
+      del negocio, con `sizes: "192x192 512x512"` (FR-425, FR-426).
+
+**Instalación con la marca real**
+
+- [x] Android: el botón instala y en la pantalla de inicio aparece **el logo del
+      negocio**, no el de Uniko, con el nombre del negocio debajo.
+- [x] iOS: lo mismo por Compartir → Añadir a pantalla de inicio.
+- [x] El `short_name` real del negocio **no se corta de forma fea** — esto solo
+      se puede ver aquí: en la pasada 1 el nombre era "Uniko", que cabe en
+      cualquier sitio.
+
+**Lo que cierra la feature**
+
+- [x] **La no regresión del SSE en dispositivo**: con la app instalada, entra un
       mensaje real de WhatsApp y **aparece solo**, sin recargar (SC-007).
+- [x] Y si además se deja la app en segundo plano unos minutos antes de que
+      entre, se ejerce de paso el fallo que arregló la 018, ahora con el service
+      worker delante.
 
 ### Qué anotar
 
@@ -167,4 +197,63 @@ Lo que sí se puede afirmar sin matices, porque es consecuencia necesaria de que
 la app quedara instalada: las instrucciones bastaron para llegar hasta el final
 sin ayuda.
 
-### Pasada 2, LanCo — pendiente (tras el merge a `main`)
+### Pasada 2, LanCo — 2026-09-07, en curso
+
+**Despliegue**: LanCo pasó de `822b7f0` a **`e5337a4`**; `/sw.js` y el manifiesto
+pasaron de 404 a 200. Antes del despliegue la instancia no era instalable, que es
+lo que hace que esta pasada signifique algo.
+
+**Paso 0 — el icono, ANTES de instalar** ✅
+
+| Dato | Valor | Cómo se obtuvo |
+|---|---|---|
+| Punto de partida | `favicon: null`, `iconoInstalable: false`, manifiesto con los dos PNG de fábrica | **verificado desde fuera** por HTTP |
+| Se subió un PNG del negocio | sí | acción del dueño |
+| **El aviso desapareció solo, sin recargar** (FR-428) | **Sí** | **confirmación explícita del dueño** |
+| El manifiesto quedó con **una sola entrada** | `/api/branding/icon?v=u1788830785540`, `sizes: "192x192 512x512"`, `image/png` | **verificado desde fuera** |
+| El icono servido es el del negocio | **512×512, cuadrado, PNG**, y distinto byte a byte del de fábrica | **verificado leyendo los bytes**, no el JSON |
+| Marca en el manifiesto | `name` "LanCo — CRM de WhatsApp", `short_name` "LanCo", `theme_color` `#3f6b66` | **verificado desde fuera** |
+
+Esto es lo que la pasada 1 no podía probar: **el camino completo del cliente**
+—aviso, subida, aviso que se retira solo, manifiesto con su icono— ejercido en
+una instancia real y no en un test.
+
+**Instalación con marca real** ✅
+
+| Dato | Valor | Cómo se obtuvo |
+|---|---|---|
+| Android: instalada, con el icono y el nombre del negocio | correcto | **confirmación global del dueño**, sin desglose criterio por criterio |
+| iOS: instalada por Compartir → Añadir a pantalla de inicio | correcto | ídem |
+| `short_name` "LanCo" sin recortes | correcto | ídem |
+| Versiones de Android e iOS | **no registradas** | no se dieron |
+
+**No regresión del SSE en dispositivo (SC-007)** ✅ — **el que cierra la feature**
+
+| Dato | Valor | Cómo se obtuvo |
+|---|---|---|
+| App instalada en la pantalla de inicio, y **en segundo plano** | sí | **relato explícito del dueño** |
+| Entró un **mensaje real de WhatsApp** durante ese rato | sí | ídem |
+| Al volver, **apareció sin recargar** | sí | ídem |
+
+**Lectura**: esto es la 018 volviendo a funcionar con el service worker delante,
+en un teléfono real y con un mensaje real — no en un arnés. Es lo que ninguna
+comprobación de `localhost` podía dar, y la razón por la que la 019 se planificó
+con ciclo completo: el service worker se pone delante del canal que la 018 acaba
+de arreglar.
+
+**Nivel 3 CERRADO** (SC-001, SC-002, SC-003, SC-007 y FR-428 ejercidos en
+dispositivo real).
+
+> **Sobre el desglose**: en las dos plataformas de esta pasada el dueño confirmó
+> el conjunto, no criterio por criterio — igual que en la pasada 1, y aquí queda
+> dicho tal cual. Lo único con detalle propio es SC-007, que sí se relató paso a
+> paso, y el paso 0 del icono, que además se verificó por HTTP desde fuera.
+
+### Hallazgo menor, anotado durante esta pasada
+
+`GET /api/settings/branding` devuelve `iconoInstalable: false` a cualquier
+llamada **sin sesión**: esa ruta es pública (el login necesita la marca) y sin
+sesión no resuelve la organización, así que el campo cae a `false` aunque el
+icono sí sirva. En la pantalla de Ajustes, con sesión, el dato es correcto — y el
+manifiesto, que resuelve la organización por otro camino, ve el icono bien. **No
+afecta a la feature**; queda apuntado para limpiar.

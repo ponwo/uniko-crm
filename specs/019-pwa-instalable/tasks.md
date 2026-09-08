@@ -301,11 +301,11 @@ se instala con el logo de fábrica y su pantalla de marca lo dice; subir un PNG 
       versión del sistema, botón/instrucciones, icono y nombre, si abrió sin barra
       de direcciones, el recorte del `short_name`, y si el logo de fábrica se ve
       aceptable
-- [ ] T036 **Nivel 3, pasada 2 (LanCo)**, tras el merge a `main`: repetir en
+- [x] T036 **Nivel 3, pasada 2 (LanCo)** — VERDE el 2026-09-07, con marca real y SC-007 comprobado en dispositivo, tras el merge a `main`: repetir en
       `https://uniko.lanco.cloud` y —lo que cierra la no regresión del SSE—
       comprobar que **entra un mensaje real con la app instalada y aparece solo**
       (SC-007)
-- [ ] T037 Actualizar `memory/pwa-en-movil-necesita-https.md` con lo que se
+- [x] T037 Actualizar `memory/pwa-en-movil-necesita-https.md` con lo que se
       aprendió de verdad al probarlo, y añadir memoria del hallazgo de los iconos
       de la flota si sigue vigente al terminar
 

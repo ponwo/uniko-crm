@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it } from "vitest";
 import { GET } from "@/app/api/sw/route";
 import { SW_RUTAS_EXCLUIDAS } from "@/lib/sw-scope";
 
@@ -17,6 +17,43 @@ describe("la ruta del service worker (/sw.js por rewrite)", () => {
 
   it("lleva la versión dentro, para que un despliegue cambie los bytes", async () => {
     expect(await cuerpo()).toMatch(/Versión: .+/);
+  });
+});
+
+describe("el commit va DENTRO del cuerpo (es lo que dispara la actualización)", () => {
+  /*
+   * El navegador decide si hay versión nueva comparando los BYTES de este
+   * archivo. Si el cuerpo no cambia entre despliegues, el worker instalado en
+   * el móvil de un cliente se queda ahí con las reglas que registró el día que
+   * se instaló.
+   *
+   * Pasó de verdad, y solo se vio en LanCo desplegada: la ruta leía la variable
+   * congelada al construir —que Coolify no siempre inyecta como build-arg— y
+   * salía vacía, mientras `/api/health` sí enseñaba el commit por su respaldo
+   * de runtime. Los dos usan ahora el mismo resolutor.
+   */
+  const original = process.env.SOURCE_COMMIT;
+  afterEach(() => {
+    if (original === undefined) delete process.env.SOURCE_COMMIT;
+    else process.env.SOURCE_COMMIT = original;
+  });
+
+  it("incluye el commit cuando la plataforma lo publica en runtime", async () => {
+    process.env.SOURCE_COMMIT = "abc1234def";
+    expect(await cuerpo()).toContain("abc1234");
+  });
+
+  it("dos despliegues distintos producen cuerpos DISTINTOS", async () => {
+    process.env.SOURCE_COMMIT = "1111111aaa";
+    const antes = await cuerpo();
+    process.env.SOURCE_COMMIT = "2222222bbb";
+    const despues = await cuerpo();
+    expect(antes).not.toBe(despues);
+  });
+
+  it("sin commit por ningún lado sigue sirviendo, solo con la versión", async () => {
+    delete process.env.SOURCE_COMMIT;
+    expect(await cuerpo()).toMatch(/Versión: \d+\.\d+\.\d+\s/);
   });
 });
 

@@ -24,6 +24,25 @@ primero.
 Ámbito: `/`. Lo da la ruta al servirse desde la raíz; no hace falta
 `Service-Worker-Allowed`.
 
+### Cómo se actualiza (y por qué el commit va DENTRO del cuerpo)
+
+El navegador decide si hay versión nueva **comparando los bytes** de este
+archivo. Por eso el cuerpo lleva `Versión: <semver>+<commit>`, resuelto con
+`resolveBuildCommit()` — **el mismo camino que `/api/health`**, no la variable
+congelada al construir.
+
+La diferencia no es cosmética: Coolify publica `SOURCE_COMMIT` en el contenedor
+pero no siempre lo inyecta como build-arg. Leyendo solo la variable de build, el
+cuerpo salía **idéntico entre despliegues** — comprobado en LanCo, donde el
+health mostraba el commit y el service worker no—, y un worker instalado en el
+teléfono de un cliente se habría quedado ahí con las reglas de enrutado estático
+que registró el día de su instalación. El día que esa lista cambie (la 020 va a
+tocarla) nadie se enteraría de que no cambió, y diagnosticarlo en un móvil ajeno
+es de lo más caro que hay.
+
+Fijado por tests: dos commits distintos producen cuerpos distintos, y sin commit
+por ningún lado la ruta sigue sirviendo con la versión sola.
+
 ## Lo que hace
 
 | Evento | Qué hace | Por qué |
