@@ -47,13 +47,19 @@ respaldo, no descargarlo.**
 
 ## Paso a paso
 
-### 1. Producir el respaldo
+### 1. Producir el respaldo — **a mano, porque no hay programaciones**
 
-En Coolify, en el proyecto de la instancia → su base **Postgres** → pestaña
-**Backups** → crear una ejecución manual. Coolify guarda el volcado en el propio
-VPS.
+> **Este paso es más largo de lo que será.** Hoy no existe ningún respaldo
+> programado (ver [`docs/respaldos-flota.md`](../../docs/respaldos-flota.md)), así
+> que **no hay "último respaldo" que descargar: hay que producirlo**. Cuando el
+> dueño configure las programaciones, este paso se reduce a *bajar la última
+> ejecución del historial* y todo lo demás sigue igual.
 
-Alternativa directa por SSH al VPS, que es lo mismo sin intermediario:
+**Opción 1 — desde Coolify** (la más simple): proyecto de la instancia → su base
+**Postgres** → pestaña **Backups** → **Back up now**. Coolify ejecuta el volcado
+y lo deja en el propio VPS, con su entrada en el historial de ejecuciones.
+
+**Opción 2 — directa por SSH al VPS**, que es lo mismo sin intermediario:
 
 ```bash
 docker exec <contenedor-postgres> pg_dump -U postgres -Fc uniko > /tmp/uniko-<instancia>-<fecha>.dump
