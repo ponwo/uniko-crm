@@ -380,3 +380,78 @@ borrar (o archivar) corridas.
    ¿021, o feature aparte?
 8. **La rúbrica del juez** (no distingue "no lo sabía" de "no debía saberlo"):
    ¿021 o aparte? Es barato y afecta al score más que los guiones.
+
+---
+
+## Addendum (2026-09-09) — el camino cambia, y una condición previa
+
+Esta investigación se cerró recomendando **no elegir**, y el dueño eligió el
+camino **(a)**: los casos los escribe el negocio. Esa decisión **queda
+revisada** tras leer el repositorio hermano
+[`kosmo-CRM`](https://github.com/ponwo/kosmo-CRM), que ya recorrió este camino
+entero en su feature 006.
+
+### El camino nuevo: genéricos neutros + generación desde el KB con revisión
+
+Lo que convenció, y por qué desarma la objeción que cerró (b) en esta misma
+investigación:
+
+- **El prompt de generación pide atacar los HUECOS del conocimiento**, no
+  recitarlo. Textual, de `buildScenarioPrompt` en kosmo: *"Busca los HUECOS del
+  conocimiento. La mitad o más de los guiones deben preguntar cosas que el
+  conocimiento de abajo NO responde por completo. Un guion que el agente
+  contesta perfecto no sirve para nada: no enseña dónde falla."* La circularidad
+  que descartaba (b) —"casos derivados del KB sólo prueban que el agente recita
+  el KB"— se resuelve invirtiendo la instrucción.
+- **Se generan PROPUESTAS que el dueño confirma**, y no se persiste nada
+  intermedio. Los casos siguen siendo suyos; el modelo sólo redacta borradores.
+  El determinismo del cliente simulado **no se pierde**: el guion sigue siendo
+  texto fijo.
+
+Se adoptan además dos piezas suyas:
+
+- **El sello del conjunto**: `sha256` de `[key, script]` de los escenarios
+  activos, ordenado por clave y serializado en JSON, guardado con cada corrida.
+  Es lo que hace que comparar dos scores signifique algo. Lo invalida añadir,
+  borrar o **editar una línea**; no lo invalida renombrar, reordenar ni cambiar
+  el teléfono sintético.
+- **El aviso de juez compartiendo modelo con el agente**: un evaluador que
+  comparte entrenamiento con el evaluado comparte sus puntos ciegos.
+
+**Y una corrección a lo que decía esta investigación**: los seis genéricos **no
+son el estado inicial** de un negocio sin conocimiento. En kosmo **conviven
+siempre** con los generados —`escenariosDe()` concatena, no sustituye— porque
+miden cosas distintas: los seis miden **comportamiento** (si alucina, si escala,
+si entiende lo mal escrito) y son comparables **entre negocios**; los propios
+miden si el **conocimiento de ese negocio** tiene huecos. Lo que sí hay que
+hacer con los seis es **reescribirlos como agnósticos de giro**, que es el
+problema 1 de este documento y se arregla solo con eso.
+
+### CONDICIÓN PREVIA: arreglar la rúbrica del juez
+
+**No es un extra ni un "de paso": es condición para adoptar la generación desde
+huecos**, y la spec de la 021 debe decirlo así.
+
+Hoy el juez y el agente se contradicen. Al agente se le ordena, en su propio
+prompt: *"si algo no está aquí, NO lo inventes — di que lo confirmarás con el
+equipo o escala"*. Y la rúbrica del juez dice: *"Si el agente **respondió sobre
+un tema** que NO está en el conocimiento → hallazgo `fuera_de_kb`"*.
+
+**Declinar correctamente y contestar sin saber comparten casilla.** El paréntesis
+de la rúbrica distingue la alucinación —afirmar datos concretos— pero no
+distingue el rechazo correcto. Así que **el juez penaliza el comportamiento que
+el producto le ordena al agente**.
+
+**Con generación que ataca los huecos, eso se amplifica hasta romper la
+herramienta**: por diseño se van a producir muchas preguntas sin respuesta
+documentada, el agente va a declinar correctamente en casi todas —que es lo
+que queremos— y el juez las va a suspender todas por la razón equivocada. El
+score bajaría cuanto mejor funcionara el agente.
+
+Kosmo **no lo arregló**: su rúbrica es idéntica a la nuestra. Adoptar su
+generación sin arreglar esto sería importar el defecto amplificado.
+
+**Lo que la spec debe exigir**: que declinar correctamente cuente como
+**verde**, y que exista una noción de **resultado esperado por escenario** —hoy
+el juez recibe el nombre de la persona y una rúbrica genérica, sin saber qué
+debería pasar en ese caso—.
