@@ -111,7 +111,18 @@ que siempre.
 
 ---
 
-## Fase 3: Que la pantalla lo explique
+## Fase 3: Que la pantalla lo explique ~~(REVERTIDA)~~
+
+> **Revertida el 2026-09-09**, después de implementarse (commit `08cb859`). El
+> botón se elimina en vez de protegerse, así que no hay pantalla que explique
+> nada. Las tareas se conservan tachadas porque describen trabajo que se hizo y
+> que la Fase 5 deshace — borrarlas dejaría ese commit sin contexto.
+>
+> **Lo que sobrevive de esta fase**: AC-14 (T023), que ya no habla del render
+> sino de que no haya una segunda implementación de la guardia. Su test sigue
+> vigente y se ajusta en T030.
+
+### ~~Tareas revertidas~~
 
 **Objetivo**: el usuario entiende por qué no puede, sin pulsar nada.
 
@@ -145,15 +156,17 @@ que siempre.
 
 ## Fase 4: Verificación y cierre
 
-- [x] T024 AC-12 en `scripts/e2e-selftest.mjs`: `POST /api/seed/demo` contra la
+- [x] T024 (rehacer tras T035) AC-12 en `scripts/e2e-selftest.mjs`: `POST /api/seed/demo` contra la
       organización del arnés responde **409** con detalle, y una lectura posterior
       confirma que **el conocimiento del arnés sigue ahí**
 - [x] T025 [P] Crear `tests/e2e/us-guardia-demo.md` con las cuatro pantallas del
       quickstart y el hueco para registrar la corrida, con la regla de siempre:
       **lo que no se vio no se marca**
-- [ ] T026 Corrida manual en local siguiendo el [quickstart](quickstart.md): base
-      desechable, alta real, los cuatro casos —incluido **sólo el perfil tocado**—
-      y el CLI con y sin `--force`. Registrar en `tests/e2e/us-guardia-demo.md`
+- [ ] T026 Corrida manual en local siguiendo el [quickstart](quickstart.md):
+      **ya no son cuatro pantallas, son dos comandos** — `pnpm seed:demo`
+      negándose y diciendo qué encontró, y `--force` imprimiendo los conteos
+      **antes** de destruir. Registrar en `tests/e2e/us-guardia-demo.md`.
+      La corre el dueño: los conteos los lee alguien que no los escribió
 - [x] T027 Gate técnico desde la ruta real:
       `pnpm typecheck && pnpm lint && pnpm test && pnpm build`
 - [ ] T028 Al abrir el PR: declarar **FR-709** —el diff no toca `drizzle/`— y que
@@ -167,6 +180,41 @@ que siempre.
       > de la puerta exigen el self-test **contra la instancia desplegada, no sólo
       > contra `localhost`**, y T024 corre en el arnés local. Aquí sale barato y es
       > seguro: lo que se espera es que **no pase nada**.
+
+---
+
+## Fase 5: Quitar el botón
+
+**Objetivo**: que el camino destructivo de un clic deje de existir. La guardia y
+el cerrojo se quedan: el CLI y el endpoint siguen siendo destructivos.
+
+- [ ] T030 En `src/components/inbox/conversation-list.tsx`: retirar el
+      `EmptyState` con estado —botón, consulta al `GET`, frase y mensaje de
+      error— y dejar el estado vacío como lo que es: *"Sin conversaciones
+      todavía"* y la explicación de que aparecerán solas
+- [ ] T031 Retirar la cadena `onSeeded` entera: la prop de `ConversationList` y
+      su paso desde `src/components/inbox/inbox-client.tsx`. Es plomería que
+      sólo existía para refrescar tras la siembra
+- [ ] T032 En `src/app/api/seed/demo/route.ts`: retirar el `GET`. Sin pantalla no
+      tiene consumidor, y una lectura sin consumidor es superficie que alguien
+      mantendrá sin saber para qué
+- [ ] T033 En `src/lib/demo-hallazgo.ts`: retirar `fraseDeEstadoVacio()` y su
+      ayuda `enPalabrasParaPantalla()`, y **reescribir la justificación del
+      módulo**: ya no existe por la frontera cliente/servidor, existe por capas.
+      Dejar la explicación vieja sería dejar una razón falsa
+- [ ] T034 Retirar de `tests/unit/seed-demo-guardia.test.ts` los cinco tests de
+      `fraseDeEstadoVacio` (T020) y de `tests/unit/seed-demo-una-guardia.test.ts`
+      la aserción de que la ruta importa `revisarDemo` — ya no lo hace, y AC-14
+      (ii) se reescribió por eso
+- [ ] T035 Retirar de `scripts/e2e-selftest.mjs` el check de la lectura del
+      render. AC-12 se queda en cuatro
+- [ ] T036 En `specs/001-uniko-core/spec.md`: **FR-075 tachado** con bloque
+      `**DEROGADO**` —referencia a la 022 y rationale—, y la misma marca en el
+      escenario de aceptación que lo menciona. Propagar a los demás artefactos de
+      la 001 que lo citen (FR-710, forma de `kosmo-CRM`)
+- [ ] T037 [P] `README.md` e `INSTALL-IA.md`: dejan de instruir pulsar el botón.
+      El segundo importa más — está en el texto de cierre que el instalador le
+      dice al usuario
 
 ---
 

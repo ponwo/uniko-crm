@@ -4,6 +4,23 @@
 
 **Input**: [`specs/022-guardia-seed-demo/spec.md`](spec.md), ya clarificada (4 preguntas) y con checklist en [`checklists/requirements.md`](checklists/requirements.md).
 
+> ## Cambio de alcance (2026-09-09)
+>
+> **El botón desaparece de la interfaz**; el endpoint se queda protegido. El
+> porqué está en la [spec](spec.md), sección "Cambio de alcance". Lo que este
+> plan pierde: la decisión **D4** (la frase del estado vacío) queda sin objeto, y
+> con ella la capa de cliente entera.
+>
+> **Y con eso desaparece el riesgo que este plan no vio venir**: la Fase 3
+> destapó al construir que la pantalla, siendo componente de cliente, arrastraba
+> `@/lib/db` al bundle del navegador. Sin pantalla no hay frontera que cuidar.
+> `src/lib/demo-hallazgo.ts` **se queda** —el CLI necesita `textoDeConteos`— pero
+> su justificación se reescribe: ya no es "la pantalla lo necesita", es capas
+> limpias, lo puro separado de lo que consulta.
+>
+> Las decisiones **D1, D2 y D3 siguen vigentes tal cual**: son de la Fase 2, que
+> no se toca.
+
 ## Summary
 
 Sustituir `isDomainEmpty()` —que mira contactos, la única tabla garantizadamente
@@ -97,9 +114,13 @@ src/server/seed/
 └── guardia.ts                 # NUEVO — revisarDemo(db, organizationId): la única
                                #   función de la guardia, y el tipo de su hallazgo (FR-703)
 
-src/app/api/seed/demo/route.ts # POST usa el hallazgo para el 409; GET nuevo para el render
-src/components/inbox/conversation-list.tsx  # estado vacío: frase o botón (FR-706, FR-707)
+src/app/api/seed/demo/route.ts # POST usa el hallazgo para el 409 (el GET se retira)
+src/components/inbox/conversation-list.tsx  # se RETIRA el botón y su cadena onSeeded
+src/components/inbox/inbox-client.tsx       # ídem: la prop onSeeded desaparece
 scripts/seed/demo.ts           # --force: conteos + mismo cerrojo (FR-708)
+src/lib/demo-hallazgo.ts       # tipos y textos; pierde fraseDeEstadoVacio
+specs/001-uniko-core/spec.md   # FR-075 tachado + bloque DEROGADO (FR-710)
+README.md · INSTALL-IA.md      # dejan de mandar pulsar un botón que no existe
 
 tests/unit/seed-demo-guardia.test.ts   # NUEVO — AC-1..AC-11, AC-13, AC-14
 tests/unit/seed-demo-tenant.test.ts    # ya existe, se mantiene
@@ -175,7 +196,12 @@ Dos consecuencias buscadas:
    FR-708 manda imprimir. Saltarse la comprobación habría dejado al CLI sin nada
    que contar — el requisito y el atajo se habrían contradicho en silencio.
 
-### D4 — La frase del estado vacío se compone del hallazgo, y el caso de UNO manda
+### D4 — La frase del estado vacío se compone del hallazgo, y el caso de UNO manda ~~(SIN OBJETO)~~
+
+> **Sin objeto desde el 2026-09-09**: no hay estado vacío que componer. Se
+> conserva —igual que FR-706 y FR-707 en la spec— porque llegó a implementarse y
+> el commit `08cb859` habla de ella. Lo que sigue describe una decisión que se
+> tomó y se revirtió, no lo que el producto hace.
 
 **Decisión**: el hallazgo son **datos** —tipo y cuenta por comprobación
 incumplida—; la frase se compone con un unidor de lista natural: `A` · `A y B` ·
