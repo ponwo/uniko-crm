@@ -1,8 +1,10 @@
 # 022 — La guardia del seed demo
 
 **Mini-spec.** Arreglo de seguridad de datos, no producto. Aterriza **antes** que
-la 021 y viaja en el mismo PR que el arreglo del Principio III ya commiteado
-(`93b7022`).
+la 021 y viaja en el mismo PR que el arreglo del Principio III ya commiteado:
+`93b7022` — *"fix(seed): el seed demo no puede tocar los datos de otra
+organización"*. Va el asunto además del hash a propósito: un hash no sobrevive a
+un rebase y el asunto sí.
 
 **Rama**: `022-guardia-seed-demo`, desde `main` (`f13fd19`).
 **Sin migración. Sin tocar el esquema.**
@@ -42,6 +44,26 @@ recién desplegado.
 que falló aquí fue usar un indicador indirecto— ni más: no se comprueban las
 plantillas, ni las credenciales de WhatsApp, ni las etapas del pipeline, porque
 el seed no las destruye. El criterio dice qué comprobar **y qué no**.
+
+### Dos comprobaciones que NO son superficie destruida, y por qué están
+
+El criterio explica seis de las ocho cosas que mira la guardia. Las otras dos
+están por una razón distinta, y conviene decirlo en vez de dejar que parezcan una
+incoherencia:
+
+- **Los contactos.** El seed sólo borra los contactos de los **teléfonos demo**,
+  no todos. Exigir **cero contactos** no es proteger lo que se destruye: es
+  **la señal de que el negocio está vivo**. Un negocio con clientes reales no
+  quiere "datos de demostración" bajo ningún concepto, aunque técnicamente el
+  seed no fuese a tocar a esos clientes — le llenaría la bandeja de conversaciones
+  falsas de una ferretería.
+- **`agent_profile.enabled`.** El `UPDATE` del seed **no toca** `enabled` (ver
+  AC-9). Se comprueba por el mismo motivo que los contactos: un agente encendido
+  es un negocio en marcha.
+
+Las dos son deliberadamente **más estrictas** que el criterio. Lo que el criterio
+prohíbe es lo contrario —comprobar **menos** de lo que se destruye—, que es
+exactamente el fallo que esta feature arregla.
 
 ---
 
@@ -106,7 +128,9 @@ y no en producción.
 La guardia DEBE considerar la organización **virgen** sólo si las cuatro son
 ciertas:
 
-1. **sin contactos** — `contact` sin filas de la organización;
+1. **sin contactos** — `contact` sin filas de la organización. Ojo: **no es
+   superficie destruida**, es señal de negocio vivo — ver "Dos comprobaciones que
+   NO son superficie destruida";
 2. **sin conocimiento** — `kb_entry` sin filas;
 3. **sin corridas del Laboratorio** — `agent_test_run` sin filas (cualquier
    estado: `running`, `done` o `failed`);
@@ -210,8 +234,10 @@ feature **no toca `drizzle/`** y por tanto **no requiere ensayo del Principio X*
   y **el conocimiento sigue ahí** después. No basta con comprobar el código de
   estado: hay que comprobar que no se borró.
 
-- **AC-3 — Corridas del Laboratorio y cero contactos ⇒ 409.** Con al menos un
-  `agent_test_run` y ningún contacto.
+- **AC-3 — Corridas del Laboratorio y cero contactos ⇒ 409 y no se borra nada.**
+  Con al menos un `agent_test_run` y ningún contacto: responde 409 y **las
+  corridas siguen ahí** después, contadas de nuevo. El código de estado dice que
+  la guardia habló; sólo el recuento posterior dice que nadie borró.
 
 - **AC-4 — Perfil tocado ⇒ 409, un caso por campo.** Seis casos independientes,
   cada uno con lo demás virgen: `enabled = true`; `name` distinto de "Asistente";
@@ -232,6 +258,54 @@ feature **no toca `drizzle/`** y por tanto **no requiere ensayo del Principio X*
 - **AC-7 — La comprobación y el borrado, atómicos.** Se afirma que la
   comprobación de ejecución ocurre dentro de la transacción que hace la limpieza
   (FR-604).
+
+- **AC-8 — Un caso del Laboratorio no puede quedar huérfano.** Un test declara
+  que `agent_test_case.run_id` es `NOT NULL` con `ON DELETE cascade`. La guardia
+  no cuenta casos, sólo corridas: se apoya en que no puede haber un caso sin su
+  corrida. Igual que AC-6, el día que eso deje de ser cierto tiene que romperse
+  aquí.
+
+- **AC-9 — Lo que el seed sobrescribe del perfil está TODO vigilado.** El test
+  captura las columnas del `UPDATE` sobre `agent_profile` que hace `seedDemo()`
+  —quitando `updated_at`, que es metadato— y las compara con el conjunto que
+  inspecciona FR-601 #4. Rompe si divergen **en la dirección peligrosa**: toda
+  columna que el seed escriba tiene que estar vigilada.
+
+  > **No es igualdad de conjuntos, y la diferencia importa.** Hoy el seed escribe
+  > `name`, `tone`, `instructions`, `escalation_rules` y `greeting`, y la guardia
+  > mira esas cinco **más `enabled`**, que el seed no toca. Exigir igualdad
+  > estricta haría fallar el test desde el primer día por una asimetría
+  > deliberada. Lo que se exige es: **vigilado ⊇ escrito**, con `enabled`
+  > declarado explícitamente como "vigilado a propósito aunque no se escriba". Si
+  > mañana alguien añade un campo al `UPDATE` sin vigilarlo, rompe; si alguien
+  > deja de vigilar uno que se escribe, rompe.
+
+- **AC-10 — El 409 nombra lo que se perdería.** El cuerpo del 409 trae el detalle
+  estructurado del FR-602 —qué comprobación falló y cuánto hay— y no sólo un
+  mensaje. Es la mitad mecanizable del FR-606: sin este dato, la pantalla no
+  puede explicar nada.
+
+- **AC-11 — Los conteos del `--force` salen de la misma función.** El texto que
+  el CLI imprime antes de destruir (FR-608) se construye desde el hallazgo del
+  FR-602, no de un recuento propio. El test cubre la función que lo formatea:
+  con un hallazgo de ejemplo, el texto nombra las entradas de conocimiento, las
+  corridas y el perfil configurado.
+
+### Lo que se verifica a mano, y dónde
+
+Dos requisitos no llevan test automático, y se dice en vez de fingirlo:
+
+- **FR-607 (la etiqueta del botón)** y **la mitad visual de FR-606** (que el
+  estado vacío explique en vez de esconder). Este repositorio no tiene pruebas de
+  componentes —Vitest corre en `node`, sin biblioteca de render— y montarlas para
+  dos textos es más máquina que problema.
+- **Dónde se verifican: en local, con una organización recién dada de alta**, y
+  **no en LanCo**: la pantalla vacía sólo aparece con cero conversaciones, y LanCo
+  tiene conversaciones reales desde hace semanas. **Ninguna instancia de la flota
+  puede enseñar este estado sin ensuciarla**, así que el nivel 3 de esta
+  mini-spec es local por necesidad, no por comodidad.
+- **Se registra** en el guion de la historia, con la regla de siempre: lo que no
+  se vio no se marca.
 
 ---
 
@@ -256,8 +330,10 @@ conocimiento a ser una segunda capa.
 > previo, o no tocarlo, es un problema **distinto y sin resolver**. Que la 021
 > añada `source` a `kb_entry` **no** cierra este caso.
 
-**Numeración**: esta mini-spec ocupa la banda **FR-6xx**. La 021, aunque tenga el
-número menor, debe empezar en **FR-7xx** para no colisionar.
+> **Sobre la numeración**: esta spec usa FR-601 en adelante siguiendo la
+> costumbre del repositorio, pero **aquí no se decide ninguna banda**. La regla
+> —si se adopta— es de gobernanza y va al `constitution.md`, no dentro de una
+> feature. Propuesta de pasaje, aparte de esta spec.
 
 ---
 
