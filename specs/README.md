@@ -49,6 +49,40 @@ de algo ya documentado, y la única que nadie ejecuta: la que envejece hasta
 contradecir a las otras tres, con el agravante de estar en la carpeta donde uno
 espera encontrar la verdad.
 
+## Hallazgos pendientes de abrir como feature
+
+Cosas encontradas leyendo el código mientras se trabajaba en otra cosa, que **no
+entraron en la feature donde aparecieron** para no ensanchar su alcance, y que no
+deben perderse por eso.
+
+### La primera persona que se registre se queda con la organización
+
+**Encontrado el 2026-09-08**, investigando la 022.
+
+En una instancia recién desplegada el registro público está abierto hasta que
+existe la primera organización: `isPublicSignupAllowed()`
+([`src/server/auth/registration.ts:9`](../src/server/auth/registration.ts))
+devuelve cierto mientras `organization` esté vacía, y el gate se aplica en
+[`src/lib/auth/index.ts:82`](../src/lib/auth/index.ts) sobre `/sign-up/email`.
+Es FR-060 de [`001-uniko-core`](001-uniko-core/spec.md), así que es
+comportamiento especificado, no un descuido.
+
+**Lo que no está resuelto**: entre que el contenedor levanta con su DNS ya
+resolviendo y que el dueño entra a registrarse hay una ventana en la que
+**cualquiera que llegue a `/register` se convierte en el propietario del CRM de
+ese negocio**. No hay confirmación, ni segunda oportunidad, ni forma de
+recuperarlo desde el producto: el registro se cierra solo detrás de quien llegó
+primero. La única mitigación de hoy es que la ventana es corta y la URL no se
+publica.
+
+Importa **al desplegar clientes nuevos**, que es justo lo que la flota hace cada
+vez que entra un negocio. Merece feature propia: decidir si el alta del
+propietario se siembra al desplegar, si se protege con un secreto de un solo uso,
+o si se acota de otra forma. `ALLOW_SIGNUP=true` reabre el registro pero no
+resuelve nada de esto — sólo lo vuelve a abrir.
+
+---
+
 ## De aquí en adelante
 
 Toda feature declara su carril **antes** de escribir código y deja su `spec.md`

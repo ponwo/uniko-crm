@@ -145,7 +145,7 @@ y no en producción.
 
 ## Requisitos
 
-### FR-601 — Qué comprueba la guardia
+### FR-701 — Qué comprueba la guardia
 
 La guardia DEBE considerar la organización **virgen** sólo si las cuatro son
 ciertas:
@@ -164,7 +164,7 @@ ciertas:
 
 Si alguna falla, la organización **no** es virgen.
 
-### FR-602 — Devuelve el hallazgo, no un booleano
+### FR-702 — Devuelve el hallazgo, no un booleano
 
 La función DEBE devolver **qué encontró**: por cada comprobación incumplida, qué
 es y cuánto hay (número de entradas de conocimiento, número de corridas, qué
@@ -175,7 +175,7 @@ explicar es la mitad del arreglo: hoy, cuando la guardia dice que no, el botón
 `isDomainEmpty()` desaparece. No se conserva como envoltorio: un booleano
 disponible es un booleano que alguien vuelve a usar.
 
-### FR-603 — Una sola función, dos usos
+### FR-703 — Una sola función, dos usos
 
 La MISMA función DEBE alimentar el **render** (qué enseña el estado vacío) y la
 **ejecución** (si el seed corre). Dos criterios que se parecen acaban divergiendo,
@@ -183,7 +183,7 @@ y el que diverge en silencio es el de la ejecución.
 
 El render la alcanza por una lectura HTTP; la ejecución la llama en el servidor.
 
-### FR-604 — La comprobación de ejecución, dentro de la transacción de la limpieza, y con cerrojo
+### FR-704 — La comprobación de ejecución, dentro de la transacción de la limpieza, y con cerrojo
 
 La comprobación que autoriza el borrado DEBE correr **en la misma transacción**
 que la limpieza, y esa transacción DEBE **tomar un cerrojo consultivo**
@@ -214,14 +214,14 @@ daño en una acción tan rara como cargar la demo.
 > así que no es urgente; ensancharlo a todo el seed es una decisión aparte y no
 > se toma aquí.
 
-### FR-605 — 409 con detalle
+### FR-705 — 409 con detalle
 
 Con la organización no virgen, `POST /api/seed/demo` DEBE responder **409** con el
 detalle de **qué se perdería**, no sólo un mensaje genérico. El cuerpo mantiene la
 forma de `apiError` (`{ error: { code, message } }`) y añade el detalle
-estructurado del FR-602.
+estructurado del FR-702.
 
-### FR-606 — El estado vacío explica en vez de esconder
+### FR-706 — El estado vacío explica en vez de esconder
 
 Con la organización no virgen, el estado vacío de la bandeja DEBE **decir por qué
 no se puede cargar la demo**, nombrando lo que se perdería. Hoy el botón
@@ -241,7 +241,7 @@ puedo?"—. La frase responde antes de que la pregunta se formule.
 aparece y desaparece medio segundo después es peor que uno que tarda en aparecer,
 y en este caso el que desaparece es el que destruye datos.
 
-### FR-607 — La etiqueta dice lo que hace
+### FR-707 — La etiqueta dice lo que hace
 
 El botón DEBE decir que **sustituye la configuración del agente**, no sólo que
 carga datos. "Cargar datos de demostración" es verdad y es incompleto: no
@@ -251,7 +251,7 @@ menciona que reemplaza el conocimiento y la personalidad del agente.
 alcanza a una organización que no tiene nada que perder. Meter fricción ahí es
 fricción sin riesgo. La honestidad va en la etiqueta, no en un modal.
 
-### FR-608 — El `--force` del CLI se queda, y cuenta lo que va a destruir
+### FR-708 — El `--force` del CLI se queda, y cuenta lo que va a destruir
 
 `pnpm seed:demo --force` DEBE seguir existiendo: está documentado y se usa dentro
 del contenedor. Pero antes de destruir DEBE imprimir **los conteos de lo que va a
@@ -261,7 +261,7 @@ agente está configurado.
 Quien tiene shell puede destruir; lo que no debe es hacerlo sin que quede en el
 log.
 
-### FR-609 — Sin migración
+### FR-709 — Sin migración
 
 Las cuatro comprobaciones se responden con lo que ya hay en el esquema. Esta
 feature **no toca `drizzle/`** y por tanto **no requiere ensayo del Principio X**.
@@ -341,7 +341,7 @@ app real **sin destruir nada**.
   **todos** los borrados de la limpieza salen por el `tx` que entrega
   `db.transaction()`; y (iii) **ninguno de los dos** sale por el `db` exterior.
   Falla si alguien comprueba fuera y entra en la transacción sólo a borrar — que
-  es exactamente el fallo que FR-604 cierra.
+  es exactamente el fallo que FR-704 cierra.
 
   > **Lo que este AC no prueba, dicho a propósito**: que Postgres aísle de verdad
   > a otra conexión concurrente. Eso exige una base real, y este repositorio no
@@ -359,7 +359,7 @@ app real **sin destruir nada**.
 - **AC-9 — Lo que el seed sobrescribe del perfil está TODO vigilado.** El test
   captura las columnas del `UPDATE` sobre `agent_profile` que hace `seedDemo()`
   —quitando `updated_at`, que es metadato— y las compara con el conjunto que
-  inspecciona FR-601 #4. Rompe si divergen **en la dirección peligrosa**: toda
+  inspecciona FR-701 #4. Rompe si divergen **en la dirección peligrosa**: toda
   columna que el seed escriba tiene que estar vigilada.
 
   > **No es igualdad de conjuntos, y la diferencia importa.** Hoy el seed escribe
@@ -372,15 +372,15 @@ app real **sin destruir nada**.
   > deja de vigilar uno que se escribe, rompe.
 
 - **AC-10 — La respuesta de rechazo nombra lo que se perdería.** La función que
-  construye el rechazo del FR-605 incluye el **detalle estructurado** del FR-602
+  construye el rechazo del FR-705 incluye el **detalle estructurado** del FR-702
   —qué comprobación falló y cuánto hay— además del mensaje. Se prueba dándole un
-  hallazgo de ejemplo, sin HTTP: es la mitad mecanizable del FR-606, porque sin
+  hallazgo de ejemplo, sin HTTP: es la mitad mecanizable del FR-706, porque sin
   ese dato la pantalla no puede explicar nada. Que el detalle llegue de verdad
   por la red lo comprueba AC-12.
 
 - **AC-11 — Los conteos del `--force` salen de la misma función.** El texto que
-  el CLI imprime antes de destruir (FR-608) se construye desde el hallazgo del
-  FR-602, no de un recuento propio. El test cubre la función que lo formatea:
+  el CLI imprime antes de destruir (FR-708) se construye desde el hallazgo del
+  FR-702, no de un recuento propio. El test cubre la función que lo formatea:
   con un hallazgo de ejemplo, el texto nombra las entradas de conocimiento, las
   corridas y el perfil configurado.
 
@@ -390,19 +390,30 @@ app real **sin destruir nada**.
   guardia y que cualquier borrado. Un cerrojo que se toma después de comprobar no
   sirve para nada, y ese error no se ve leyendo el código por encima.
 
+- **AC-14 — El render y la ejecución llaman a LA MISMA función.** Se espía la
+  guardia con `vi.mock` sobre su módulo, se ejerce el camino de **render** (la
+  lectura que alimenta el estado vacío) y el de **ejecución** (`POST`), y se
+  afirma que **el mismo espía** registró una llamada por cada camino. Falla en el
+  caso que importa: si alguien reimplementa la comprobación en el render —dos
+  criterios que se parecen— el espía sólo vería una llamada.
+
+  > Es el criterio que faltaba, y no es decorativo: **dos caminos que comprueban
+  > "casi" lo mismo es el fallo original de esta feature repetido en otra capa.**
+  > La guardia vieja miraba una tabla y la operación destruía otras cuatro.
+
 - **AC-12 — En la app real, la organización del arnés recibe 409 con detalle.**
   En `scripts/e2e-selftest.mjs`: `POST /api/seed/demo` contra la organización del
   arnés —que tiene contactos, conocimiento y corridas— responde **409**, el cuerpo
-  trae el **detalle estructurado** del FR-602 nombrando qué se perdería, y una
+  trae el **detalle estructurado** del FR-702 nombrando qué se perdería, y una
   lectura posterior confirma que **el conocimiento del arnés sigue ahí**. Es el
   único criterio que se ejerce contra HTTP real, y es seguro precisamente porque
   el resultado esperado es que **no pase nada**.
 
 ### Lo que se verifica a mano, y dónde
 
-Dos requisitos no llevan test automático, y se dice en vez de fingirlo:
+Tres requisitos no llevan test automático, y se dice en vez de fingirlo:
 
-- **FR-607 (la etiqueta del botón)** y **la mitad visual de FR-606**: que con la
+- **FR-707 (la etiqueta del botón)** y **la mitad visual de FR-706**: que con la
   organización no virgen **no haya botón** sino la frase que nombra lo
   configurado, y que **mientras la comprobación viaja no aparezca ningún botón**.
   Este repositorio no tiene pruebas de componentes —Vitest corre en `node`, sin
@@ -413,6 +424,10 @@ Dos requisitos no llevan test automático, y se dice en vez de fingirlo:
   tiene conversaciones reales desde hace semanas. **Ninguna instancia de la flota
   puede enseñar este estado sin ensuciarla**, así que el nivel 3 de esta
   mini-spec es local por necesidad, no por comodidad.
+- **FR-709 (sin migración)**: no lleva criterio automático porque es una
+  afirmación **sobre el diff**, no sobre el comportamiento — `git diff` no toca
+  `drizzle/`. Se comprueba al revisar el PR y se declara ahí. Un test que
+  inspeccionara el árbol de trabajo comprobaría el repositorio, no el producto.
 - **Se registra** en el guion de la historia, con la regla de siempre: lo que no
   se vio no se marca.
 
@@ -439,11 +454,6 @@ conocimiento a ser una segunda capa.
 > previo, o no tocarlo, es un problema **distinto y sin resolver**. Que la 021
 > añada `source` a `kb_entry` **no** cierra este caso.
 
-> **Sobre la numeración**: esta spec usa FR-601 en adelante siguiendo la
-> costumbre del repositorio, pero **aquí no se decide ninguna banda**. La regla
-> —si se adopta— es de gobernanza y va al `constitution.md`, no dentro de una
-> feature. Propuesta de pasaje, aparte de esta spec.
-
 ---
 
 ## Fuera de alcance
@@ -453,4 +463,4 @@ conocimiento a ser una segunda capa.
   conversaciones `is_test` huérfanas por las claves foráneas.
 - **Que el seed deje de ser destructivo.** Depende de la 021 (arriba).
 - **Guardar o restaurar el perfil del agente.** Sin resolver, y dicho arriba.
-- **Transaccionalidad del resto del seed.** FR-604 y su nota.
+- **Transaccionalidad del resto del seed.** FR-704 y su nota.
