@@ -38,6 +38,28 @@ recién desplegado.
 
 ---
 
+## Clarifications
+
+### Session 2026-09-08
+
+- Q: ¿Qué observa AC-7 para afirmar que la comprobación corre dentro de la
+  transacción de la limpieza? → A: Opción A — BD simulada que vigila por qué
+  manejador sale cada consulta (comprobación y borrados por el `tx`, ninguno por
+  el `db` exterior).
+- Q: ¿Dónde corren AC-1 a AC-5, si el repositorio no tiene carril de tests con
+  base de datos? → A: Opción C — híbrido: los cinco en unitario con BD simulada,
+  más un check en el arnés E2E que afirma el 409 con detalle contra la
+  organización real del arnés, que ya es no virgen.
+- Q: ¿La transacción tiene que impedir además dos siembras simultáneas? → A:
+  Opción B — sí, con `pg_advisory_xact_lock` dentro de la misma transacción,
+  como ya hace el alta.
+- Q: Con la organización no virgen, ¿qué muestra el estado vacío? → A: Opción B —
+  sin botón, y en su lugar una frase que nombra lo que ya hay configurado y dice
+  que la demo lo reemplazaría. Mientras la comprobación viaja no se muestra
+  ningún botón.
+
+---
+
 ## Criterio
 
 **La guardia cubre la misma superficie que la operación destruye.** Ni menos —lo
@@ -161,16 +183,30 @@ y el que diverge en silencio es el de la ejecución.
 
 El render la alcanza por una lectura HTTP; la ejecución la llama en el servidor.
 
-### FR-604 — La comprobación de ejecución, dentro de la transacción de la limpieza
+### FR-604 — La comprobación de ejecución, dentro de la transacción de la limpieza, y con cerrojo
 
 La comprobación que autoriza el borrado DEBE correr **en la misma transacción**
-que la limpieza.
+que la limpieza, y esa transacción DEBE **tomar un cerrojo consultivo**
+(`pg_advisory_xact_lock`) **antes** de comprobar nada.
 
 Hoy hay dos viajes separados: la ruta comprueba, y después `seedDemo()` borra. Una
 entrada de conocimiento creada entre medias **la destruye una comprobación que
 nunca la vio**. Es una ventana estrecha y real, y cerrarla cuesta un
 `db.transaction()` — el patrón ya está en el repo (`on-signup.ts:24`,
 `stage-history.ts:63`).
+
+**Y el cerrojo, por la otra carrera.** Dos clics a la vez sobre una organización
+virgen no chocan de forma benigna: las dos siembras pasan la guardia, las dos
+limpian y las dos insertan, y `contact` tiene índice único
+(`contact_org_channel_identity_uq`), así que la segunda revienta con violación de
+unicidad — **500 y demo a medio cargar**. Con el cerrojo, la segunda espera, se
+encuentra la organización ya **no virgen** y recibe un 409 correcto, que es
+exactamente lo que debería recibir.
+
+Se usa el mismo mecanismo que el alta (`on-signup.ts:27`) con una **clave
+distinta** de la suya (874201). Clave fija y no por organización: una instancia es
+un negocio, y serializar entre organizaciones —si algún día las hubiera— no hace
+daño en una acción tan rara como cargar la demo.
 
 > **Fuera de alcance, dicho a propósito**: el resto del seed (los inserts) sigue
 > sin transacción, como hoy. Un fallo a mitad deja la demo a medio cargar. Con la
@@ -191,6 +227,19 @@ Con la organización no virgen, el estado vacío de la bandeja DEBE **decir por 
 no se puede cargar la demo**, nombrando lo que se perdería. Hoy el botón
 simplemente no aparece tras un fallo, que es la peor de las opciones: el usuario
 no sabe si es un error suyo, un fallo del producto o una decisión.
+
+**La forma, decidida**: **no hay botón**, y en su lugar va una frase que nombra lo
+que ya hay configurado y dice que la demo lo reemplazaría. Por ejemplo: *"No se
+puede cargar la demo: ya tienes 12 entradas de conocimiento y el agente
+configurado. Reemplazaría lo que ya escribiste."*
+
+**No un botón deshabilitado**: un botón que no se puede pulsar es una promesa rota
+a la vista, y provoca justo la pregunta que esto quiere evitar —"¿por qué no
+puedo?"—. La frase responde antes de que la pregunta se formule.
+
+**Y mientras la comprobación viaja**: **no se muestra ningún botón**. Un botón que
+aparece y desaparece medio segundo después es peor que uno que tarda en aparecer,
+y en este caso el que desaparece es el que destruye datos.
 
 ### FR-607 — La etiqueta dice lo que hace
 
@@ -221,6 +270,29 @@ feature **no toca `drizzle/`** y por tanto **no requiere ensayo del Principio X*
 
 ## Criterios de aceptación (van como tests)
 
+### Dónde corre cada uno
+
+Este repositorio **no tiene carril de tests con base de datos**: Vitest corre en
+`node` y el arnés E2E corre contra la app viva. Eso reparte los criterios en dos
+sitios, y conviene decirlo antes de leerlos:
+
+- **AC-1 a AC-11: unitarios, con BD simulada** (el patrón de
+  `tests/unit/seed-demo-tenant.test.ts`, que pasa la conexión como parámetro). El
+  observable de "no se borró nada" es **que no se emitió ningún borrado**, no que
+  las filas sobrevivan: sin base real no hay filas que contar, y afirmar lo que
+  no se puede observar es peor que afirmar menos.
+- **AC-12: en el arnés E2E**, contra la app real.
+
+**Por qué el arnés no puede cubrir más.** La organización del arnés **nunca es
+virgen** —tiene contactos desde la primera corrida— y el registro se cierra tras
+la primera organización, así que **no hay forma de fabricar una organización
+virgen** ahí. AC-1 y AC-5 no tienen dónde correr por HTTP. Y AC-5 ("virgen ⇒
+carga") destruiría los datos del propio arnés si pudiera correr.
+
+Esa misma asimetría es lo que hace valioso AC-12: la organización del arnés es
+**naturalmente** el caso que hay que proteger, así que el 409 se afirma contra la
+app real **sin destruir nada**.
+
 - **AC-1 — Alta real ⇒ virgen.** Una organización creada por **el camino real de
   alta** (`onUserCreated()` en `src/server/auth/on-signup.ts:22`) es considerada virgen por
   la guardia.
@@ -228,18 +300,25 @@ feature **no toca `drizzle/`** y por tanto **no requiere ensayo del Principio X*
   > cambia —un campo nuevo con default, un perfil que ya no nace apagado— este
   > test rompe. **Eso es lo que se quiere**: la alternativa es que la guardia se
   > desactualice en silencio y vuelva a dejar pasar lo que debía frenar.
+  >
+  > **Cómo se observa sin base de datos**: se corre `onUserCreated()` contra la BD
+  > simulada y se **captura el `INSERT` de `agent_profile`** que hace el alta.
+  > Esa fila capturada —no una escrita a mano en el test— es la que se le da a la
+  > guardia. Si el test construyera el perfil por su cuenta, estaría comprobando
+  > que la guardia coincide con el test, que es lo único que no importa.
 
-- **AC-2 — Conocimiento y cero contactos ⇒ 409 y no se borra nada.** Con al menos
-  una entrada de `kb_entry` y ningún contacto: `POST /api/seed/demo` responde 409
-  y **el conocimiento sigue ahí** después. No basta con comprobar el código de
-  estado: hay que comprobar que no se borró.
+- **AC-2 — Conocimiento y cero contactos ⇒ rechazo y ningún borrado.** Con al
+  menos una entrada de `kb_entry` y ningún contacto: la guardia rechaza **y el
+  fake no registra ni un solo `DELETE`**. No basta con comprobar que dijo que no:
+  hay que comprobar que no borró.
 
-- **AC-3 — Corridas del Laboratorio y cero contactos ⇒ 409 y no se borra nada.**
-  Con al menos un `agent_test_run` y ningún contacto: responde 409 y **las
-  corridas siguen ahí** después, contadas de nuevo. El código de estado dice que
-  la guardia habló; sólo el recuento posterior dice que nadie borró.
+- **AC-3 — Corridas del Laboratorio y cero contactos ⇒ rechazo y ningún
+  borrado.** Con al menos un `agent_test_run` y ningún contacto: la guardia
+  rechaza **y no se emite ningún `DELETE`** — en particular ninguno sobre
+  `agent_test_run` ni `agent_test_case`. Que la guardia hable no basta; lo que
+  hay que ver es que nadie tocó las corridas.
 
-- **AC-4 — Perfil tocado ⇒ 409, un caso por campo.** Seis casos independientes,
+- **AC-4 — Perfil tocado ⇒ rechazo, un caso por campo.** Seis casos independientes,
   cada uno con lo demás virgen: `enabled = true`; `name` distinto de "Asistente";
   y `tone`, `instructions`, `escalation_rules`, `greeting` no nulos, uno por uno.
   Un solo test con los seis campos a la vez pasaría aunque la guardia mirase sólo
@@ -255,9 +334,21 @@ feature **no toca `drizzle/`** y por tanto **no requiere ensayo del Principio X*
   conversaciones, mensajes ni leads; el día que deje de ser cierto, esto tiene que
   romperse aquí.
 
-- **AC-7 — La comprobación y el borrado, atómicos.** Se afirma que la
-  comprobación de ejecución ocurre dentro de la transacción que hace la limpieza
-  (FR-604).
+- **AC-7 — La comprobación y el borrado, atómicos: observado por el manejador.**
+  Con la BD simulada del patrón que ya usa `tests/unit/seed-demo-tenant.test.ts`,
+  el fake registra **por qué manejador sale cada consulta**. Se afirma que:
+  (i) `seedDemo()` abre una transacción; (ii) la comprobación de la guardia y
+  **todos** los borrados de la limpieza salen por el `tx` que entrega
+  `db.transaction()`; y (iii) **ninguno de los dos** sale por el `db` exterior.
+  Falla si alguien comprueba fuera y entra en la transacción sólo a borrar — que
+  es exactamente el fallo que FR-604 cierra.
+
+  > **Lo que este AC no prueba, dicho a propósito**: que Postgres aísle de verdad
+  > a otra conexión concurrente. Eso exige una base real, y este repositorio no
+  > tiene carril de tests con base de datos ni en local ni en CI. El observable
+  > elegido atrapa el **error de programación** —comprobar fuera, borrar dentro—,
+  > no el del motor. Montar ese carril para un solo AC es desproporcionado; si
+  > algún día existe por otra razón, este AC se refuerza con él.
 
 - **AC-8 — Un caso del Laboratorio no puede quedar huérfano.** Un test declara
   que `agent_test_case.run_id` es `NOT NULL` con `ON DELETE cascade`. La guardia
@@ -280,10 +371,12 @@ feature **no toca `drizzle/`** y por tanto **no requiere ensayo del Principio X*
   > mañana alguien añade un campo al `UPDATE` sin vigilarlo, rompe; si alguien
   > deja de vigilar uno que se escribe, rompe.
 
-- **AC-10 — El 409 nombra lo que se perdería.** El cuerpo del 409 trae el detalle
-  estructurado del FR-602 —qué comprobación falló y cuánto hay— y no sólo un
-  mensaje. Es la mitad mecanizable del FR-606: sin este dato, la pantalla no
-  puede explicar nada.
+- **AC-10 — La respuesta de rechazo nombra lo que se perdería.** La función que
+  construye el rechazo del FR-605 incluye el **detalle estructurado** del FR-602
+  —qué comprobación falló y cuánto hay— además del mensaje. Se prueba dándole un
+  hallazgo de ejemplo, sin HTTP: es la mitad mecanizable del FR-606, porque sin
+  ese dato la pantalla no puede explicar nada. Que el detalle llegue de verdad
+  por la red lo comprueba AC-12.
 
 - **AC-11 — Los conteos del `--force` salen de la misma función.** El texto que
   el CLI imprime antes de destruir (FR-608) se construye desde el hallazgo del
@@ -291,14 +384,30 @@ feature **no toca `drizzle/`** y por tanto **no requiere ensayo del Principio X*
   con un hallazgo de ejemplo, el texto nombra las entradas de conocimiento, las
   corridas y el perfil configurado.
 
+- **AC-13 — El cerrojo se toma dentro de la transacción y ANTES de comprobar.**
+  Con la misma BD simulada de AC-7, se afirma que la **primera** sentencia que
+  sale por el `tx` es el `pg_advisory_xact_lock`, antes que la consulta de la
+  guardia y que cualquier borrado. Un cerrojo que se toma después de comprobar no
+  sirve para nada, y ese error no se ve leyendo el código por encima.
+
+- **AC-12 — En la app real, la organización del arnés recibe 409 con detalle.**
+  En `scripts/e2e-selftest.mjs`: `POST /api/seed/demo` contra la organización del
+  arnés —que tiene contactos, conocimiento y corridas— responde **409**, el cuerpo
+  trae el **detalle estructurado** del FR-602 nombrando qué se perdería, y una
+  lectura posterior confirma que **el conocimiento del arnés sigue ahí**. Es el
+  único criterio que se ejerce contra HTTP real, y es seguro precisamente porque
+  el resultado esperado es que **no pase nada**.
+
 ### Lo que se verifica a mano, y dónde
 
 Dos requisitos no llevan test automático, y se dice en vez de fingirlo:
 
-- **FR-607 (la etiqueta del botón)** y **la mitad visual de FR-606** (que el
-  estado vacío explique en vez de esconder). Este repositorio no tiene pruebas de
-  componentes —Vitest corre en `node`, sin biblioteca de render— y montarlas para
-  dos textos es más máquina que problema.
+- **FR-607 (la etiqueta del botón)** y **la mitad visual de FR-606**: que con la
+  organización no virgen **no haya botón** sino la frase que nombra lo
+  configurado, y que **mientras la comprobación viaja no aparezca ningún botón**.
+  Este repositorio no tiene pruebas de componentes —Vitest corre en `node`, sin
+  biblioteca de render— y montarlas para dos textos y un estado de carga es más
+  máquina que problema.
 - **Dónde se verifican: en local, con una organización recién dada de alta**, y
   **no en LanCo**: la pantalla vacía sólo aparece con cero conversaciones, y LanCo
   tiene conversaciones reales desde hace semanas. **Ninguna instancia de la flota
