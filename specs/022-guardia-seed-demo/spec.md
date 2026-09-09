@@ -9,6 +9,33 @@ un rebase y el asunto sí.
 **Rama**: `022-guardia-seed-demo`, desde `main` (`f13fd19`).
 **Sin migración. Sin tocar el esquema.**
 
+> ## Cambio de alcance (2026-09-09): el botón se elimina
+>
+> Decidido por el dueño con la Fase 3 ya implementada: **el botón "Cargar datos
+> de demostración" desaparece de la interfaz**, en vez de protegerse.
+>
+> **Por qué ahora se puede.** Sólo servía para demostración y ya no hace falta:
+> LanCo es la instancia de pruebas del dueño, y NuriaAndrea e ILTU tienen la base
+> en blanco y **no están liberadas**, así que ninguna llegaría a verlo. Quitar el
+> botón **elimina el riesgo entero** en vez de acotarlo — y una guardia es un
+> cortafuegos, no un rediseño.
+>
+> **Lo que NO cambia**: el `POST /api/seed/demo` **se queda, protegido**, y con él
+> toda la Fase 2 —guardia, cerrojo, transacción y el `UPDATE` del perfil dentro
+> de ella—. Sigue siendo una operación destructiva y sigue necesitando su
+> guardia. El motivo de conservar el endpoint es concreto y está comprobado:
+> **`scripts/screenshots.mjs` lo llama** para poblar una instancia recién migrada
+> antes de regenerar las capturas del README. No está en `package.json`, se corre
+> a mano, y matar el endpoint lo rompería en silencio hasta que alguien fuera a
+> regenerar capturas.
+>
+> **Y el `--force` del CLI se queda**, que era el otro camino destructivo.
+>
+> Qué decae con el botón: **FR-706 y FR-707** (derogados abajo, con su texto
+> intacto), **FR-703** reescrito, el `GET` del render, la frase de pantalla y sus
+> tests. Sin pantalla, esta feature **deja de tocar código de cliente**, y con eso
+> desaparece el riesgo de bundle que el build destapó en la Fase 3.
+
 ---
 
 ## El problema, en una frase
@@ -57,6 +84,9 @@ recién desplegado.
   sin botón, y en su lugar una frase que nombra lo que ya hay configurado y dice
   que la demo lo reemplazaría. Mientras la comprobación viaja no se muestra
   ningún botón.
+  **(Sin objeto desde el 2026-09-09: el estado vacío ya no ofrece la demo. La
+  respuesta se conserva porque registra qué se decidió y cuándo, no lo que hoy
+  hace el producto.)**
 
 ---
 
@@ -179,13 +209,21 @@ No lleva criterio propio porque **lo atrapa el typecheck**: si queda un uso, el
 gate se pone rojo antes que cualquier test. Se dice aquí para que la ausencia de
 AC se lea como una decisión y no como un olvido.
 
-### FR-703 — Una sola función, dos usos
+### FR-703 — Una sola implementación de la guardia
 
-La MISMA función DEBE alimentar el **render** (qué enseña el estado vacío) y la
-**ejecución** (si el seed corre). Dos criterios que se parecen acaban divergiendo,
-y el que diverge en silencio es el de la ejecución.
+La comprobación DEBE existir **una sola vez**, en su módulo, y todo el que decida
+si la demo se carga DEBE llamarla ahí. Nadie escribe su propia versión
+"parecida".
 
-El render la alcanza por una lectura HTTP; la ejecución la llama en el servidor.
+> **Reescrito el 2026-09-09**, al eliminarse el botón. Antes decía "una sola
+> función, **dos usos**" —render y ejecución— y ese enunciado se queda sin objeto
+> cuando el render desaparece: sólo queda un llamador.
+>
+> **No se deroga, se reescribe**, porque su valor de fondo sobrevive intacto: que
+> `seedDemo()` **no traiga su propia comprobación**. Esa es la forma exacta del
+> fallo que esta feature arregla —la guardia vieja miraba una tabla y la
+> operación destruía otras cuatro— y basta con que alguien "consulte aquí que es
+> más cómodo" para reproducirla en otra capa. Lo sigue afirmando AC-14.
 
 ### FR-704 — La comprobación de ejecución, dentro de la transacción de la limpieza, y con cerrojo
 
@@ -225,7 +263,16 @@ detalle de **qué se perdería**, no sólo un mensaje genérico. El cuerpo manti
 forma de `apiError` (`{ error: { code, message } }`) y añade el detalle
 estructurado del FR-702.
 
-### FR-706 — El estado vacío explica en vez de esconder
+### FR-706 — El estado vacío explica en vez de esconder ~~(DEROGADO)~~
+
+> **DEROGADO el 2026-09-09, antes de llegar a `main`.** El estado vacío ya no
+> ofrece cargar la demo, así que no hay nada que explicar en él: el botón se
+> elimina en vez de protegerse (ver "Cambio de alcance" arriba).
+>
+> **El texto se conserva y no se reescribe.** Estuvo implementado —el estado
+> vacío llegó a consultar la guardia y a componer su frase— y describe una
+> decisión que se tomó con su razón. Borrarlo dejaría el commit `08cb859`
+> hablando de un requisito que no existe.
 
 Con la organización no virgen, el estado vacío de la bandeja DEBE **decir por qué
 no se puede cargar la demo**, nombrando lo que se perdería. Hoy el botón
@@ -245,7 +292,15 @@ puedo?"—. La frase responde antes de que la pregunta se formule.
 aparece y desaparece medio segundo después es peor que uno que tarda en aparecer,
 y en este caso el que desaparece es el que destruye datos.
 
-### FR-707 — La etiqueta dice lo que hace
+### FR-707 — La etiqueta dice lo que hace ~~(DEROGADO)~~
+
+> **DEROGADO el 2026-09-09, antes de llegar a `main`.** No hay botón cuya
+> etiqueta corregir. Mismo tratamiento que FR-706: el texto se conserva.
+>
+> Y con él decae también lo que decía de la confirmación. Ese razonamiento
+> —"con la guardia corregida, el clic sólo alcanza a una organización que no
+> tiene nada que perder"— era correcto y ahora es innecesario: **sin clic no hay
+> nada que confirmar**.
 
 El botón DEBE decir que **sustituye la configuración del agente**, no sólo que
 carga datos. "Cargar datos de demostración" es verdad y es incompleto: no
@@ -269,6 +324,32 @@ log.
 
 Las cuatro comprobaciones se responden con lo que ya hay en el esquema. Esta
 feature **no toca `drizzle/`** y por tanto **no requiere ensayo del Principio X**.
+
+### FR-710 — Derogación parcial de FR-075 (001-uniko-core)
+
+Eliminar el botón **deroga en parte un requisito de otra feature**, y eso se
+registra en los dos sitios, no sólo aquí.
+
+`FR-075` de [`001-uniko-core`](../001-uniko-core/spec.md) dice: *"Con base de
+datos vacía, la UI **MUST** ofrecer «Cargar datos de demostración» (también vía
+script y variable), sembrando el negocio demo […] de forma idempotente."*
+
+- **Lo que se deroga**: la primera parte — que **la UI** lo ofrezca.
+- **Lo que sigue vigente**: el resto. El negocio demo se sigue sembrando por
+  script (`pnpm seed:demo`) y sigue siendo idempotente.
+- **Por qué**: ver "Cambio de alcance". Ninguna instancia de la flota llegaría a
+  usar ese botón, y quitarlo elimina un camino destructivo de un clic.
+
+**La spec de la 001 NO se reescribe**: se le añade una marca junto a FR-075
+apuntando aquí, en el mismo PR que elimina el botón. Un requisito citado en
+commits y comentarios es una dirección estable; lo que se anota es que está
+derogado, no se cambia lo que decía.
+
+> Esta anotación cruzada no es invento de esta spec: se propone como regla en el
+> `constitution.md`, junto a la de las bandas de numeración. Si esa enmienda no
+> se aprueba, esta feature la aplica igualmente **en este caso concreto**, porque
+> el problema que resuelve es real — quien abra la 001 dentro de un año se
+> encuentra un MUST vigente que el producto incumple.
 
 ---
 
@@ -437,9 +518,18 @@ app real **sin destruir nada**.
      argumento es el `tx` que entregó `db.transaction()`, no el `db` exterior**.
      El manejador viaja como argumento, así que se observa sin clasificar SQL: es
      lo que cierra FR-704 por el lado de la comprobación, donde AC-7 no llega.
-  2. **Estática**: `guardia.ts` exporta **una sola** función de decisión, y el
-     módulo de la ruta —el que sirve tanto el `GET` del render como el `POST`— la
-     importa de ahí sin declarar ninguna otra.
+  2. **Estática**: el módulo de la ruta **no inspecciona por su cuenta ninguna
+     tabla que la guardia vigila** — ni `kb_entry`, ni `agent_test_run`, ni
+     `agent_profile`, ni `contact`—. Si alguien decide que "aquí es más cómodo
+     consultarlo directamente", esto se pone rojo.
+
+     > **Reescrita el 2026-09-09.** Antes afirmaba que la ruta **importa**
+     > `revisarDemo`, y eso deja de ser cierto al eliminarse el `GET` del render:
+     > la ruta pasa a importar sólo `cuerpoDeRechazo`, porque la comprobación
+     > ocurre dentro de `seedDemo()`. Afirmar una importación que ya no existe
+     > habría convertido este criterio en rojo permanente por la razón
+     > equivocada. Lo que se conserva es lo que de verdad protegía: **que no haya
+     > una segunda implementación**.
 
   > **El doble del módulo devuelve un hallazgo bien formado** (`virgen: true`), no
   > un `vi.fn()` pelado: `seedDemo()` lee el resultado para decidir, y un
@@ -468,6 +558,11 @@ app real **sin destruir nada**.
   único criterio que se ejerce contra HTTP real, y es seguro precisamente porque
   el resultado esperado es que **no pase nada**.
 
+  > **Encogido el 2026-09-09**: tenía un quinto check —que la lectura del render
+  > coincidiera con la ejecución— y se va con el `GET`. Quedan cuatro. El valor
+  > del criterio no cambia: sigue siendo el único sitio donde el 409 y su detalle
+  > se ejercen contra HTTP real, y donde se comprueba que **nadie borró**.
+
   > Se afirma **lo que hace falta** —que no es virgen— y no un inventario. El
   > arnés crea contactos y conocimiento, pero las **corridas del Laboratorio** las
   > crea `e2e-push.mjs`, que corre **después** en la cadena: enumerar un estado
@@ -476,7 +571,19 @@ app real **sin destruir nada**.
 
 ### Lo que se verifica a mano, y dónde
 
-Tres requisitos no llevan test automático, y se dice en vez de fingirlo:
+> **Reducido el 2026-09-09.** Sin botón no hay pantallas que juzgar: **las cuatro
+> del nivel 3 desaparecen**, y con ellas la parte que sólo una persona podía
+> aprobar —si la frase de un solo elemento sonaba a español—. Lo que queda es el
+> CLI, y sigue mereciendo una persona: **los conteos que `--force` imprime antes
+> de destruir los lee alguien, y conviene que no sea quien los escribió.**
+>
+> Lo que se verifica a mano pasa a ser: `pnpm seed:demo` negándose y diciendo qué
+> encontró, y `pnpm seed:demo --force` imprimiendo los conteos **antes** de
+> destruir. Sigue siendo local: hace falta una organización con datos, y la del
+> arnés sirve.
+
+Lo que sigue, tachado, es lo que decía cuando había pantalla. Se conserva porque
+FR-706 y FR-707 se conservan derogados, no borrados:
 
 - **FR-707 (la etiqueta del botón)** y **la mitad visual de FR-706**: que con la
   organización no virgen **no haya botón** sino la frase que nombra lo
