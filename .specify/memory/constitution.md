@@ -1,71 +1,64 @@
 <!--
 SYNC IMPACT REPORT
 ==================
-Versión: 1.5.0 → 1.5.1
+Versión: 1.5.1 → 1.6.0
 
 Cambios:
-  - Principio II, Rationale → REDACCIÓN: dejaba de pie la premisa que el Cambio
-    2 de la 1.5.0 ya había corregido en el encabezado ("El producto se regala
-    para que agencias lo desplieguen en VPS de clientes… rompe la promesa
-    'gratis y tuyo'"). Pasa a apoyarse en la premisa vigente: cada instancia es
-    el despliegue de UN negocio y la flota multiplica lo que se meta en el
-    núcleo. El argumento no cambia —cada dependencia externa es costo, punto de
-    fallo y fuga de soberanía—, cambia el hecho sobre el que se apoya.
-  - Principio VIII, párrafo de apertura → REDACCIÓN: "Es un CRM … que las
-    agencias despliegan para negocios" pasa a "… desplegado una vez por
-    negocio". Se toca ÚNICAMENTE esa primera oración descriptiva; la que sigue
-    en el mismo párrafo ("Lo que no ayude a atender, organizar y convertir
-    conversaciones de WhatsApp de UN negocio se rechaza") SÍ es criterio de
-    aceptación y queda literal, igual que los tres bullets y el Rationale.
-  - Ningún otro Rationale de la constitución arrastraba la premisa: barrida
-    completa por "agencia", "gratis/gratuito", "open source" y "despliega".
-  - Principios I, III, IV, V, VI, VII, IX y X: íntegros (sin cambio).
-  - Encabezado, "Restricciones de Plataforma y Seguridad", "Flujo de Desarrollo
-    y Puertas de Calidad" y Governance: sin cambio.
+  - Principio VI, "Reglas que sostienen lo anterior" → REGLA NUEVA: la banda de
+    numeración de requisitos (FR-xxx) se deriva del número de feature y no la
+    elige la spec. Se añade el mapeo explícito 017→FR-2xx … 024→FR-9xx, la
+    fórmula que lo extiende, la regla de ancho y búsqueda, y la excepción de las
+    features 001, 015 y 016, que no se renumeran.
+  - Ningún otro principio se toca. Principios I, II, III, IV, V, VII, VIII, IX y
+    X: íntegros.
+  - Encabezado, "Restricciones de Plataforma y Seguridad", "Flujo de Desarrollo y
+    Puertas de Calidad" y Governance: sin cambio.
 
-Bump: PATCH (1.5.0 → 1.5.1) — refinamiento de redacción sin efecto semántico. No
-se añade, elimina ni redefine ningún principio, y ningún criterio de aceptación
-cambia de contenido: los dos párrafos tocados son texto de justificación. Un PR
-que pasaba el Constitution Check con la 1.5.0 lo pasa idéntico con la 1.5.1.
+Bump: MINOR (1.5.1 → 1.6.0) — se AÑADE una regla que antes no existía. No es
+PATCH: a partir de aquí una spec puede incumplir algo que antes no podía
+incumplir, porque no estaba escrito. Tampoco es MAJOR: no elimina ni redefine
+ningún principio, y ninguna spec existente queda inválida (las tres anteriores a
+la regla están exceptuadas por el propio texto).
 
 Motivación:
-  Deuda que la propia 1.5.0 dejó anotada como TODO diferido. El Cambio 2 de esa
-  enmienda corrigió la premisa del producto en el encabezado y en el tercer
-  bullet del Principio VIII, pero su alcance estaba acotado por la propuesta
-  ratificada, que decía explícitamente "el resto del Principio VIII queda
-  íntegro". El resultado era una constitución que afirmaba dos cosas distintas
-  sobre quién despliega Uniko según el párrafo que se leyera: el encabezado
-  hablaba de flota y el Rationale del II seguía hablando de un producto que "se
-  regala" a agencias. Que sea texto de justificación no lo vuelve inocuo: los
-  Rationale son lo que se lee para decidir los casos que la regla no previó.
-  No se toca la licencia MIT ni la atribución a Vocero CRM y a Kevin Belier en
-  LICENSE y en los agradecimientos del README: lo que dejó de ser cierto es la
-  distribución pública, no la licencia.
+  La costumbre existía desde la 017 y nadie la había escrito, así que cada spec
+  la deducía mirando la anterior. Eso ya falló una vez de forma medible: la 022
+  se escribió antes que la 021 y tomó FR-6xx, la banda que le tocaba a la 021,
+  porque numeró por orden de llegada en vez de por número de feature. Se corrigió
+  antes de implementar nada —renumerada a FR-7xx—, y esa corrección es barata
+  exactamente una vez: el día que un identificador esté citado en código, en un
+  PR y en un guion de pruebas, deja de serlo.
+  Antes de escribir la regla se verificó el mapeo real contra los archivos:
+  017 usa FR-201..FR-209, 018 FR-301..FR-314, 019 FR-401..FR-429 y 020
+  FR-501..FR-523. Se comprobó también que la serie moderna no invade lo viejo:
+  001-uniko-core define FR-001..FR-085 —incluidos FR-030 y FR-060, citados hoy
+  en comentarios de `src/server/lab/personas.ts` y
+  `src/server/auth/registration.ts`— y ninguna spec de la 017 en adelante define
+  nada por debajo de FR-200.
 
 Plantillas dependientes:
   - .specify/templates/plan-template.md — ✅ compatible (sin cambios).
-  - .specify/templates/spec-template.md — ✅ compatible (sin cambios).
   - .specify/templates/tasks-template.md — ✅ compatible (sin cambios).
   - .specify/templates/constitution-template.md — ✅ compatible (sin cambios).
-  - CLAUDE.md — ✅ compatible (sin cambios): su bloque de reglas no negociables
-    resume principios, y ninguno cambió de contenido.
-  - docs/despliegue-flota.md — ✅ compatible (sin cambios): ya se escribió sobre
-    la premisa de flota.
-  - README.md — ✅ actualizado en este mismo cambio: el público "Agencias de
-    IA/automatización … despliegas una instancia por cliente en su VPS" pasa a
-    "Quien opera una flota", y la sección Stack deja de decir "diseñado para que
-    una agencia lo modifique". Sin tocar Licencia ni Créditos.
-  - docs/getting-started.md — ✅ compatible (sin cambios): no menciona agencias
-    ni la premisa de distribución pública.
+  - CLAUDE.md — ✅ compatible (sin cambios): su resumen de principios no entra en
+    la numeración de requisitos.
+  - specs/README.md — ✅ compatible (sin cambios): describe carriles y
+    artefactos, no identificadores.
+  - .specify/templates/spec-template.md — ⚠️ DESALINEADA, y queda anotada abajo:
+    sus ejemplos numeran FR-001, FR-002, … Una feature nueva que copie el
+    esqueleto literalmente arranca en la banda equivocada. No se toca en este
+    commit, que es sólo constitucional.
 
 TODOs diferidos:
+  - Alinear `.specify/templates/spec-template.md` con esta regla: que sus
+    ejemplos usen una banda ficticia (FR-N01, FR-N02…) o lleven una nota de una
+    línea remitiendo al Principio VI. Es el único sitio del repositorio que
+    contradice la regla recién escrita.
+  - Las features 001, 015 y 016 comparten identificadores entre sí (las tres
+    empiezan en FR-001). Queda así a propósito, por lo que dice la regla; se
+    anota para que nadie lo lea como un descuido pendiente.
   - Deuda documental heredada de la 1.3.0 (features entre `003` y la app 1.2.0
     sin spec): sigue igual; esta enmienda no la toca.
-  - README, "Modo agencia (Tech Provider)": NO es la premisa corregida aquí sino
-    una capacidad real del producto (una plataforma de agencia que ya hizo el
-    Embedded Signup conecta su backend a la instancia). Se deja intacta a
-    propósito. Queda anotado para que una futura limpieza de la premisa no la
-    borre por parecido de nombre.
 -->
 
 # Uniko CRM Constitution
@@ -216,6 +209,42 @@ Reglas que sostienen lo anterior:
 - Un spec escrito DESPUÉS de la implementación se marca visiblemente como tal en su
   encabezado. Es documentación, no diseño, y confundirlos hace creer a quien lo lea
   dentro de un año que esas decisiones se tomaron antes de programar.
+
+- **La banda de numeración de requisitos se deriva del número de feature, no se
+  elige.** El mapeo es:
+
+  | Feature | Banda | Feature | Banda |
+  |---|---|---|---|
+  | 017 | FR-2xx | 021 | FR-6xx |
+  | 018 | FR-3xx | 022 | FR-7xx |
+  | 019 | FR-4xx | 023 | FR-8xx |
+  | 020 | FR-5xx | 024 | FR-9xx |
+
+  Para una feature `NNN`, la centena es `(NNN − 15) × 100`. **El desplazamiento
+  de 15 es histórico y no significa nada**: es dónde estaba la numeración cuando
+  la 017 tomó FR-2xx. Si algún día la fórmula y la tabla discreparan, **manda la
+  tabla**: la fórmula es una comodidad para extenderla, no su fuente.
+
+  **Ancho y búsqueda.** Un identificador se escribe y se busca SIEMPRE completo
+  —`FR-701`, nunca `FR-70`—. De la feature 025 en adelante la banda pasa a
+  cuatro dígitos (025 → FR-10xx, 026 → FR-11xx, y así), y para que eso no rompa
+  las búsquedas por prefijo **la banda FR-1xx queda permanentemente sin
+  asignar**: sin ella, ningún identificador de cuatro dígitos puede confundirse
+  con uno de tres. Ninguna banda se reutiliza.
+
+  **La banda no depende del orden en que las features aterrizan.** Una spec
+  escrita antes que otra de número menor conserva la suya. Si se numerase por
+  orden de llegada, dos specs abiertas a la vez elegirían la misma banda — y ya
+  pasó: la 022 se escribió antes que la 021 y tomó FR-6xx, que no le tocaba. Se
+  renumeró antes de implementar nada. Una spec que decide su propia banda, o la
+  de otra feature, está legislando fuera de su alcance.
+
+  **Las features 001, 015 y 016 no se renumeran.** Las tres empiezan en FR-001 y
+  se pisan entre sí: son anteriores a esta regla. Un requisito citado en un PR,
+  en un commit o en un comentario del código —`FR-030` en
+  `src/server/lab/personas.ts`, `FR-060` en `src/server/auth/registration.ts`—
+  es una dirección estable, y reescribirla rompe más de lo que ordena. La regla
+  rige de la 017 en adelante, que es de donde ya venía sin estar escrita.
 
 **Rationale**: Especificar el comportamiento observable antes de codificar previene
 retrabajo y mantiene alineadas todas las fases del flujo. Los tres carriles existen
@@ -404,4 +433,4 @@ práctica, convención o preferencia; ante un conflicto, gana la constitución.
 - **Propagación**: al enmendar la constitución se revisan y, si procede, se actualizan
   las plantillas dependientes (plan, spec, tasks).
 
-**Version**: 1.5.1 | **Ratified**: 2026-07-09 | **Last Amended**: 2026-09-05
+**Version**: 1.6.0 | **Ratified**: 2026-07-09 | **Last Amended**: 2026-09-08
