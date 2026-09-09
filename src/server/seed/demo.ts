@@ -1,8 +1,9 @@
-import { eq, inArray } from "drizzle-orm";
+import { eq, inArray, sql } from "drizzle-orm";
 import type { getDb } from "@/lib/db";
 import { schema } from "@/lib/db";
 import { newId } from "@/lib/db/ids";
 import { scoped } from "@/lib/db/tenant";
+import { revisarDemo, type Conexion, type RevisionDemo } from "@/server/seed/guardia";
 
 /**
  * Negocio de demostración "Ferretería El Martillo" (FR-075).
@@ -131,12 +132,93 @@ const DEMO_KB: { kind: "qa" | "block"; question?: string; answer?: string; conte
   // HUECO INTENCIONAL: nada sobre garantías ni devoluciones (lo encuentra el Laboratorio).
 ];
 
+/**
+ * La organización no estaba virgen y no se pidió forzar: no se borró nada.
+ *
+ * Lleva el hallazgo dentro porque quien la atrapa —la ruta o el CLI— tiene que
+ * poder explicar QUÉ se habría perdido, no sólo que no se hizo (FR-702).
+ */
+export class DemoNoVirgenError extends Error {
+  constructor(readonly revision: RevisionDemo) {
+    super("La organización ya tiene datos configurados; la demo los reemplazaría");
+    this.name = "DemoNoVirgenError";
+  }
+}
+
+export type OpcionesSeed = {
+  /**
+   * Saltarse la guardia. **No se salta el cerrojo ni la comprobación**: el
+   * hallazgo se calcula igual, y de ahí salen los conteos que el CLI imprime
+   * antes de destruir.
+   */
+  forzar?: boolean;
+  /** Se invoca con el hallazgo, dentro de la transacción y ANTES de borrar. */
+  alDecidir?: (revision: RevisionDemo) => void;
+};
+
+/**
+ * Carga el negocio de demostración sobre una organización.
+ *
+ * **Lo destructivo va dentro de una transacción con cerrojo** (FR-704): el
+ * cerrojo primero, la comprobación después, y sólo entonces los borrados y el
+ * `UPDATE` del perfil. Así la transacción cubre exactamente la superficie que
+ * la guardia protege.
+ *
+ * Las inserciones se quedan fuera a propósito: son la **carga** de la demo, no
+ * su destrucción. Si algún día conviene que el seed entero sea atómico, se
+ * decidirá por sus méritos.
+ */
 export async function seedDemo(
   db: Db,
-  organizationId: string
+  organizationId: string,
+  { forzar = false, alDecidir }: OpcionesSeed = {}
 ): Promise<{ contacts: number; kbEntries: number }> {
   const demoPhones = DEMO_CONTACTS.map((c) => c.phone);
 
+  const revision = await db.transaction(async (tx) => {
+    /*
+     * Cerrojo PRIMERO, antes de comprobar nada.
+     *
+     * Dos clics simultáneos sobre una organización virgen no chocan de forma
+     * benigna: las dos siembras pasarían la guardia, las dos limpiarían y las
+     * dos insertarían, y `contact` tiene índice único — la segunda revienta con
+     * violación de unicidad y deja la demo a medias. Con el cerrojo, la segunda
+     * espera, se encuentra la organización ya no virgen y recibe su 409.
+     *
+     * Forma de DOS argumentos, distinta del `pg_advisory_xact_lock(874201)` del
+     * alta: PostgreSQL mantiene espacios de bloqueo separados para la forma de
+     * uno y la de dos, y además el 22 —el número de esta feature— ya los separa.
+     * La clave se deriva de la organización para que dos negocios no se esperen
+     * entre sí.
+     */
+    await tx.execute(sql`select pg_advisory_xact_lock(22, hashtext(${organizationId}))`);
+
+    const revision = await revisarDemo(tx, organizationId);
+    alDecidir?.(revision);
+    if (!revision.virgen && !forzar) return revision;
+
+    await destruirLoPrevio(tx, organizationId, demoPhones);
+    return revision;
+  });
+
+  if (!revision.virgen && !forzar) throw new DemoNoVirgenError(revision);
+
+  return sembrar(db, organizationId);
+}
+
+/**
+ * Todo lo que el seed DESTRUYE, junto y dentro de la transacción.
+ *
+ * Que esta función exista es la mitad del arreglo: antes, lo destructivo estaba
+ * repartido por el cuerpo del seed —los borrados al principio y el `UPDATE` del
+ * perfil doscientas líneas más abajo, entre inserciones— y no había forma de
+ * mirar "lo que se pierde" en un solo sitio.
+ */
+async function destruirLoPrevio(
+  db: Conexion,
+  organizationId: string,
+  demoPhones: string[]
+): Promise<void> {
   /*
    * --- Idempotencia: limpiar datos demo previos (orden inverso de FKs) ---
    *
@@ -228,6 +310,34 @@ export async function seedDemo(
     .delete(schema.agentTestRun)
     .where(scoped(schema.agentTestRun.organizationId, organizationId));
 
+  /*
+   * El perfil del agente, que TAMBIÉN es destructivo y por eso está aquí.
+   *
+   * Sobrescribe nombre, tono, instrucciones, reglas de escalado y saludo: todo
+   * lo que un negocio configura antes de recibir su primer mensaje. Vivía al
+   * final del seed, entre inserciones; ahí quedaba fuera de la transacción y la
+   * "superficie destruida" no coincidía con la superficie protegida.
+   */
+  await db
+    .update(schema.agentProfile)
+    .set({
+      name: "Martillito",
+      tone: "Cercano y práctico, de ferretería de confianza. Tutea al cliente.",
+      instructions:
+        "Ayuda a cotizar y cerrar ventas. Da precios en MXN solo si están en el conocimiento. Si piden mayoreo, menciona los mínimos. Nunca inventes existencias.",
+      escalationRules:
+        "Escala a un humano si piden factura con datos fiscales complejos, si hay una queja de producto dañado o si lo piden explícitamente.",
+      greeting: "¡Hola! Soy Martillito, el asistente de Ferretería El Martillo 🔨",
+      updatedAt: new Date(),
+    })
+    .where(scoped(schema.agentProfile.organizationId, organizationId));
+}
+
+/** Lo que el seed ESCRIBE. Fuera de la transacción, como decidió FR-704. */
+async function sembrar(
+  db: Db,
+  organizationId: string
+): Promise<{ contacts: number; kbEntries: number }> {
   // --- Etapas (por nombre) ---
   const stages = await db
     .select()
@@ -308,21 +418,6 @@ export async function seedDemo(
       content: entry.content ?? null,
     });
   }
-
-  // --- Comportamiento del agente de la demo ---
-  await db
-    .update(schema.agentProfile)
-    .set({
-      name: "Martillito",
-      tone: "Cercano y práctico, de ferretería de confianza. Tutea al cliente.",
-      instructions:
-        "Ayuda a cotizar y cerrar ventas. Da precios en MXN solo si están en el conocimiento. Si piden mayoreo, menciona los mínimos. Nunca inventes existencias.",
-      escalationRules:
-        "Escala a un humano si piden factura con datos fiscales complejos, si hay una queja de producto dañado o si lo piden explícitamente.",
-      greeting: "¡Hola! Soy Martillito, el asistente de Ferretería El Martillo 🔨",
-      updatedAt: new Date(),
-    })
-    .where(eq(schema.agentProfile.organizationId, organizationId));
 
   // --- Corrida de Laboratorio de ejemplo (guardada, con el hueco encontrado) ---
   const runId = newId("testRun");
@@ -430,15 +525,3 @@ export async function seedDemo(
   return { contacts: DEMO_CONTACTS.length, kbEntries: DEMO_KB.length };
 }
 
-/** true si la organización aún no tiene datos de dominio (para el botón). */
-export async function isDomainEmpty(
-  db: Db,
-  organizationId: string
-): Promise<boolean> {
-  const rows = await db
-    .select({ id: schema.contact.id })
-    .from(schema.contact)
-    .where(eq(schema.contact.organizationId, organizationId))
-    .limit(1);
-  return rows.length === 0;
-}

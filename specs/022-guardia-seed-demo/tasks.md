@@ -26,25 +26,25 @@ terminar esta fase nada ha cambiado para el usuario todavía.
 **Verificación independiente**: `pnpm test` en verde con los criterios nuevos; la
 app se comporta exactamente como antes.
 
-- [ ] T001 Crear `src/server/seed/guardia.ts` con el tipo del hallazgo
+- [x] T001 Crear `src/server/seed/guardia.ts` con el tipo del hallazgo
       (`{ virgen: boolean; encontrado: Hallazgo[] }`, donde cada `Hallazgo` lleva
       qué comprobación falló y cuánto hay) y la función `revisarDemo(db, organizationId)`
       con las cuatro comprobaciones de FR-701 — contactos, `kb_entry`,
       `agent_test_run` y perfil sin tocar—, **todas por `scoped()`** (FR-701, FR-702)
-- [ ] T003 Crear `tests/unit/seed-demo-guardia.test.ts` con la BD simulada del
+- [x] T003 Crear `tests/unit/seed-demo-guardia.test.ts` con la BD simulada del
       patrón de `tests/unit/seed-demo-tenant.test.ts` (conexión por parámetro,
       captura de sentencias)
-- [ ] T004 AC-1 en `tests/unit/seed-demo-guardia.test.ts`: correr `onUserCreated()`
+- [x] T004 AC-1 en `tests/unit/seed-demo-guardia.test.ts`: correr `onUserCreated()`
       contra la BD simulada, **capturar el `INSERT` de `agent_profile`** y dárselo
       a la guardia; afirmar que la considera virgen. El perfil **no** se escribe a
       mano en el test
-- [ ] T005 AC-4 en `tests/unit/seed-demo-guardia.test.ts`: **seis casos
+- [x] T005 AC-4 en `tests/unit/seed-demo-guardia.test.ts`: **seis casos
       independientes**, uno por campo del perfil (`enabled`, `name`, y los cuatro
       textos), cada uno con lo demás virgen
-- [ ] T006 AC-2, AC-3 y AC-5 en `tests/unit/seed-demo-guardia.test.ts`: con
+- [x] T006 AC-2, AC-3 y AC-5 en `tests/unit/seed-demo-guardia.test.ts`: con
       conocimiento y cero contactos, y con corridas y cero contactos, **rechazo y
       ningún `DELETE` emitido**; con todo limpio, la carga procede
-- [ ] T007 AC-6 y AC-8 en `tests/unit/seed-demo-guardia.test.ts`: los invariantes
+- [x] T007 AC-6 y AC-8 en `tests/unit/seed-demo-guardia.test.ts`: los invariantes
       del esquema en los que se apoya la guardia — `conversation.contactId`,
       `message.conversationId` y `lead.contactId` `NOT NULL`, y
       `agent_test_case.runId` `NOT NULL` con cascada
@@ -60,20 +60,20 @@ incremento que cierra el agujero.
 responde 409 y no borra nada. Con la organización virgen, la demo se carga igual
 que siempre.
 
-- [ ] T008 En `src/server/seed/demo.ts`: envolver **cerrojo → comprobación →
+- [x] T008 En `src/server/seed/demo.ts`: envolver **cerrojo → comprobación →
       limpieza** en un `db.transaction()`, tomando
       `pg_advisory_xact_lock(22, hashtext(<organizationId>))` como **primera
       sentencia** (FR-704, decisión D2 del plan)
-- [ ] T009 En `src/server/seed/demo.ts`: **mover el `UPDATE` de `agent_profile`
+- [x] T009 En `src/server/seed/demo.ts`: **mover el `UPDATE` de `agent_profile`
       dentro de la transacción**, junto a los borrados y antes de las inserciones.
       Hoy está al final del seed; ahí queda fuera y AC-7 lo caza. Es destructivo:
       sobrescribe nombre, tono, instrucciones, escalado y saludo
-- [ ] T010 En `src/server/seed/demo.ts`: firma `seedDemo(db, organizationId, { forzar })`.
+- [x] T010 En `src/server/seed/demo.ts`: firma `seedDemo(db, organizationId, { forzar })`.
       El cerrojo y el cálculo del hallazgo ocurren **siempre**; `forzar` sólo decide
       si el hallazgo detiene la ejecución (decisión D3 del plan). `forzar` lleva
       **valor por defecto `false`**: sin él, cambiar la firma obliga a editar la
       ruta en esta misma tarea, y eso arrastraría T002 y T011 de vuelta aquí
-- [ ] T002 Eliminar `isDomainEmpty()` de `src/server/seed/demo.ts` y sustituir su
+- [x] T002 Eliminar `isDomainEmpty()` de `src/server/seed/demo.ts` y sustituir su
       uso en `src/app/api/seed/demo/route.ts`. **No dejar envoltorio booleano**:
       un booleano disponible es un booleano que alguien vuelve a usar (FR-702)
 
@@ -82,9 +82,9 @@ que siempre.
       > rechaza** con las cuatro comprobaciones pero el usuario recibe el **mensaje
       > viejo, sin detalle**: sabe que no puede y no sabe por qué. Entra junto a
       > T011 para que rechazar y explicar lleguen a la vez.
-- [ ] T011 En `src/app/api/seed/demo/route.ts`: el `POST` responde **409 con el
+- [x] T011 En `src/app/api/seed/demo/route.ts`: el `POST` responde **409 con el
       detalle estructurado** del hallazgo, no sólo un mensaje (FR-705)
-- [ ] T012 AC-7 en `tests/unit/seed-demo-guardia.test.ts`: el fake registra
+- [x] T012 AC-7 en `tests/unit/seed-demo-guardia.test.ts`: el fake registra
       **manejador y tipo** de cada sentencia. Se afirma que por el `db` exterior
       **no sale ninguna destructiva** (`DELETE`, `UPDATE`, `TRUNCATE`) —por
       ausencia, no por lista— **y el ancla de vitalidad, que son DOS
@@ -92,20 +92,20 @@ que siempre.
       **por el `tx` salieron sentencias destructivas**. Quedarse en (a) deja
       pasar un fake que ejecuta el callback y no borra nada; quedarse en la
       ausencia deja pasar uno que no ejecuta nada
-- [ ] T013 AC-13 en `tests/unit/seed-demo-guardia.test.ts`: la **primera** sentencia
+- [x] T013 AC-13 en `tests/unit/seed-demo-guardia.test.ts`: la **primera** sentencia
       del `tx` es el `pg_advisory_xact_lock`, antes de la comprobación y de
       cualquier borrado
-- [ ] T014 AC-9 en `tests/unit/seed-demo-guardia.test.ts`: capturar las columnas del
+- [x] T014 AC-9 en `tests/unit/seed-demo-guardia.test.ts`: capturar las columnas del
       `UPDATE` de `agent_profile` —quitando `updated_at`— y afirmar **vigilado ⊇
       escrito**, con `enabled` declarado como vigilado a propósito aunque el seed
       no lo escriba
-- [ ] T015 AC-10 en `tests/unit/seed-demo-guardia.test.ts`: la función que construye
+- [x] T015 AC-10 en `tests/unit/seed-demo-guardia.test.ts`: la función que construye
       el rechazo incluye el detalle estructurado además del mensaje
-- [ ] T016 En `scripts/seed/demo.ts`: `--force` sigue existiendo y **imprime los
+- [x] T016 En `scripts/seed/demo.ts`: `--force` sigue existiendo y **imprime los
       conteos de lo que va a destruir** antes de hacerlo — entradas de
       conocimiento, corridas, contactos demo y si el perfil está configurado
       (FR-708)
-- [ ] T017 AC-11 en `tests/unit/seed-demo-guardia.test.ts`: el texto del CLI se
+- [x] T017 AC-11 en `tests/unit/seed-demo-guardia.test.ts`: el texto del CLI se
       construye **desde el hallazgo**, no de un recuento propio; con un hallazgo de
       ejemplo nombra las tres cosas
 

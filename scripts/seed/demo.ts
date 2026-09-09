@@ -7,7 +7,8 @@ import { readFileSync } from "node:fs";
 import { drizzle } from "drizzle-orm/postgres-js";
 import postgres from "postgres";
 import * as schema from "@/lib/db/schema";
-import { seedDemo, isDomainEmpty } from "@/server/seed/demo";
+import { DemoNoVirgenError, seedDemo } from "@/server/seed/demo";
+import { textoDeConteos } from "@/server/seed/guardia";
 
 function loadEnvVar(name: string): string | undefined {
   if (process.env[name]) return process.env[name];
@@ -39,18 +40,33 @@ if (!org) {
   process.exit(1);
 }
 
-const force = process.argv.includes("--force");
-if (!force && !(await isDomainEmpty(db, org.id))) {
-  console.error(
-    "[seed] La organización ya tiene datos. Usa --force para recargar la demo."
-  );
-  await sql.end();
-  process.exit(1);
-}
+const forzar = process.argv.includes("--force");
 
-const result = await seedDemo(db, org.id);
-console.log(
-  `[seed] Ferretería El Martillo cargada: ${result.contacts} contactos, ${result.kbEntries} entradas de KB, 1 corrida de ejemplo`
-);
+/*
+ * `--force` se salta la GUARDIA, no el cerrojo ni la comprobación: el hallazgo
+ * se calcula igual, dentro de la transacción, y se imprime ANTES de destruir.
+ *
+ * Quien tiene shell puede destruir; lo que no debe es hacerlo sin que quede en
+ * el log qué se llevó por delante.
+ */
+try {
+  const result = await seedDemo(db, org.id, {
+    forzar,
+    alDecidir: (revision) => {
+      if (!revision.virgen) console.warn(`[seed] ${textoDeConteos(revision)}`);
+    },
+  });
+  console.log(
+    `[seed] Ferretería El Martillo cargada: ${result.contacts} contactos, ${result.kbEntries} entradas de KB, 1 corrida de ejemplo`
+  );
+} catch (err) {
+  if (err instanceof DemoNoVirgenError) {
+    console.error(`[seed] ${textoDeConteos(err.revision)}`);
+    console.error("[seed] Usa --force si de verdad quieres reemplazarlo.");
+    await sql.end();
+    process.exit(1);
+  }
+  throw err;
+}
 await sql.end();
 process.exit(0);
