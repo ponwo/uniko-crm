@@ -41,7 +41,7 @@ Y `tests/unit/seed-demo-tenant.test.ts` sigue vigilando el Principio III: que
 
 ## Nivel 2 — Arnés, contra HTTP real ✅
 
-En `scripts/e2e-selftest.mjs`, cinco comprobaciones (AC-12) contra la
+En `scripts/e2e-selftest.mjs`, cuatro comprobaciones (AC-12) contra la
 organización del arnés, que **no es virgen**: el propio arnés le crea perfil y
 una entrada de conocimiento antes de llegar ahí.
 
@@ -49,14 +49,12 @@ una entrada de conocimiento antes de llegar ahí.
 - [x] El cuerpo trae el **detalle estructurado** de qué se perdería.
 - [x] El detalle **nombra el conocimiento** configurado.
 - [x] Y el conocimiento **sigue ahí** después: la guardia habló y nadie borró.
-- [x] La lectura del render (`GET`) coincide: **no es virgen**.
 
 Es seguro precisamente porque **lo esperado es que no pase nada**.
 
 ### Corrida — 2026-09-09 ✅
 
-Contra el servidor de desarrollo con los mocks encendidos: **99/108 checks**, y
-los **5 nuevos en verde**.
+Contra el servidor de desarrollo con los mocks encendidos: **98/107 checks**, y los **4 en verde**.
 
 **Los 9 fallos restantes son previos a esta feature y están comprobados como
 tales**, no supuestos: corriendo el MISMO arnés contra `main` salen **12**
