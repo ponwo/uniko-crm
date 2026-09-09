@@ -118,22 +118,22 @@ que siempre.
 **Verificación independiente**: las cuatro pantallas del
 [quickstart](quickstart.md) en local.
 
-- [ ] T018 En `src/app/api/seed/demo/route.ts`: añadir el `GET` que devuelve el
+- [x] T018 En `src/app/api/seed/demo/route.ts`: añadir el `GET` que devuelve el
       hallazgo para el render, llamando a **la misma** `revisarDemo()` (FR-703)
-- [ ] T019 Crear el formateador de la frase de pantalla en `src/server/seed/guardia.ts`
+- [x] T019 Crear el formateador de la frase de pantalla en `src/server/seed/guardia.ts`
       (o módulo hermano): compone desde el hallazgo con unidor de lista natural
       —`A` · `A y B` · `A, B y C`— y **se lee como una frase con UN solo
       elemento**, que es el caso más probable en un despliegue nuevo (FR-706,
       decisión D4 del plan)
-- [ ] T020 Test del formateador en `tests/unit/seed-demo-guardia.test.ts`: **uno,
+- [x] T020 Test del formateador en `tests/unit/seed-demo-guardia.test.ts`: **uno,
       dos y cuatro** elementos. El de uno es el que manda
-- [ ] T021 En `src/components/inbox/conversation-list.tsx`: el estado vacío consulta
+- [x] T021 En `src/components/inbox/conversation-list.tsx`: el estado vacío consulta
       el `GET`; con la organización no virgen **no muestra botón** sino la frase; y
       **mientras la comprobación viaja no muestra ningún botón** (FR-706)
-- [ ] T022 En `src/components/inbox/conversation-list.tsx`: la etiqueta del botón
+- [x] T022 En `src/components/inbox/conversation-list.tsx`: la etiqueta del botón
       dice que **sustituye la configuración del agente**, no sólo que carga datos
       (FR-707)
-- [ ] T023 AC-14 en `tests/unit/seed-demo-guardia.test.ts`: espiar
+- [x] T023 AC-14 en `tests/unit/seed-demo-guardia.test.ts`: espiar
       `@/server/seed/guardia` con `vi.mock` —devolviendo un hallazgo **bien
       formado**, no un `vi.fn()` pelado— y afirmar que `seedDemo()` lo llama **y
       que el primer argumento es el `tx`, no el `db` exterior**; más la

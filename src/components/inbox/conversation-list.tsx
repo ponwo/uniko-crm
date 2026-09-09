@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { Search, Sparkles, UserRound, X } from "lucide-react";
 import type { ConversationDto } from "@/lib/types";
 import { CHANNEL_LABEL, type Channel } from "@/lib/channels";
@@ -10,6 +10,7 @@ import { cn } from "@/lib/utils";
 import { ContactAvatar } from "@/components/avatar";
 import { Button } from "@/components/ui/button";
 import { formatTime, previewText } from "./helpers";
+import { fraseDeEstadoVacio, type RevisionDemo } from "@/lib/demo-hallazgo";
 
 /* Puntos de etapa con la paleta de la landing: azul, ámbar, verde WhatsApp. */
 const STAGE_DOT: Record<string, string> = {
@@ -21,18 +22,53 @@ const STAGE_DOT: Record<string, string> = {
 };
 const STAGE_DOT_FALLBACK = "#8391aa";
 
+/**
+ * 022 — El estado vacío de la bandeja, que es donde vivía el accidente.
+ *
+ * Esta pantalla es lo que ve un negocio recién desplegado: sin conversaciones,
+ * porque todavía no le ha escrito nadie. Y aquí había un botón de un clic que
+ * borraba su conocimiento entero y sobrescribía la personalidad de su agente.
+ *
+ * Tres decisiones que parecen de estilo y no lo son:
+ *
+ * 1. **Con la organización no virgen no hay botón**, hay una frase que dice qué
+ *    hay configurado. Un botón deshabilitado es una promesa rota a la vista y
+ *    provoca la pregunta que esto quiere evitar — "¿por qué no puedo?".
+ * 2. **Mientras la comprobación viaja no se muestra ningún botón.** Uno que
+ *    aparece y desaparece medio segundo después es peor que uno que tarda, y
+ *    aquí el que desaparecería es el que destruye datos.
+ * 3. **La etiqueta dice que sustituye la configuración del agente.** "Cargar
+ *    datos de demostración" era verdad y estaba incompleto.
+ */
 function EmptyState({ onSeeded }: { onSeeded: () => void }) {
+  const [revision, setRevision] = useState<RevisionDemo | null>(null);
   const [seeding, setSeeding] = useState(false);
-  const [failed, setFailed] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const revisar = useCallback(async () => {
+    const res = await fetch("/api/seed/demo").catch(() => null);
+    if (res?.ok) setRevision((await res.json()) as RevisionDemo);
+  }, []);
+
+  useEffect(() => {
+    void revisar();
+  }, [revisar]);
 
   async function seed() {
     setSeeding(true);
+    setError(null);
     const res = await fetch("/api/seed/demo", { method: "POST" }).catch(
       () => null
     );
     setSeeding(false);
-    if (res?.ok) onSeeded();
-    else setFailed(true);
+    if (res?.ok) {
+      onSeeded();
+      return;
+    }
+    // Si alguien configuró algo entre la comprobación y el clic, el servidor
+    // manda: se relee y la pantalla pasa a explicar en vez de insistir.
+    setError("No se pudo cargar la demo.");
+    await revisar();
   }
 
   return (
@@ -44,17 +80,35 @@ function EmptyState({ onSeeded }: { onSeeded: () => void }) {
         Cuando alguien escriba a tu número de WhatsApp, su conversación
         aparecerá aquí en tiempo real.
       </p>
-      {!failed && (
-        <Button
-          size="sm"
-          variant="outline"
-          disabled={seeding}
-          onClick={() => void seed()}
-        >
-          <Sparkles className="h-4 w-4" strokeWidth={1.7} />
-          {seeding ? "Cargando demo…" : "Cargar datos de demostración"}
-        </Button>
+
+      {revision?.virgen === true && (
+        <>
+          <Button
+            size="sm"
+            variant="outline"
+            disabled={seeding}
+            onClick={() => void seed()}
+          >
+            <Sparkles className="h-4 w-4" strokeWidth={1.7} />
+            {seeding ? "Cargando demo…" : "Cargar negocio de ejemplo"}
+          </Button>
+          <p className="max-w-xs text-xs text-text-3">
+            Sustituye el conocimiento y la configuración de tu agente por los de
+            la ferretería de demostración.
+          </p>
+        </>
       )}
+
+      {revision?.virgen === false && (
+        <p
+          data-testid="demo-no-disponible"
+          className="max-w-xs text-xs text-text-3"
+        >
+          {fraseDeEstadoVacio(revision)}
+        </p>
+      )}
+
+      {error && <p className="text-xs text-destructive">{error}</p>}
     </div>
   );
 }

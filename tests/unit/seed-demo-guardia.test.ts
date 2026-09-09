@@ -138,8 +138,12 @@ vi.mock("@/lib/db", async (importOriginal) => {
 const { revisarDemo, NOMBRE_DE_AGENTE_POR_DEFECTO, CAMPOS_DE_PERFIL_VIGILADOS } =
   await import("@/server/seed/guardia");
 const { onUserCreated } = await import("@/server/auth/on-signup");
-const { cuerpoDeRechazo, textoDeConteos, CAMPOS_QUE_EL_SEED_NO_ESCRIBE } =
-  await import("@/server/seed/guardia");
+const {
+  cuerpoDeRechazo,
+  textoDeConteos,
+  fraseDeEstadoVacio,
+  CAMPOS_QUE_EL_SEED_NO_ESCRIBE,
+} = await import("@/server/seed/guardia");
 const { seedDemo, DemoNoVirgenError } = await import("@/server/seed/demo");
 
 /* ══════════════════ Ayudas ══════════════════ */
@@ -571,5 +575,67 @@ describe("AC-10 y AC-11 — el rechazo se explica", () => {
 
     expect(texto).toContain("1 entrada de conocimiento");
     expect(texto).not.toContain("1 entradas");
+  });
+});
+
+/* ══════════════════ T020 — la frase del estado vacío ══════════════════ */
+
+describe("FR-706 — la frase se lee como una frase, y el caso de UNO manda", () => {
+  it("con UN solo elemento: el más probable en un despliegue nuevo", () => {
+    // Un negocio que configuró su agente y aún no tiene ni conocimiento ni
+    // evaluaciones. Es el caso que hay que diseñar primero, no el degenerado.
+    const frase = fraseDeEstadoVacio({
+      virgen: false,
+      encontrado: [{ que: "perfil", campos: ["name"] }],
+    } as never);
+
+    expect(frase).toBe(
+      "Ya tienes el agente configurado. Cargar la demo lo reemplazaría todo por el negocio de ejemplo."
+    );
+    // Nada de enumeración degenerada.
+    expect(frase).not.toContain(":");
+    expect(frase).not.toContain(",");
+  });
+
+  it("con DOS elementos: unidos con 'y', sin coma", () => {
+    const frase = fraseDeEstadoVacio({
+      virgen: false,
+      encontrado: [
+        { que: "conocimiento", cuantos: 12 },
+        { que: "perfil", campos: ["name"] },
+      ],
+    } as never);
+
+    expect(frase).toContain("12 entradas de conocimiento y el agente configurado");
+    expect(frase).not.toContain(",");
+  });
+
+  it("con CUATRO elementos: comas y una 'y' al final", () => {
+    const frase = fraseDeEstadoVacio({
+      virgen: false,
+      encontrado: [
+        { que: "contactos", cuantos: 40 },
+        { que: "conocimiento", cuantos: 12 },
+        { que: "corridas", cuantos: 3 },
+        { que: "perfil", campos: ["name", "tone"] },
+      ],
+    } as never);
+
+    expect(frase).toContain(
+      "40 contactos, 12 entradas de conocimiento, 3 evaluaciones del Laboratorio y el agente configurado"
+    );
+  });
+
+  it("el singular no dice '1 evaluaciones'", () => {
+    const frase = fraseDeEstadoVacio({
+      virgen: false,
+      encontrado: [{ que: "corridas", cuantos: 1 }],
+    } as never);
+
+    expect(frase).toContain("1 evaluación del Laboratorio");
+  });
+
+  it("y con la organización virgen no hay frase que enseñar", () => {
+    expect(fraseDeEstadoVacio({ virgen: true, encontrado: [] })).toBe("");
   });
 });
