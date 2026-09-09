@@ -1,64 +1,58 @@
 <!--
 SYNC IMPACT REPORT
 ==================
-Versión: 1.5.1 → 1.6.0
+Versión: 1.6.0 → 1.7.0
+
+(La 1.6.0 —la banda de numeración de requisitos— entra en este mismo PR, en el
+commit anterior. Su propio informe está en ese commit; este documenta sólo lo
+que añade la 1.7.0.)
 
 Cambios:
-  - Principio VI, "Reglas que sostienen lo anterior" → REGLA NUEVA: la banda de
-    numeración de requisitos (FR-xxx) se deriva del número de feature y no la
-    elige la spec. Se añade el mapeo explícito 017→FR-2xx … 024→FR-9xx, la
-    fórmula que lo extiende, la regla de ancho y búsqueda, y la excepción de las
-    features 001, 015 y 016, que no se renumeran.
-  - Ningún otro principio se toca. Principios I, II, III, IV, V, VII, VIII, IX y
+  - Principio VII, "Reglas" → REGLA NUEVA: cómo se marca un requisito derogado
+    por una feature posterior. Dos anotaciones obligatorias —en la spec que
+    deroga y JUNTO AL REQUISITO en la spec derogada—, con la forma concreta
+    (texto tachado + bloque DEROGADO con referencia y rationale), la propagación
+    a todos los artefactos de la spec derogada, y la regla de que ambas viajan
+    en el mismo PR que la derogación.
+  - Ningún otro principio se toca. Principios I, II, III, IV, V, VI, VIII, IX y
     X: íntegros.
   - Encabezado, "Restricciones de Plataforma y Seguridad", "Flujo de Desarrollo y
     Puertas de Calidad" y Governance: sin cambio.
 
-Bump: MINOR (1.5.1 → 1.6.0) — se AÑADE una regla que antes no existía. No es
-PATCH: a partir de aquí una spec puede incumplir algo que antes no podía
-incumplir, porque no estaba escrito. Tampoco es MAJOR: no elimina ni redefine
-ningún principio, y ninguna spec existente queda inválida (las tres anteriores a
-la regla están exceptuadas por el propio texto).
+Bump: MINOR (1.6.0 → 1.7.0) — se AÑADE una regla que antes no existía. Mismo
+criterio que la 1.6.0: no es PATCH porque a partir de aquí una spec puede
+incumplir algo que antes no podía incumplir, al no estar escrito; y no es MAJOR
+porque no elimina ni redefine ningún principio, y ninguna spec existente queda
+inválida.
 
 Motivación:
-  La costumbre existía desde la 017 y nadie la había escrito, así que cada spec
-  la deducía mirando la anterior. Eso ya falló una vez de forma medible: la 022
-  se escribió antes que la 021 y tomó FR-6xx, la banda que le tocaba a la 021,
-  porque numeró por orden de llegada en vez de por número de feature. Se corrigió
-  antes de implementar nada —renumerada a FR-7xx—, y esa corrección es barata
-  exactamente una vez: el día que un identificador esté citado en código, en un
-  PR y en un guion de pruebas, deja de serlo.
-  Antes de escribir la regla se verificó el mapeo real contra los archivos:
-  017 usa FR-201..FR-209, 018 FR-301..FR-314, 019 FR-401..FR-429 y 020
-  FR-501..FR-523. Se comprobó también que la serie moderna no invade lo viejo:
-  001-uniko-core define FR-001..FR-085 —incluidos FR-030 y FR-060, citados hoy
-  en comentarios de `src/server/lab/personas.ts` y
-  `src/server/auth/registration.ts`— y ninguna spec de la 017 en adelante define
-  nada por debajo de FR-200.
+  La 022 elimina el botón "Cargar datos de demostración", y con él deroga en
+  parte FR-075 de 001-uniko-core, que dice que la UI MUST ofrecerlo. Registrarlo
+  sólo en la spec que deroga no basta: a una spec vieja se llega buscando un FR
+  concreto, no leyéndola entera, así que quien abra la 001 dentro de un año
+  encontraría un MUST vigente que el producto incumple y ninguna pista de que
+  fue deliberado.
+  La forma no se inventa aquí: es la que ya usó el repositorio hermano
+  kosmo-CRM al retirar su propia siembra demo (commit 16d3f7c, FR-075 tachado
+  con bloque DEROGADO y rationale, propagado a plan, research, tasks, quickstart
+  y contracts). Allí se hizo por criterio, sin regla escrita que lo exigiera —
+  que es exactamente el motivo de escribirla aquí.
 
 Plantillas dependientes:
   - .specify/templates/plan-template.md — ✅ compatible (sin cambios).
   - .specify/templates/tasks-template.md — ✅ compatible (sin cambios).
+  - .specify/templates/spec-template.md — ✅ compatible (sin cambios): la
+    plantilla describe requisitos nuevos, no derogaciones.
   - .specify/templates/constitution-template.md — ✅ compatible (sin cambios).
-  - CLAUDE.md — ✅ compatible (sin cambios): su resumen de principios no entra en
-    la numeración de requisitos.
-  - specs/README.md — ✅ compatible (sin cambios): describe carriles y
-    artefactos, no identificadores.
-  - .specify/templates/spec-template.md — ⚠️ DESALINEADA, y queda anotada abajo:
-    sus ejemplos numeran FR-001, FR-002, … Una feature nueva que copie el
-    esqueleto literalmente arranca en la banda equivocada. No se toca en este
-    commit, que es sólo constitucional.
+  - CLAUDE.md — ✅ compatible (sin cambios): su resumen no entra en la mecánica
+    de las specs.
+  - specs/README.md — ✅ compatible (sin cambios).
 
 TODOs diferidos:
-  - Alinear `.specify/templates/spec-template.md` con esta regla: que sus
-    ejemplos usen una banda ficticia (FR-N01, FR-N02…) o lleven una nota de una
-    línea remitiendo al Principio VI. Es el único sitio del repositorio que
-    contradice la regla recién escrita.
-  - Las features 001, 015 y 016 comparten identificadores entre sí (las tres
-    empiezan en FR-001). Queda así a propósito, por lo que dice la regla; se
-    anota para que nadie lo lea como un descuido pendiente.
-  - Deuda documental heredada de la 1.3.0 (features entre `003` y la app 1.2.0
-    sin spec): sigue igual; esta enmienda no la toca.
+  - No se hace una pasada retroactiva buscando requisitos ya derogados sin marca
+    en specs anteriores. Si aparece uno, se marca cuando aparezca: una revisión
+    completa del histórico costaría más de lo que rinde y esta regla existe para
+    lo que venga.
 -->
 
 # Uniko CRM Constitution
@@ -264,8 +258,49 @@ Las decisiones tomadas sin contexto suficiente se documentan para revisión huma
 - Los supuestos que condicionan el comportamiento se hacen explícitos para que un
   humano pueda revisarlos y revertirlos.
 
+- **Un requisito derogado se marca EN SU SITIO, no sólo donde se deroga.**
+  Cuando una feature deja sin efecto un requisito de una spec anterior —entero o
+  en parte— hacen falta **dos** anotaciones, y la segunda es la que se olvida:
+
+  1. **En la spec que deroga**: qué requisito, de qué feature, si entero o en
+     parte, y **por qué**. Una derogación sin motivo es indistinguible de un
+     descuido.
+  2. **En la spec derogada, junto al requisito**: el texto original **tachado**
+     (`~~…~~`) seguido de un bloque **`**DEROGADO**`** con la referencia —la
+     feature, el issue o el PR que lo deroga— y el **rationale**, no sólo la
+     etiqueta. Quien llega ahí necesita saber por qué, o volverá a proponerlo.
+
+  **Si la derogación es parcial, el tachado también.** Se tacha **sólo la parte
+  que deja de regir**, y el bloque dice cuál sigue vigente. Tachar el requisito
+  entero porque se derogó una de sus partes deja vigente en apariencia lo
+  contrario de lo que se decidió — y es un error más difícil de detectar que no
+  marcar nada, porque parece que alguien ya se ocupó.
+
+  **El texto original no se borra ni se reescribe: se tacha.** Era cierto cuando
+  se escribió y está citado en PRs, commits y comentarios del código;
+  reescribirlo convierte esas citas en mentiras. El tachado deja leer lo que
+  decía **y** que dejó de regir.
+
+  **La marca se propaga a TODOS los artefactos de la spec derogada** que
+  mencionen el requisito —plan, research, tasks, quickstart, contratos—, no sólo
+  al `spec.md`. Un `tasks.md` con una tarea viva de un requisito muerto manda a
+  alguien a implementarlo.
+
+  **Las anotaciones viajan en el mismo PR que la derogación**, no antes: un
+  requisito marcado como derogado por una feature que nunca llegó a `main` es
+  peor que no marcarlo.
+
+  **Sin la anotación (2) la regla no sirve para nada**, y por eso está escrita. A
+  una spec vieja se llega buscando un `FR-` concreto, no leyéndola entera: quien
+  la abra dentro de un año encuentra un MUST vigente que el producto incumple, y
+  no tiene forma de saber que alguien lo derogó a propósito. La anotación (1)
+  sólo la ve quien ya sabía que la derogación existe — es decir, quien no la
+  necesitaba.
+
 **Rationale**: Las decisiones implícitas bajo incertidumbre son la principal fuente
-de deuda oculta; hacerlas visibles permite corregirlas a tiempo.
+de deuda oculta; hacerlas visibles permite corregirlas a tiempo. Un requisito
+derogado sin marca es un caso particular de lo mismo: la decisión existe, pero
+no está donde se va a leer.
 
 ### VIII. Foco Vertical — CRM de Conversaciones y Leads de WhatsApp
 
@@ -433,4 +468,4 @@ práctica, convención o preferencia; ante un conflicto, gana la constitución.
 - **Propagación**: al enmendar la constitución se revisan y, si procede, se actualizan
   las plantillas dependientes (plan, spec, tasks).
 
-**Version**: 1.6.0 | **Ratified**: 2026-07-09 | **Last Amended**: 2026-09-08
+**Version**: 1.7.0 | **Ratified**: 2026-07-09 | **Last Amended**: 2026-09-09
