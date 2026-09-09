@@ -40,7 +40,18 @@ commiteado.
 
 ## Constitution Check
 
-*Contra `.specify/memory/constitution.md` v1.6.0.*
+*Contra `.specify/memory/constitution.md` **v1.6.0**.*
+
+> **Dependencia de orden, dicha en voz alta**: la 1.6.0 —la regla de bandas de
+> requisitos— **no viaja en esta rama**. Está en el PR de gobernanza, que entra
+> **antes** que éste porque la 021 la necesita para arrancar. Hasta que ese PR
+> aterrice, esta tabla se contrasta contra una versión que el árbol de esta rama
+> todavía no tiene, y la banda **FR-7xx** de esta feature se sostiene en una regla
+> escrita en otro sitio.
+>
+> No es un problema si el orden se respeta, y por eso se escribe: un lector que
+> llegue a esta rama suelta merece saber por qué el plan cita una versión que no
+> encuentra.
 
 | Principio | Veredicto |
 |---|---|
