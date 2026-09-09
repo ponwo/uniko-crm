@@ -31,9 +31,6 @@ app se comporta exactamente como antes.
       qué comprobación falló y cuánto hay) y la función `revisarDemo(db, organizationId)`
       con las cuatro comprobaciones de FR-701 — contactos, `kb_entry`,
       `agent_test_run` y perfil sin tocar—, **todas por `scoped()`** (FR-701, FR-702)
-- [ ] T002 Eliminar `isDomainEmpty()` de `src/server/seed/demo.ts` y sustituir su
-      uso en `src/app/api/seed/demo/route.ts`. **No dejar envoltorio booleano**:
-      un booleano disponible es un booleano que alguien vuelve a usar (FR-702)
 - [ ] T003 Crear `tests/unit/seed-demo-guardia.test.ts` con la BD simulada del
       patrón de `tests/unit/seed-demo-tenant.test.ts` (conexión por parámetro,
       captura de sentencias)
@@ -73,13 +70,28 @@ que siempre.
       sobrescribe nombre, tono, instrucciones, escalado y saludo
 - [ ] T010 En `src/server/seed/demo.ts`: firma `seedDemo(db, organizationId, { forzar })`.
       El cerrojo y el cálculo del hallazgo ocurren **siempre**; `forzar` sólo decide
-      si el hallazgo detiene la ejecución (decisión D3 del plan)
+      si el hallazgo detiene la ejecución (decisión D3 del plan). `forzar` lleva
+      **valor por defecto `false`**: sin él, cambiar la firma obliga a editar la
+      ruta en esta misma tarea, y eso arrastraría T002 y T011 de vuelta aquí
+- [ ] T002 Eliminar `isDomainEmpty()` de `src/server/seed/demo.ts` y sustituir su
+      uso en `src/app/api/seed/demo/route.ts`. **No dejar envoltorio booleano**:
+      un booleano disponible es un booleano que alguien vuelve a usar (FR-702)
+
+      > **Por qué vive aquí y no en la Fase 1**: no es la redacción de una frase.
+      > Dejarla allí abre una ventana —una fase entera— en la que la guardia **ya
+      > rechaza** con las cuatro comprobaciones pero el usuario recibe el **mensaje
+      > viejo, sin detalle**: sabe que no puede y no sabe por qué. Entra junto a
+      > T011 para que rechazar y explicar lleguen a la vez.
 - [ ] T011 En `src/app/api/seed/demo/route.ts`: el `POST` responde **409 con el
       detalle estructurado** del hallazgo, no sólo un mensaje (FR-705)
 - [ ] T012 AC-7 en `tests/unit/seed-demo-guardia.test.ts`: el fake registra
-      **manejador y tipo** de cada sentencia; se afirma que por el `db` exterior
-      **no sale ninguna destructiva** (`DELETE`, `UPDATE`, `TRUNCATE`) **ni la
-      comprobación**. Afirmación por ausencia, no por lista
+      **manejador y tipo** de cada sentencia. Se afirma que por el `db` exterior
+      **no sale ninguna destructiva** (`DELETE`, `UPDATE`, `TRUNCATE`) —por
+      ausencia, no por lista— **y el ancla de vitalidad, que son DOS
+      afirmaciones**: (a) que el callback de la transacción **corrió** y (b) que
+      **por el `tx` salieron sentencias destructivas**. Quedarse en (a) deja
+      pasar un fake que ejecuta el callback y no borra nada; quedarse en la
+      ausencia deja pasar uno que no ejecuta nada
 - [ ] T013 AC-13 en `tests/unit/seed-demo-guardia.test.ts`: la **primera** sentencia
       del `tx` es el `pg_advisory_xact_lock`, antes de la comprobación y de
       cualquier borrado
@@ -121,9 +133,13 @@ que siempre.
 - [ ] T022 En `src/components/inbox/conversation-list.tsx`: la etiqueta del botón
       dice que **sustituye la configuración del agente**, no sólo que carga datos
       (FR-707)
-- [ ] T023 AC-14 en `tests/unit/seed-demo-guardia.test.ts`: espiar el módulo de la
-      guardia con `vi.mock`, ejercer el camino de **render** y el de **ejecución**,
-      y afirmar que **el mismo espía** registró una llamada por cada uno
+- [ ] T023 AC-14 en `tests/unit/seed-demo-guardia.test.ts`: espiar
+      `@/server/seed/guardia` con `vi.mock` —devolviendo un hallazgo **bien
+      formado**, no un `vi.fn()` pelado— y afirmar que `seedDemo()` lo llama **y
+      que el primer argumento es el `tx`, no el `db` exterior**; más la
+      comprobación estática de que `guardia.ts` exporta una sola función de
+      decisión y el módulo de la ruta la importa de ahí. **Sin simulación de
+      sesión**: los handlers no se ejercen aquí
 
 ---
 
@@ -142,6 +158,15 @@ que siempre.
       `pnpm typecheck && pnpm lint && pnpm test && pnpm build`
 - [ ] T028 Al abrir el PR: declarar **FR-709** —el diff no toca `drizzle/`— y que
       el PR lleva también el arreglo del Principio III (`93b7022`)
+- [ ] T029 **Puerta de promoción, condición 3**: con LanCo ya desplegada con este
+      commit, `POST https://uniko.lanco.cloud/api/seed/demo` responde **409 con el
+      detalle**, y una lectura posterior confirma que su conocimiento sigue ahí.
+      Registrar el resultado en `tests/e2e/us-guardia-demo.md`
+
+      > No es un extra ni una repetición de T024. El Principio IX y la condición 3
+      > de la puerta exigen el self-test **contra la instancia desplegada, no sólo
+      > contra `localhost`**, y T024 corre en el arnés local. Aquí sale barato y es
+      > seguro: lo que se espera es que **no pase nada**.
 
 ---
 
@@ -150,13 +175,17 @@ que siempre.
 - **T001 bloquea todo lo demás**: sin el hallazgo no hay nada que devolver ni que
   formatear.
 - **T003 antes que T004..T007, T012..T015, T017, T020 y T023**: comparten archivo.
-- **T008 antes que T012 y T013**: no se puede afirmar sobre una transacción que no
-  existe.
+- **T001 → T002 → T011**: la ruta no puede llamar a la guardia antes de que
+  exista, y T011 reescribe la respuesta de la misma llamada que T002 introduce.
+  Los tres cambios del rechazo viajan juntos, a propósito.
+- **T008 antes que T012, T013 y T023**: no se puede afirmar sobre una transacción
+  —ni sobre el `tx` que AC-14 mira— que todavía no existe.
 - **T009 antes que T012**: mientras el `UPDATE` del perfil siga al final del seed,
   AC-7 falla — y debe fallar.
 - **T010 antes que T016**: el CLI necesita la firma con `forzar`.
 - **T018 y T019 antes que T021**: la pantalla necesita el dato y la frase.
-- **T024..T027 al final**, cuando hay algo que verificar.
+- **T024..T029 al final**, cuando hay algo que verificar. **T029 es posterior al
+  despliegue**, no sólo al merge.
 
 ## Paralelismo
 
@@ -188,7 +217,7 @@ conocimiento; al final de la Fase 3, además, sabe por qué el botón no está.
 | FR-702 — devuelve el hallazgo, sin booleano | T001, T002, T015 |
 | FR-703 — una sola función, dos usos | T018, T023 |
 | FR-704 — transacción y cerrojo | T008, T009, T012, T013 |
-| FR-705 — 409 con detalle | T011, T015, T024 |
+| FR-705 — 409 con detalle | T011, T015, T024, T029 |
 | FR-706 — el estado vacío explica | T019, T020, T021 |
 | FR-707 — la etiqueta dice lo que hace | T022, T026 |
 | FR-708 — `--force` cuenta lo que destruye | T010, T016, T017 |

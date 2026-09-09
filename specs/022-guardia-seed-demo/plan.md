@@ -83,7 +83,8 @@ y los DTO que consuma algo de fuera del repositorio.
 ```text
 src/server/seed/
 ├── demo.ts                    # seedDemo(): transacción + cerrojo; deja de decidir
-└── guardia.ts                 # NUEVO — la única función de la guardia (FR-703)
+└── guardia.ts                 # NUEVO — revisarDemo(db, organizationId): la única
+                               #   función de la guardia, y el tipo de su hallazgo (FR-703)
 
 src/app/api/seed/demo/route.ts # POST usa el hallazgo para el 409; GET nuevo para el render
 src/components/inbox/conversation-list.tsx  # estado vacío: frase o botón (FR-706, FR-707)

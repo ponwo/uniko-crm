@@ -175,6 +175,10 @@ explicar es la mitad del arreglo: hoy, cuando la guardia dice que no, el botón
 `isDomainEmpty()` desaparece. No se conserva como envoltorio: un booleano
 disponible es un booleano que alguien vuelve a usar.
 
+No lleva criterio propio porque **lo atrapa el typecheck**: si queda un uso, el
+gate se pone rojo antes que cualquier test. Se dice aquí para que la ausencia de
+AC se lea como una decisión y no como un olvido.
+
 ### FR-703 — Una sola función, dos usos
 
 La MISMA función DEBE alimentar el **render** (qué enseña el estado vacío) y la
@@ -324,9 +328,10 @@ app real **sin destruir nada**.
   Un solo test con los seis campos a la vez pasaría aunque la guardia mirase sólo
   uno.
 
-- **AC-5 — Virgen ⇒ carga.** Con las cuatro comprobaciones limpias, el seed corre
-  y la demo queda cargada. La guardia tiene que dejar pasar el caso para el que
-  existe.
+- **AC-5 — Virgen ⇒ carga.** Con las cuatro comprobaciones limpias, el seed corre:
+  el fake registra **los `INSERT` de la demo** y **ninguna sentencia de rechazo**.
+  La guardia tiene que dejar pasar el caso para el que existe — un cortafuegos que
+  también apaga la cocina no sirve.
 
 - **AC-6 — El invariante del esquema, afirmado.** Un test declara que
   `conversation.contactId`, `message.conversationId` y `lead.contactId` son
@@ -334,17 +339,35 @@ app real **sin destruir nada**.
   conversaciones, mensajes ni leads; el día que deje de ser cierto, esto tiene que
   romperse aquí.
 
-- **AC-7 — Lo destructivo y la comprobación, dentro de la transacción: afirmado
-  por AUSENCIA.** Con la BD simulada del patrón que ya usa
+- **AC-7 — Lo destructivo, dentro de la transacción: por AUSENCIA y con ancla de
+  vitalidad.** Con la BD simulada del patrón que ya usa
   `tests/unit/seed-demo-tenant.test.ts`, el fake registra **por qué manejador sale
   cada sentencia y de qué tipo es**. Se afirma que `seedDemo()` abre una
-  transacción y que **por el `db` exterior no sale NINGUNA sentencia destructiva
-  —`DELETE`, `UPDATE`, `TRUNCATE`— ni la comprobación de la guardia**.
+  transacción y que **por el `db` exterior no sale NINGUNA sentencia destructiva**
+  —`DELETE`, `UPDATE`, `TRUNCATE`—.
 
   La afirmación es **por ausencia, no por lista**: un octavo `DELETE` escrito
   fuera de la transacción la rompe sin que nadie tenga que acordarse de añadirlo
   a ningún inventario. Y falla igual en el caso original: comprobar fuera y
   entrar en la transacción sólo a borrar.
+
+  **Y con ancla de vitalidad, que son dos cosas y no una**: se afirma (a) que **el
+  callback de la transacción corrió** y (b) que **por el `tx` salieron sentencias
+  destructivas** — los borrados de la limpieza y el `UPDATE` del perfil.
+
+  > **Por qué el ancla no es opcional.** Una afirmación por ausencia se cumple
+  > sola cuando no se ejecuta nada. Un fake cuyo `transaction()` no invoque el
+  > callback —que es lo primero que sale al escribirlo— deja este criterio en
+  > verde con la transacción **sin ejercer**: no hubo destructivas fuera porque no
+  > hubo destructivas en ningún sitio. Es el mismo fallo que el arnés de la 020 ya
+  > pagó una vez, cuando un silencio que era falta de espera se leyó como silencio.
+
+  > **La comprobación de la guardia NO se afirma aquí.** Con la guardia real son
+  > `SELECT` de conteo, indistinguibles del `SELECT` de `pipelineStage` que el
+  > propio seed hace; reconocerlos exigiría clasificar por texto de SQL, que es la
+  > fragilidad que este criterio existe para evitar. Que la comprobación ocurra
+  > dentro de la transacción lo afirma **AC-14**, que tiene el manejador delante
+  > como argumento.
 
   > **Los `INSERT` se quedan fuera a propósito**, como decide la nota de FR-704:
   > son la **carga** de la demo, no su destrucción. Acotar por categoría es lo que
@@ -406,24 +429,50 @@ app real **sin destruir nada**.
   guardia y que cualquier borrado. Un cerrojo que se toma después de comprobar no
   sirve para nada, y ese error no se ve leyendo el código por encima.
 
-- **AC-14 — El render y la ejecución llaman a LA MISMA función.** Se espía la
-  guardia con `vi.mock` sobre su módulo, se ejerce el camino de **render** (la
-  lectura que alimenta el estado vacío) y el de **ejecución** (`POST`), y se
-  afirma que **el mismo espía** registró una llamada por cada camino. Falla en el
-  caso que importa: si alguien reimplementa la comprobación en el render —dos
-  criterios que se parecen— el espía sólo vería una llamada.
+- **AC-14 — Una sola implementación de la guardia, afirmada en la frontera del
+  módulo.** Dos afirmaciones, ninguna a través de los handlers HTTP:
 
-  > Es el criterio que faltaba, y no es decorativo: **dos caminos que comprueban
-  > "casi" lo mismo es el fallo original de esta feature repetido en otra capa.**
-  > La guardia vieja miraba una tabla y la operación destruía otras cuatro.
+  1. **Runtime**: con `vi.mock` sobre `@/server/seed/guardia`, ejercer
+     `seedDemo()` y comprobar que el espía registró la llamada **y que su primer
+     argumento es el `tx` que entregó `db.transaction()`, no el `db` exterior**.
+     El manejador viaja como argumento, así que se observa sin clasificar SQL: es
+     lo que cierra FR-704 por el lado de la comprobación, donde AC-7 no llega.
+  2. **Estática**: `guardia.ts` exporta **una sola** función de decisión, y el
+     módulo de la ruta —el que sirve tanto el `GET` del render como el `POST`— la
+     importa de ahí sin declarar ninguna otra.
+
+  > **El doble del módulo devuelve un hallazgo bien formado** (`virgen: true`), no
+  > un `vi.fn()` pelado: `seedDemo()` lee el resultado para decidir, y un
+  > `undefined` reventaría el test por una razón que no es la que se prueba.
+
+  > **Por qué no se ejerce el camino de render.** El `GET` va envuelto en
+  > `withAuth`, que responde 401 antes de llegar al cuerpo, así que probarlo
+  > exigiría **construir simulación de sesión** — y hoy **ningún test unitario de
+  > este repositorio ejerce un handler autenticado**: no hay patrón que copiar.
+  > Montar esa maquinaria es una decisión propia, con sus méritos, y no algo que
+  > deba salir de un criterio de aceptación de una mini-spec.
+
+  > **Lo que sí atrapa**, que es el riesgo real: que alguien **reimplemente** la
+  > comprobación en el render en vez de llamar a la única que hay — dos caminos
+  > que comprueban "casi" lo mismo es el fallo original de esta feature repetido
+  > en otra capa. **Lo que no atrapa**: que el `GET` la invoque de verdad en
+  > tiempo de ejecución. Eso se ve en la corrida manual del quickstart, donde la
+  > pantalla enseña la frase correcta o no la enseña.
 
 - **AC-12 — En la app real, la organización del arnés recibe 409 con detalle.**
   En `scripts/e2e-selftest.mjs`: `POST /api/seed/demo` contra la organización del
-  arnés —que tiene contactos, conocimiento y corridas— responde **409**, el cuerpo
+  arnés —que **no es virgen**: el propio arnés le crea contactos y conocimiento
+  antes de llegar aquí— responde **409**, el cuerpo
   trae el **detalle estructurado** del FR-702 nombrando qué se perdería, y una
   lectura posterior confirma que **el conocimiento del arnés sigue ahí**. Es el
   único criterio que se ejerce contra HTTP real, y es seguro precisamente porque
   el resultado esperado es que **no pase nada**.
+
+  > Se afirma **lo que hace falta** —que no es virgen— y no un inventario. El
+  > arnés crea contactos y conocimiento, pero las **corridas del Laboratorio** las
+  > crea `e2e-push.mjs`, que corre **después** en la cadena: enumerar un estado
+  > que la propia corrida no establece es una premisa que sólo se cumple, por
+  > casualidad, a partir de la segunda pasada.
 
 ### Lo que se verifica a mano, y dónde
 
