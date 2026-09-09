@@ -316,6 +316,51 @@ async function main() {
   });
   ok("entrada de KB creada desde la pantalla", kbQa.res.ok, JSON.stringify(kbQa.json));
 
+  /*
+   * 022 — AC-12: la guardia del seed demo, contra HTTP real.
+   *
+   * Es el único criterio de la 022 que no corre con BD simulada, y es seguro
+   * precisamente porque **lo que se espera es que no pase nada**: la
+   * organización del arnés no es virgen —acaba de recibir perfil y una entrada
+   * de conocimiento, ahí arriba—, así que cargar la demo tiene que ser
+   * imposible. Si algún día esto devolviera 200, el arnés se habría borrado a
+   * sí mismo el conocimiento y las siguientes comprobaciones caerían como
+   * fichas; mejor que caiga aquí, con nombre.
+   */
+  const kbAntes = await api("/api/kb");
+  const nKbAntes = (kbAntes.json?.entries ?? []).length;
+
+  const demoBloqueada = await api("/api/seed/demo", { method: "POST" });
+  ok(
+    "la demo NO se carga sobre una organización con datos → 409",
+    demoBloqueada.res.status === 409,
+    `status=${demoBloqueada.res.status}`
+  );
+  ok(
+    "y el 409 dice QUÉ se perdería, no sólo que no",
+    Array.isArray(demoBloqueada.json?.detalle) && demoBloqueada.json.detalle.length > 0,
+    JSON.stringify(demoBloqueada.json)
+  );
+  ok(
+    "el detalle nombra el conocimiento configurado",
+    (demoBloqueada.json?.detalle ?? []).some((h) => h.que === "conocimiento"),
+    JSON.stringify(demoBloqueada.json?.detalle)
+  );
+
+  const kbDespues = await api("/api/kb");
+  ok(
+    "y el conocimiento sigue ahí: la guardia habló y NADIE borró",
+    (kbDespues.json?.entries ?? []).length === nKbAntes && nKbAntes > 0,
+    `antes=${nKbAntes} despues=${(kbDespues.json?.entries ?? []).length}`
+  );
+
+  const revision = await api("/api/seed/demo");
+  ok(
+    "y la lectura del render coincide: no es virgen",
+    revision.res.ok && revision.json?.virgen === false,
+    JSON.stringify(revision.json)
+  );
+
   const prof = await bot("/api/bot/profile");
   ok(
     "GET /api/bot/profile → 200 con el perfil de la pantalla",

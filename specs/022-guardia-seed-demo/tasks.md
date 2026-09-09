@@ -145,16 +145,16 @@ que siempre.
 
 ## Fase 4: Verificación y cierre
 
-- [ ] T024 AC-12 en `scripts/e2e-selftest.mjs`: `POST /api/seed/demo` contra la
+- [x] T024 AC-12 en `scripts/e2e-selftest.mjs`: `POST /api/seed/demo` contra la
       organización del arnés responde **409** con detalle, y una lectura posterior
       confirma que **el conocimiento del arnés sigue ahí**
-- [ ] T025 [P] Crear `tests/e2e/us-guardia-demo.md` con las cuatro pantallas del
+- [x] T025 [P] Crear `tests/e2e/us-guardia-demo.md` con las cuatro pantallas del
       quickstart y el hueco para registrar la corrida, con la regla de siempre:
       **lo que no se vio no se marca**
 - [ ] T026 Corrida manual en local siguiendo el [quickstart](quickstart.md): base
       desechable, alta real, los cuatro casos —incluido **sólo el perfil tocado**—
       y el CLI con y sin `--force`. Registrar en `tests/e2e/us-guardia-demo.md`
-- [ ] T027 Gate técnico desde la ruta real:
+- [x] T027 Gate técnico desde la ruta real:
       `pnpm typecheck && pnpm lint && pnpm test && pnpm build`
 - [ ] T028 Al abrir el PR: declarar **FR-709** —el diff no toca `drizzle/`— y que
       el PR lleva también el arreglo del Principio III (`93b7022`)
