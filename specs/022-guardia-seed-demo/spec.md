@@ -334,14 +334,30 @@ app real **sin destruir nada**.
   conversaciones, mensajes ni leads; el día que deje de ser cierto, esto tiene que
   romperse aquí.
 
-- **AC-7 — La comprobación y el borrado, atómicos: observado por el manejador.**
-  Con la BD simulada del patrón que ya usa `tests/unit/seed-demo-tenant.test.ts`,
-  el fake registra **por qué manejador sale cada consulta**. Se afirma que:
-  (i) `seedDemo()` abre una transacción; (ii) la comprobación de la guardia y
-  **todos** los borrados de la limpieza salen por el `tx` que entrega
-  `db.transaction()`; y (iii) **ninguno de los dos** sale por el `db` exterior.
-  Falla si alguien comprueba fuera y entra en la transacción sólo a borrar — que
-  es exactamente el fallo que FR-704 cierra.
+- **AC-7 — Lo destructivo y la comprobación, dentro de la transacción: afirmado
+  por AUSENCIA.** Con la BD simulada del patrón que ya usa
+  `tests/unit/seed-demo-tenant.test.ts`, el fake registra **por qué manejador sale
+  cada sentencia y de qué tipo es**. Se afirma que `seedDemo()` abre una
+  transacción y que **por el `db` exterior no sale NINGUNA sentencia destructiva
+  —`DELETE`, `UPDATE`, `TRUNCATE`— ni la comprobación de la guardia**.
+
+  La afirmación es **por ausencia, no por lista**: un octavo `DELETE` escrito
+  fuera de la transacción la rompe sin que nadie tenga que acordarse de añadirlo
+  a ningún inventario. Y falla igual en el caso original: comprobar fuera y
+  entrar en la transacción sólo a borrar.
+
+  > **Los `INSERT` se quedan fuera a propósito**, como decide la nota de FR-704:
+  > son la **carga** de la demo, no su destrucción. Acotar por categoría es lo que
+  > permite tener las dos cosas — la afirmación fuerte y el alcance que la spec
+  > eligió. Si algún día el seed entero debe ser transaccional, se decidirá por
+  > sus méritos y en su momento, no porque a un test le quedara más cómodo.
+
+  > **Consecuencia sobre el orden del código**: el `UPDATE` de `agent_profile`
+  > **es** destructivo —sobrescribe la personalidad que el negocio configuró— así
+  > que entra en la transacción junto a los borrados, **antes** de las
+  > inserciones. Con eso la transacción cubre **exactamente la superficie que la
+  > guardia protege**, que es la misma frase que da nombre al criterio de esta
+  > feature.
 
   > **Lo que este AC no prueba, dicho a propósito**: que Postgres aísle de verdad
   > a otra conexión concurrente. Eso exige una base real, y este repositorio no

@@ -106,25 +106,30 @@ que esta feature arregla, repetido en otra capa.
 
 Cuatro cosas que la spec no fija y que aquí quedan resueltas.
 
-### D1 — El fake de AC-7 afirma que NADA sale por el `db` exterior
+### D1 — El fake de AC-7 afirma por AUSENCIA, acotado por categoría
 
-**Decisión**: el fake registra el **manejador** de cada sentencia (`db` o `tx`), y
-la afirmación es por **ausencia**: la lista de sentencias emitidas por el `db`
-exterior está **vacía**. No "estas siete salen por el `tx`".
+**Decisión**: el fake registra el **manejador** de cada sentencia (`db` o `tx`) y
+**su tipo**. La afirmación es por ausencia: por el `db` exterior no sale ninguna
+sentencia **destructiva** —`DELETE`, `UPDATE`, `TRUNCATE`— ni la comprobación de
+la guardia. No "estas siete salen por el `tx`".
 
-Un octavo `DELETE` escrito fuera de la transacción rompe el test **sin que nadie
-tenga que acordarse de añadirlo a una lista**. Esa es la diferencia entre un test
-que envejece y uno que no.
+Un octavo `DELETE` fuera de la transacción rompe el test **sin que nadie tenga que
+acordarse de añadirlo a una lista**. Esa es la diferencia entre un test que
+envejece y uno que no.
 
-> **Y esto obliga a envolver el seed ENTERO en la transacción**, no sólo
-> comprobación + limpieza. Es un cambio de alcance frente a la nota de FR-704, que
-> dejaba los `INSERT` fuera a propósito. Va como **enmienda pendiente a la spec**,
-> abajo; no se aplica sin decirlo.
->
-> A favor de envolverlo todo: desaparece el "demo a medio cargar" ante un fallo a
-> mitad, el cerrojo se sostiene hasta el commit, y AC-7 se puede escribir en su
-> forma fuerte. En contra: nada material — son unas cuarenta inserciones pequeñas
-> en una acción que ocurre una vez en la vida de la instancia.
+**Y los `INSERT` se quedan fuera**, como decidió FR-704: son la carga de la demo,
+no su destrucción. Acotar por categoría da las dos cosas a la vez —la afirmación
+fuerte y el alcance que la spec eligió— sin que el test dicte el diseño. Si el
+seed entero debe ser transaccional algún día, se decidirá **por sus méritos**, no
+porque a un test le quedara más cómodo.
+
+**Consecuencia sobre el orden del código, y no es menor**: el `UPDATE` de
+`agent_profile` **es** destructivo —sobrescribe nombre, tono, instrucciones,
+reglas de escalado y saludo—, así que se mueve **dentro** de la transacción, junto
+a los borrados y **antes** de las inserciones. Hoy está al final del seed, después
+de insertar contactos y conocimiento; ahí quedaría fuera de la transacción y AC-7
+lo cazaría. Con el movimiento, la transacción cubre **exactamente la superficie
+que la guardia protege** — que es la frase que define esta feature entera.
 
 ### D2 — La clave del cerrojo se deriva de la organización y vive en otro espacio
 
@@ -182,18 +187,6 @@ hallazgo**, no la cadena. El test del formateador de pantalla cubre **uno, dos y
 cuatro** elementos; el del CLI es AC-11.
 
 ---
-
-## Enmienda pendiente a la spec (de D1)
-
-FR-704 dice hoy, en su nota de fuera de alcance, que *"el resto del seed (los
-inserts) sigue sin transacción, como hoy"*. **D1 la contradice**: para poder
-afirmar que ninguna consulta sale por el `db` exterior, el seed entero tiene que
-correr dentro de la transacción.
-
-No lo cambio por mi cuenta. Si se aprueba, la nota de FR-704 pasa a decir que el
-seed es atómico de principio a fin y desaparece de "Fuera de alcance" la línea de
-transaccionalidad. Si no se aprueba, AC-7 vuelve a su forma débil —"estas siete
-salen por el `tx`"—, que es justo la que se pidió evitar.
 
 ## Aspiración registrada para AC-7
 
