@@ -1,16 +1,14 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
-import { Search, Sparkles, UserRound, X } from "lucide-react";
+import { useEffect, useRef, useState } from "react";
+import { Search, UserRound, X } from "lucide-react";
 import type { ConversationDto } from "@/lib/types";
 import { CHANNEL_LABEL, type Channel } from "@/lib/channels";
 import { ChannelBadge } from "@/components/channel-badge";
 import { matchesQuery } from "@/lib/search";
 import { cn } from "@/lib/utils";
 import { ContactAvatar } from "@/components/avatar";
-import { Button } from "@/components/ui/button";
 import { formatTime, previewText } from "./helpers";
-import { fraseDeEstadoVacio, type RevisionDemo } from "@/lib/demo-hallazgo";
 
 /* Puntos de etapa con la paleta de la landing: azul, ámbar, verde WhatsApp. */
 const STAGE_DOT: Record<string, string> = {
@@ -23,54 +21,18 @@ const STAGE_DOT: Record<string, string> = {
 const STAGE_DOT_FALLBACK = "#8391aa";
 
 /**
- * 022 — El estado vacío de la bandeja, que es donde vivía el accidente.
+ * El estado vacío de la bandeja.
  *
- * Esta pantalla es lo que ve un negocio recién desplegado: sin conversaciones,
- * porque todavía no le ha escrito nadie. Y aquí había un botón de un clic que
- * borraba su conocimiento entero y sobrescribía la personalidad de su agente.
+ * Aquí vivió un botón de "Cargar datos de demostración" que, con un clic y sin
+ * confirmación, borraba el conocimiento entero de la organización, su historial
+ * del Laboratorio y la personalidad configurada de su agente. Se retiró en la
+ * 022: la siembra demo sigue existiendo por CLI —donde quien la lanza tiene
+ * shell y sabe lo que hace— pero deja de ser alcanzable desde la interfaz.
  *
- * Tres decisiones que parecen de estilo y no lo son:
- *
- * 1. **Con la organización no virgen no hay botón**, hay una frase que dice qué
- *    hay configurado. Un botón deshabilitado es una promesa rota a la vista y
- *    provoca la pregunta que esto quiere evitar — "¿por qué no puedo?".
- * 2. **Mientras la comprobación viaja no se muestra ningún botón.** Uno que
- *    aparece y desaparece medio segundo después es peor que uno que tarda, y
- *    aquí el que desaparecería es el que destruye datos.
- * 3. **La etiqueta dice que sustituye la configuración del agente.** "Cargar
- *    datos de demostración" era verdad y estaba incompleto.
+ * Con eso, esta pantalla vuelve a ser lo único que tenía que ser: la
+ * explicación de que las conversaciones aparecerán solas.
  */
-function EmptyState({ onSeeded }: { onSeeded: () => void }) {
-  const [revision, setRevision] = useState<RevisionDemo | null>(null);
-  const [seeding, setSeeding] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-
-  const revisar = useCallback(async () => {
-    const res = await fetch("/api/seed/demo").catch(() => null);
-    if (res?.ok) setRevision((await res.json()) as RevisionDemo);
-  }, []);
-
-  useEffect(() => {
-    void revisar();
-  }, [revisar]);
-
-  async function seed() {
-    setSeeding(true);
-    setError(null);
-    const res = await fetch("/api/seed/demo", { method: "POST" }).catch(
-      () => null
-    );
-    setSeeding(false);
-    if (res?.ok) {
-      onSeeded();
-      return;
-    }
-    // Si alguien configuró algo entre la comprobación y el clic, el servidor
-    // manda: se relee y la pantalla pasa a explicar en vez de insistir.
-    setError("No se pudo cargar la demo.");
-    await revisar();
-  }
-
+function EmptyState() {
   return (
     <div className="flex h-full flex-col items-center justify-center gap-3 p-6 text-center">
       <p className="font-serif text-[21px] italic leading-tight text-foreground">
@@ -80,35 +42,6 @@ function EmptyState({ onSeeded }: { onSeeded: () => void }) {
         Cuando alguien escriba a tu número de WhatsApp, su conversación
         aparecerá aquí en tiempo real.
       </p>
-
-      {revision?.virgen === true && (
-        <>
-          <Button
-            size="sm"
-            variant="outline"
-            disabled={seeding}
-            onClick={() => void seed()}
-          >
-            <Sparkles className="h-4 w-4" strokeWidth={1.7} />
-            {seeding ? "Cargando demo…" : "Cargar negocio de ejemplo"}
-          </Button>
-          <p className="max-w-xs text-xs text-text-3">
-            Sustituye el conocimiento y la configuración de tu agente por los de
-            la ferretería de demostración.
-          </p>
-        </>
-      )}
-
-      {revision?.virgen === false && (
-        <p
-          data-testid="demo-no-disponible"
-          className="max-w-xs text-xs text-text-3"
-        >
-          {fraseDeEstadoVacio(revision)}
-        </p>
-      )}
-
-      {error && <p className="text-xs text-destructive">{error}</p>}
     </div>
   );
 }
@@ -118,14 +51,12 @@ export function ConversationList({
   channels,
   selectedId,
   onSelect,
-  onSeeded,
 }: {
   conversations: ConversationDto[] | null;
   /** Canales encendidos en esta instancia (ADR-001). */
   channels: readonly Channel[];
   selectedId: string | null;
   onSelect: (id: string) => void;
-  onSeeded: () => void;
 }) {
   const [query, setQuery] = useState("");
   const [filter, setFilter] = useState<"all" | "unread">("all");
@@ -299,7 +230,7 @@ export function ConversationList({
         {loading ? (
           <p className="p-6 text-center text-xs text-text-3">Cargando…</p>
         ) : conversations.length === 0 ? (
-          <EmptyState onSeeded={onSeeded} />
+          <EmptyState />
         ) : visible.length === 0 ? (
           <p className="p-6 text-center text-xs text-text-3">
             Sin resultados para este filtro.

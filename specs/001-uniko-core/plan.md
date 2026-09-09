@@ -120,7 +120,7 @@ src/
 
 scripts/
 ├── migrate.mjs                    # migraciones al boot (esbuild)
-└── seed/demo.mjs                  # seed Ferretería El Martillo (idempotente)
+└── seed/demo.mjs                  # seed Ferretería El Martillo (idempotente; sin botón desde la 022)
 
 tests/
 ├── unit/                          # crypto, firma, tenant, ventana, parser, regex,

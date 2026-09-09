@@ -1,23 +1,9 @@
 import { withAuth } from "@/lib/api";
 import { getDb } from "@/lib/db";
 import { DemoNoVirgenError, seedDemo } from "@/server/seed/demo";
-import { cuerpoDeRechazo, revisarDemo } from "@/server/seed/guardia";
+import { cuerpoDeRechazo } from "@/server/seed/guardia";
 
 export const dynamic = "force-dynamic";
-
-/**
- * Qué se perdería si la demo se cargara ahora. Lo consume el estado vacío de la
- * bandeja para decidir si enseña el botón o la explicación (FR-703, FR-706).
- *
- * Llama a **la misma** función que la ejecución. Que el render tenga su propia
- * versión "parecida" de la comprobación es el fallo original de esta feature
- * repetido en otra capa, y AC-14 existe para que no vuelva.
- *
- * Aquí sí vale la conexión normal: de esta lectura no depende ningún borrado.
- */
-export const GET = withAuth(async (session) => {
-  return Response.json(await revisarDemo(getDb(), session.organizationId));
-});
 
 /**
  * Carga el negocio demo (FR-075), sólo sobre una organización **virgen**.

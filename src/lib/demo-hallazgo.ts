@@ -1,16 +1,18 @@
 /**
  * 022 — El hallazgo de la guardia del seed demo: tipos y textos.
  *
- * Vive en `lib/` y no en `server/` por una razón que sólo se ve al construir:
- * **la pantalla de la bandeja es un componente de cliente** y necesita la frase
- * del estado vacío. Cuando esto estaba junto a `revisarDemo()`, importar la
- * frase arrastraba `@/lib/db` al bundle del navegador y el build se caía
- * pidiendo `perf_hooks` y `fs` — el driver de Postgres entero, camino del
- * cliente.
- *
- * Así que aquí no se importa nada que toque la base. Es la frontera, y está
- * puesta a propósito: lo que consulta se queda en
+ * Vive en `lib/` y no en `server/` por capas: aquí están los tipos y los
+ * textos, que no consultan nada; lo que va a la base se queda en
  * [`@/server/seed/guardia`](../server/seed/guardia.ts).
+ *
+ * **La razón original era otra, y conviene no dejarla escrita como si siguiera
+ * en pie**: este módulo nació porque la pantalla de la bandeja —componente de
+ * cliente— necesitaba la frase del estado vacío, y tenerla junto a
+ * `revisarDemo()` arrastraba `@/lib/db` al bundle del navegador; el build se
+ * caía pidiendo `perf_hooks` y `fs`. Esa pantalla se retiró en la 022 al
+ * eliminar el botón de la demo, así que **hoy nada de cliente importa de aquí**.
+ * La separación se conserva porque sigue siendo buena capa, no porque haga
+ * falta para compilar.
  */
 
 /** Nombre con el que el alta crea el perfil (`agent_profile.name` por defecto). */
@@ -122,42 +124,4 @@ export function cuerpoDeRechazo(revision: RevisionDemo) {
     },
     detalle: revision.encontrado,
   };
-}
-
-/* ══════════════ Lo que se lee en pantalla ══════════════ */
-
-/** Cómo se nombra cada hallazgo de cara al usuario, no al log. */
-function enPalabrasParaPantalla(hallazgo: Hallazgo): string {
-  switch (hallazgo.que) {
-    case "contactos":
-      return hallazgo.cuantos === 1 ? "1 contacto" : `${hallazgo.cuantos} contactos`;
-    case "conocimiento":
-      return hallazgo.cuantos === 1
-        ? "1 entrada de conocimiento"
-        : `${hallazgo.cuantos} entradas de conocimiento`;
-    case "corridas":
-      return hallazgo.cuantos === 1
-        ? "1 evaluación del Laboratorio"
-        : `${hallazgo.cuantos} evaluaciones del Laboratorio`;
-    case "perfil":
-      return "el agente configurado";
-  }
-}
-
-/**
- * La frase del estado vacío cuando la demo NO se puede cargar (FR-706).
- *
- * **El caso de un solo elemento es el que manda**, no el degenerado: en un
- * despliegue nuevo lo más probable es que el negocio haya configurado su agente
- * y todavía no tenga ni conocimiento ni evaluaciones. Tiene que leerse
- * "Ya tienes el agente configurado", nunca "Ya tienes: el agente".
- *
- * Y no lleva pronombre de vuelta —"las reemplazaría", "lo reemplazaría"— porque
- * el género y el número cambian con lo que se haya encontrado. "Lo reemplazaría
- * todo" funciona en los cuatro casos y no hay que pensarlo cada vez.
- */
-export function fraseDeEstadoVacio(revision: RevisionDemo): string {
-  if (revision.virgen) return "";
-  const lista = unirEnLista(revision.encontrado.map(enPalabrasParaPantalla));
-  return `Ya tienes ${lista}. Cargar la demo lo reemplazaría todo por el negocio de ejemplo.`;
 }

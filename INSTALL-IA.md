@@ -87,8 +87,10 @@ docker compose up -d --build
 >
 > 1. Entra y **regístrate**: el primer registro crea tu organización (después
 >    el registro público se cierra solo).
-> 2. Pulsa **"Cargar datos de demostración"** si quieres explorar con la
->    Ferretería El Martillo.
+> 2. Si quieres explorar con datos de ejemplo, corre `pnpm seed:demo` desde la
+>    terminal del servidor. **No hay botón en la interfaz**: la siembra
+>    reemplaza el conocimiento y la configuración del agente, así que no debe
+>    estar a un clic de distancia.
 > 3. Para conectar tu WhatsApp entra a **Configuración → WhatsApp**: ahí está
 >    el wizard y la URL exacta del webhook para el panel de Meta o para tu
 >    backend de agencia. La conexión del número NO es parte de esta

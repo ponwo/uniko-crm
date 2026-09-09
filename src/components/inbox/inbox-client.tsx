@@ -324,7 +324,6 @@ export function InboxClient({ channels }: { channels: readonly Channel[] }) {
           channels={channels}
           selectedId={selectedId}
           onSelect={select}
-          onSeeded={() => void refetchConversations()}
         />
       </section>
 

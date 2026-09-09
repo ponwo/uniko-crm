@@ -29,7 +29,7 @@ Todas autenticadas por sesión Better Auth y scoped a la organización del usuar
 | `POST /api/settings/whatsapp/test` | probar conexión (valida token↔número, NO guarda) |
 | `GET /api/settings/webhook` | URL completa del webhook + estado firma |
 | `GET/POST /api/settings/team` | miembros / crear cuenta (owner only) |
-| `POST /api/seed/demo` | cargar demo (solo BD vacía de dominio; idempotente) |
+| `POST /api/seed/demo` | cargar demo (**sólo organización virgen**; idempotente). Sin llamador en la UI desde la [022](../../022-guardia-seed-demo/spec.md): lo usa `scripts/screenshots.mjs` |
 | `POST /api/auth/[...all]` | Better Auth (registro gated por 1ª org / `ALLOW_SIGNUP`) |
 
 Rate limiting in-process por IP en endpoints de auth (login/registro): ventana

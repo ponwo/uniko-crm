@@ -82,11 +82,15 @@ describe("AC-14 (i) — la ejecución llama a la guardia, y con el tx", () => {
 describe("AC-14 (ii) — no hay una segunda implementación", () => {
   const fuenteDeLaRuta = readFileSync("src/app/api/seed/demo/route.ts", "utf8");
 
-  it("la ruta importa la guardia del módulo de la guardia", () => {
-    expect(fuenteDeLaRuta).toMatch(
-      /import \{[^}]*revisarDemo[^}]*\} from "@\/server\/seed\/guardia"/
-    );
-  });
+  /*
+   * Aquí hubo un test que afirmaba que la ruta IMPORTA `revisarDemo`. Se retiró
+   * con el `GET` del render (022, Fase 5): sin él la ruta sólo importa
+   * `cuerpoDeRechazo`, porque la comprobación ocurre dentro de `seedDemo()`.
+   * Mantenerlo habría dejado un rojo permanente por la razón equivocada.
+   *
+   * Lo que de verdad protegía este bloque sigue abajo: que nadie escriba una
+   * segunda implementación de la guardia.
+   */
 
   it("y la ruta NO inspecciona por su cuenta las tablas que la guardia vigila", () => {
     // Si alguien decide "aquí es más cómodo consultarlo directamente", esto se

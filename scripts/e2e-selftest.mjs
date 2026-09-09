@@ -354,13 +354,6 @@ async function main() {
     `antes=${nKbAntes} despues=${(kbDespues.json?.entries ?? []).length}`
   );
 
-  const revision = await api("/api/seed/demo");
-  ok(
-    "y la lectura del render coincide: no es virgen",
-    revision.res.ok && revision.json?.virgen === false,
-    JSON.stringify(revision.json)
-  );
-
   const prof = await bot("/api/bot/profile");
   ok(
     "GET /api/bot/profile → 200 con el perfil de la pantalla",

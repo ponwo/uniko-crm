@@ -185,10 +185,14 @@ Caddy emite el certificado HTTPS solo. Verifica con
 
 1. Entra y **regístrate**: el primer registro crea tu organización y cierra el
    registro público.
-2. Opcional: pulsa **"Cargar datos de demostración"** para explorar con la
+2. Opcional, y **desde la terminal**: `pnpm seed:demo` carga la
    **Ferretería El Martillo** (contactos, conversaciones, pipeline, un
    knowledge base con huecos a propósito y una corrida de Laboratorio de
    ejemplo — corre el Laboratorio y mira cómo los encuentra).
+
+   > Sólo carga sobre una organización **virgen**: si ya configuraste tu agente
+   > o tu conocimiento, se niega y te dice qué encontró. Reemplazarlo de todas
+   > formas exige `--force`, que imprime antes qué va a destruir.
 3. La conexión de WhatsApp se hace después, en **Configuración → WhatsApp**.
 
 ## Conexión del número de WhatsApp

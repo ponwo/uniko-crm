@@ -338,10 +338,13 @@ Ruta B literalmente (modo de pruebas interno) hasta ver la bandeja funcionando.
    explícitamente: "entra a Configuración → WhatsApp para conectar tu número; ahí verás
    la URL exacta del webhook" — la conexión de WhatsApp NO es parte del despliegue.
 4. **Given** la base de datos vacía en el primer arranque, **When** el usuario entra,
-   **Then** ve un estado vacío con botón "Cargar datos de demostración" que puebla el
-   negocio demo ("Ferretería El Martillo": ~8 contactos, conversaciones realistas en MXN,
-   leads en el kanban, knowledge base lleno con 1–2 huecos INTENCIONALES —garantías y
-   devoluciones— y una corrida de Laboratorio de ejemplo guardada).
+   **Then** ~~ve un estado vacío con botón "Cargar datos de demostración" que puebla el
+   negocio demo~~ ve un estado vacío que explica que las conversaciones aparecerán
+   cuando alguien escriba al número ("Ferretería El Martillo": ~8 contactos,
+   conversaciones realistas en MXN, leads en el kanban, knowledge base lleno con 1–2
+   huecos INTENCIONALES —garantías y devoluciones— y una corrida de Laboratorio de
+   ejemplo guardada, **hoy sólo por `pnpm seed:demo`**).
+   **DEROGADO EN PARTE** por la [022](../022-guardia-seed-demo/spec.md) — ver FR-075.
 5. **Given** el README público, **When** una agencia lo lee, **Then** encuentra: qué es
    (con captura) → para quién → features (Laboratorio primero) → requisitos → apuntar el
    dominio a la VPS → instalación A y B → configuración de Meta paso a paso → modo
@@ -517,9 +520,28 @@ Ruta B literalmente (modo de pruebas interno) hasta ver la bandeja funcionando.
 - **FR-074**: `.env.example` MUST contener todas las variables con placeholders
   `REEMPLAZA_...`, guía inline y comando de generación de cada secreto; la variable del
   modo de pruebas interno MUST NOT aparecer en él.
-- **FR-075**: Con base de datos vacía, la UI MUST ofrecer "Cargar datos de demostración"
-  (también vía script y variable), sembrando el negocio demo con los huecos intencionales
-  del KB y una corrida de Laboratorio de ejemplo, de forma idempotente.
+- **FR-075**: ~~Con base de datos vacía, la UI MUST ofrecer "Cargar datos de
+  demostración"~~ (también vía script y variable), sembrando el negocio demo con los
+  huecos intencionales del KB y una corrida de Laboratorio de ejemplo, de forma
+  idempotente.
+
+  > **DEROGADO EN PARTE** por la [022](../022-guardia-seed-demo/spec.md) (FR-710).
+  >
+  > **Lo que se deroga**: sólo lo tachado — que **la UI** ofrezca el botón. **Lo
+  > que sigue vigente**: todo lo demás. El negocio demo se sigue sembrando por
+  > script (`pnpm seed:demo`) y sigue siendo idempotente.
+  >
+  > **Por qué**: el botón vivía en el estado vacío de la bandeja —lo que ve un
+  > negocio recién desplegado— y con **un clic sin confirmación** borraba el
+  > conocimiento entero de la organización, su historial del Laboratorio y la
+  > personalidad configurada de su agente. La 022 empezó protegiéndolo con una
+  > guardia; el dueño decidió después eliminarlo, porque ninguna instancia de la
+  > flota llegaría a usarlo —LanCo es la instancia de pruebas, y NuriaAndrea e
+  > ILTU no están liberadas— y quitarlo **elimina el riesgo en vez de acotarlo**.
+  >
+  > La siembra por CLI se queda **con su guardia y su cerrojo**: sigue siendo
+  > destructiva, sólo que ahora quien la lanza tiene shell y ve los conteos de lo
+  > que va a destruir antes de que ocurra.
 
 **Seguridad de instancia pública (transversal, cada regla con test unitario)**
 

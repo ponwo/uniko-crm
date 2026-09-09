@@ -14,8 +14,11 @@ pnpm db:migrate                                            # aplicar migraciones
 pnpm dev                                                   # http://localhost:3000
 ```
 
-Primer uso: registrarse (crea la organización) → botón "Cargar datos de demostración"
-(o `pnpm seed:demo`).
+Primer uso: registrarse (crea la organización) → ~~botón "Cargar datos de
+demostración"~~ `pnpm seed:demo` si quieres datos de ejemplo.
+
+> **DEROGADO EN PARTE** por la [022](../022-guardia-seed-demo/spec.md): el botón
+> se retiró de la interfaz (ver FR-075). La siembra por CLI se queda.
 
 ## Modo de pruebas interno (self-test)
 

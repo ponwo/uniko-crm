@@ -188,31 +188,31 @@ que siempre.
 **Objetivo**: que el camino destructivo de un clic deje de existir. La guardia y
 el cerrojo se quedan: el CLI y el endpoint siguen siendo destructivos.
 
-- [ ] T030 En `src/components/inbox/conversation-list.tsx`: retirar el
+- [x] T030 En `src/components/inbox/conversation-list.tsx`: retirar el
       `EmptyState` con estado —botón, consulta al `GET`, frase y mensaje de
       error— y dejar el estado vacío como lo que es: *"Sin conversaciones
       todavía"* y la explicación de que aparecerán solas
-- [ ] T031 Retirar la cadena `onSeeded` entera: la prop de `ConversationList` y
+- [x] T031 Retirar la cadena `onSeeded` entera: la prop de `ConversationList` y
       su paso desde `src/components/inbox/inbox-client.tsx`. Es plomería que
       sólo existía para refrescar tras la siembra
-- [ ] T032 En `src/app/api/seed/demo/route.ts`: retirar el `GET`. Sin pantalla no
+- [x] T032 En `src/app/api/seed/demo/route.ts`: retirar el `GET`. Sin pantalla no
       tiene consumidor, y una lectura sin consumidor es superficie que alguien
       mantendrá sin saber para qué
-- [ ] T033 En `src/lib/demo-hallazgo.ts`: retirar `fraseDeEstadoVacio()` y su
+- [x] T033 En `src/lib/demo-hallazgo.ts`: retirar `fraseDeEstadoVacio()` y su
       ayuda `enPalabrasParaPantalla()`, y **reescribir la justificación del
       módulo**: ya no existe por la frontera cliente/servidor, existe por capas.
       Dejar la explicación vieja sería dejar una razón falsa
-- [ ] T034 Retirar de `tests/unit/seed-demo-guardia.test.ts` los cinco tests de
+- [x] T034 Retirar de `tests/unit/seed-demo-guardia.test.ts` los cinco tests de
       `fraseDeEstadoVacio` (T020) y de `tests/unit/seed-demo-una-guardia.test.ts`
       la aserción de que la ruta importa `revisarDemo` — ya no lo hace, y AC-14
       (ii) se reescribió por eso
-- [ ] T035 Retirar de `scripts/e2e-selftest.mjs` el check de la lectura del
+- [x] T035 Retirar de `scripts/e2e-selftest.mjs` el check de la lectura del
       render. AC-12 se queda en cuatro
-- [ ] T036 En `specs/001-uniko-core/spec.md`: **FR-075 tachado** con bloque
+- [x] T036 En `specs/001-uniko-core/spec.md`: **FR-075 tachado** con bloque
       `**DEROGADO**` —referencia a la 022 y rationale—, y la misma marca en el
       escenario de aceptación que lo menciona. Propagar a los demás artefactos de
       la 001 que lo citen (FR-710, forma de `kosmo-CRM`)
-- [ ] T037 [P] `README.md` e `INSTALL-IA.md`: dejan de instruir pulsar el botón.
+- [x] T037 [P] `README.md` e `INSTALL-IA.md`: dejan de instruir pulsar el botón.
       El segundo importa más — está en el texto de cierre que el instalador le
       dice al usuario
 
