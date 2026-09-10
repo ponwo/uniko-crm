@@ -18,3 +18,4 @@ Vacío al inicio; se irá poblando.
 - [Android sin vista móvil: era el navegador](android-sin-vista-movil.md) — RESUELTO: Chrome tenía "Versión para ordenador" activada. Descarta eso antes de diagnosticar cualquier problema de renderizado móvil.
 - [Probar la PWA en móvil necesita HTTPS](pwa-en-movil-necesita-https.md) — localhost desbloquea desarrollar el service worker de la 019, no probarlo instalado. Anotado antes de empezar.
 - [Worktree y arneses en la máquina de desarrollo](worktree-y-arneses-en-la-maquina-de-desarrollo.md) — Node 22 vía fnm, `pnpm install --offline`, base `uniko_dev_<NNN>` desechable para los arneses, `sse-mudo` no termina.
+- [Relevo de contenedor en Coolify](relevo-de-contenedor-en-coolify.md) — tras un deploy, ~1 min alternando viejo/502; exigir /api/health 10/10 antes de medir contra la instancia.

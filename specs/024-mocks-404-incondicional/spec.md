@@ -195,9 +195,21 @@ Una cosa que el guion enseñó al escribirse: `GET /api/dev/sse-mudo` es un
 stream que por diseño no termina, así que el guion lee el estado de las
 cabeceras y cancela el cuerpo; leerlo entero colgaba la primera pasada.
 
-**Pendiente**: correr `scripts/e2e-mocks-404.mjs --base=https://uniko.lanco.cloud`
-cuando LanCo tenga este commit desplegado, como parte del self-test contra la
-instancia (puerta de promoción).
+**Contra LanCo desplegada (`e64a164`, mismo día)**:
+`scripts/e2e-mocks-404.mjs --base=https://uniko.lanco.cloud` → **20/20**. Las
+dos peticiones que abrieron esto —`PUT /api/dev/wa-mock/outbox` y
+`GET /api/dev/wa-mock/status`— pasaron de 405 a 404 en la instancia real.
+
+Una lección del camino: la primera corrida, lanzada en cuanto `/api/health`
+reportó el commit nuevo, salió con 18 fallos mezclando 405 y 502. No era el
+código: el proxy alternaba entre el contenedor viejo (los 405) y el que
+arrancaba (los 502), una petición sí y una no. `/api/health` en 200 **una
+vez** no significa que el relevo terminó; hay que verlo estable (10/10) antes
+de medir nada contra la instancia. Con ~1 min de espera, la segunda corrida
+fue la buena.
+
+Queda pendiente el mismo guion contra las otras dos instancias cuando
+`production` reciba este commit; es parte del cierre de la promoción.
 
 ---
 
