@@ -200,12 +200,141 @@ Laboratorio. Que es para lo que existe.
 
 ## Entrega 3 — El negocio genera sus escenarios
 
-Se detalla al empezarla. Depende de la Entrega 2.
+**Toca `drizzle/`.** Es el primer cambio de esquema desde la 020, así que
+arrastra el ensayo del Principio X y plan de reversión declarado en el PR.
+Diseño en [plan.md](plan.md), D5 a D9.
 
-Alcance conocido: FR-620..FR-632 · tabla `lab_scenario` + columna del sello ·
-**toca `drizzle/`**, así que arrastra el ensayo del Principio X
-([procedimiento](../020-notificaciones-push/quickstart.md)) y plan de reversión
-declarado en el PR.
+### ⛔ Regla de orden: la migración se ensaya ANTES de construir encima
+
+T204 (el ensayo) va antes que la Fase 2. Si el ensayo destapa algo, cambiar el
+esquema con medio producto construido encima cuesta el triple — y la migración
+es lo único de este proyecto que no se arregla volviendo atrás.
+
+### Fase 1: El esquema — la parte irreversible
+
+- [x] **T20' `schema.ts`: tabla `lab_scenario` y las columnas
+      `scenario_set` y `rubric_version` en `agent_test_run`, **ambas
+      nullable** (D5). Índices únicos `(org, key)` y `(org, phone)`.
+- [x] **T20' `pnpm db:generate` → migración nueva en `drizzle/`.
+- [x] **T20' **Leer el SQL generado a mano**: que sea aditivo puro — sin
+      `DROP`, sin `ALTER … SET NOT NULL` sobre tabla con datos, sin
+      `DEFAULT` que reescriba filas. Drizzle acierta casi siempre; "casi" no
+      es un gate.
+- [x] **T204** **Ensayo del Principio X**: respaldo real restaurado en un
+      PostgreSQL desechable, migración corrida contra esa copia, app arrancada
+      contra ella. **HECHO el 2026-09-10** — registro abajo.
+
+#### El ensayo del Principio X — corrida del 2026-09-10
+
+Registrado tal como pasó.
+
+**Contra qué datos**: respaldo de **LanCo** —instancia real, en producción—,
+ejecución `fudmvgnalivsnhimvegduhsh` del 2026-09-10 20:56 UTC,
+`pg-dump-uniko-1789073816.dmp`, **106.697 bytes** (tamaño verificado contra lo
+que reporta Coolify **antes** de restaurar nada). Descargado por el dueño desde
+el panel: esa parte no se puede automatizar desde esta máquina y está explicado
+en el [quickstart de la 020](../020-notificaciones-push/quickstart.md).
+
+**Base desechable**: `uniko_ensayo_lanco_20260910` en el PostgreSQL 16 local.
+Nunca `uniko_dev`, nunca una instancia de la flota. **Borrada al terminar**, y
+comprobado: solo queda `uniko_dev`.
+
+**Venía por detrás de la migración**, que es lo que hace que el ensayo pruebe
+algo: 14 entradas en el diario de Drizzle (es decir, en la 0013), sin
+`lab_scenario` y sin las dos columnas nuevas.
+
+| Paso | Resultado | Tiempo |
+|---|---|---|
+| `pg_restore` del volcado | limpio, sin errores | **632 ms** |
+| `drizzle-kit migrate` | `migrations applied successfully` | **1.317 ms** |
+| `next start` contra la copia | `/api/health` → `{"ok":true}`, sin errores de arranque | — |
+
+**Que es aditiva, medido y no supuesto.** Inventario de la misma base antes y
+después:
+
+| | antes | después |
+|---|---|---|
+| organizaciones | 1 | **1** |
+| contactos | 8 | **8** |
+| conversaciones | 14 | **14** |
+| mensajes | 109 | **109** |
+| entradas de KB | 4 | **4** |
+| corridas del Laboratorio | 2 | **2** |
+| casos del Laboratorio | 12 | **12** |
+
+Y lo nuevo: `lab_scenario` creada y vacía con sus 4 índices, las 2 columnas
+presentes, y **las 2 corridas preexistentes con `scenario_set` y
+`rubric_version` en NULL** — que es exactamente lo que el diseño pide (D5): un
+null dice "de esta no se sabe" en vez de inventarles un examen.
+
+**Por qué este respaldo y no otro**: LanCo es la única instancia con corridas
+del Laboratorio (2 corridas, 12 casos). La migración añade columnas a
+`agent_test_run`, así que contra una base sin esas filas no se habría ejercido
+la forma de los datos que la migración toca — que es justo lo que el Principio X
+exige y lo que `seed:demo` no da.
+
+### Fase 2: El modelo y sus guardarraíles
+
+- [x] **T205** `src/server/lab/escenarios.ts`: rango de teléfonos reservado,
+      derivación por hash de la clave, comprobación bloqueante contra contactos
+      reales en las dos formas (D6, FR-628).
+- [x] **T206** `validarGuion()`: entre 2 y 5 líneas, sin líneas vacías ni
+      larguísimas, y **rechazo de líneas que dependen del contexto** —el
+      cliente simulado no reacciona (FR-627).
+- [x] **T207** CRUD: crear (con tope), editar, borrar **lógico** (FR-632).
+- [x] **T208** Tests de T205–T207, **falsificados**.
+
+### Fase 3: El sello y la rúbrica versionada
+
+- [x] **T209** `src/server/lab/conjunto.ts`: `selloDeConjunto()` sobre el
+      contenido, ordenado por clave, serializado con JSON (D8, FR-625).
+- [x] **T210** Versión de rúbrica: constante junto a `buildJudgePrompt`, que se
+      sube a mano cuando el prompt cambia (FR-616).
+- [x] **T211** El runner guarda las dos en `agent_test_run`.
+- [x] **T212** El histórico **avisa** cuando dos corridas difieren en sello o
+      en rúbrica, en vez de mostrar un delta que no significa nada (FR-626).
+
+### Fase 4: El runner concatena
+
+- [x] **T213** `escenariosDe(org)` = los seis **+** los propios habilitados
+      (D9, FR-624).
+- [x] **T214** Las etiquetas del reporte se resuelven **sin filtrar por
+      `enabled`**: borrar quita del futuro, no del pasado (FR-632).
+
+### Fase 5: La generación
+
+- [x] **T215** `buildScenarioPrompt()`: pide atacar los **huecos** del
+      conocimiento (FR-621) y guiones que se sostengan sin saber qué contestó
+      el agente (FR-627).
+- [x] **T216** `src/server/lab/generar.ts`: `chatJson` con **el modelo del
+      agente**, esquema permisivo y validación uno a uno (D7, FR-622).
+- [x] **T217** Los caminos infelices con su mensaje: sin proveedor (FR-629),
+      sin conocimiento (FR-630), respuesta inservible del proveedor.
+- [x] **T218** El `ai-mock` sabe responder al prompt del generador de forma
+      determinista, o el self-test de esta entrega no puede existir.
+- [x] **T219** Rutas: listar, crear desde propuestas, editar, borrar, generar.
+
+### Fase 6: La pantalla
+
+- [x] **T220** Lista de escenarios propios, con su origen y su estado.
+- [x] **T221** Revisar propuestas antes de confirmar: editar el texto y
+      descartar las que no sirvan (FR-623).
+- [x] **T222** Antes de correr, **anunciar** cuántos escenarios y cuánto tarda
+      (FR-631).
+
+### Fase 7: Verificación
+
+- [x] **T223** Los cuatro gates en verde.
+- [x] **T224** El arnés `e2e-lab.mjs` extendido: generar, confirmar, correr con
+      los propios, y el aviso de sello distinto.
+- [x] **T225** **Falsificar** lo nuevo del arnés.
+- [ ] **T226** Pendiente de verificación humana: una corrida real en LanCo con
+      escenarios generados de su propio conocimiento.
+
+### MVP
+
+**Fases 1 a 5.** Con eso el negocio ya genera y corre sus escenarios; la
+pantalla (Fase 6) es lo que lo hace usable sin `curl`.
 
 ---
 
@@ -281,3 +410,51 @@ verificación cuenta.
 **T016 — pendiente de verificación humana**: que un guion neutro le sirva a un
 negocio real. Solo se sabe mirando una corrida de una instancia con su
 conocimiento cargado.
+
+---
+
+## Cómo salió de verdad — Entrega 3, 2026-09-10
+
+**La regla de orden se respetó**: el ensayo del Principio X (T204) se hizo
+**antes** de construir encima. Su registro está más arriba.
+
+**Tres cosas las encontró el trabajo, no el diseño:**
+
+1. **`"El segundo, ¿cuánto?"` se escapaba del validador de guiones** por la
+   coma: el matcher exigía un espacio detrás del comienzo sospechoso. Lo cazó
+   el test. Ahora se pide que lo siguiente no sea letra ni dígito, y
+   `"esotérico"` sigue sin confundirse con `"eso"`.
+2. **Un regex mal escrito habría borrado los DÍGITOS** de las etiquetas al
+   derivar la clave de un escenario. Invisible leyendo el código; hay test que
+   lo fija.
+3. **`contarEscenariosPropios` armaba su `WHERE` a mano** en vez de pasar por
+   `scoped()`. Corregido: es la puerta que el Principio III exige y la que
+   revienta con un `organizationId` vacío.
+
+**Las falsificaciones, y una que se cobró un fallo del propio arnés:**
+
+- **Tenant**: quitarle el `scoped()` a una lectura de `escenarios.ts` pone rojo
+  el test con el SQL a la vista — `"lab_scenario"."enabled" = $1`.
+- **Etiquetas (FR-632)**: dejar de resolver las etiquetas propias hace que el
+  reporte enseñe **claves crudas** (`gen_pregunta_por_garantia_0_rsdcy`), que
+  es exactamente lo que el requisito existe para impedir.
+- Y esa falsificación destapó que **el arnés no era re-ejecutable**: limpiaba
+  los escenarios propios *después* de los checks de la corrida 1, así que un
+  residuo rompía "seis casos" y "score 83". Se movió la limpieza a la
+  preparación. Comprobado corriéndolo **dos veces seguidas**: 32/32 las dos.
+
+| Gate | Resultado |
+|---|---|
+| `typecheck` · `lint` · `build` | limpios |
+| `test` (unidad) | **576 pasan**, 68 archivos |
+| `scripts/e2e-lab.mjs` | **32/32** (12 checks nuevos), idempotente |
+| `scripts/e2e-selftest.mjs` | **103/103**, sin daño colateral |
+
+**Un fallo que arrastraba de la 023**: el test del 404 del seed demo importa un
+route handler, lo que arrastra el grafo entero de la app (~3 s). Pasaba aislado
+y caía dentro de la suite completa por el límite de 5 s — intermitente, que es
+peor que no tenerlo. Se le puso límite propio, con el porqué escrito.
+
+**T226 queda pendiente y es real**: una corrida en LanCo con escenarios
+generados de su propio conocimiento. El mock afirma de forma determinista la
+mecánica; que los guiones generados sirvan es juicio sobre un modelo real.

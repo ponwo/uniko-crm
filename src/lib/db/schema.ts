@@ -652,6 +652,33 @@ export const agentTestRun = pgTable(
       .notNull()
       .default("running"),
     score: integer("score"),
+    /**
+     * 021 Entrega 3 (FR-625) — Sello del CONJUNTO de escenarios contra el que
+     * se evaluó esta corrida.
+     *
+     * Hash del CONTENIDO —parejas `(clave, guion)` ordenadas por clave—, no
+     * solo de las claves: editar un guion cambia el examen igual que añadir
+     * uno, y un hash de claves diría que dos corridas midieron lo mismo cuando
+     * el dueño reescribió el texto entre ellas. Es justo el caso que esto
+     * existe para detectar.
+     *
+     * NULLABLE a propósito: las corridas anteriores a esta entrega no lo
+     * tienen. Rellenarlas con el sello de hoy afirmaría que se midieron contra
+     * el examen actual — y los seis guiones se reescribieron en la Entrega 1.
+     * Un null dice "de esta no se sabe", que es la verdad.
+     */
+    scenarioSet: text("scenario_set"),
+    /**
+     * 021 Entrega 3 (FR-616) — Versión de la RÚBRICA con la que juzgó el juez.
+     *
+     * El sello no la cubre: cambiar la rúbrica no toca el conjunto de
+     * escenarios y sin embargo hace incomparables dos scores. Está medido en
+     * vivo: la Entrega 2 llevó a LanCo de 42 a 75 sin que su agente cambiara,
+     * y la pantalla lo presentó como mejora.
+     *
+     * NULLABLE por el mismo motivo que `scenario_set`.
+     */
+    rubricVersion: text("rubric_version"),
     error: text("error"),
     startedAt: timestamp("started_at").notNull().defaultNow(),
     finishedAt: timestamp("finished_at"),
@@ -662,6 +689,74 @@ export const agentTestRun = pgTable(
       .on(t.organizationId)
       .where(sql`${t.status} = 'running'`),
     index("test_run_org_idx").on(t.organizationId, t.startedAt),
+  ]
+);
+
+/**
+ * 021 Entrega 3 — Escenarios del Laboratorio propios de una organización.
+ *
+ * Aquí vive lo que el negocio generó desde su conocimiento o escribió a mano.
+ * Los SEIS genéricos NO: siguen siendo constantes en `server/lab/personas.ts`,
+ * porque se corren igual en todas las instancias y son comparables ENTRE
+ * negocios. Estos miden si el conocimiento de ESTE negocio tiene huecos, y
+ * conviven con aquellos en vez de sustituirlos (FR-624).
+ *
+ * ═══════════════════════════════════════════════════════════════════════════
+ * DECISIÓN DE SEGURIDAD — léela antes de tocar `phone`.
+ *
+ * El Laboratorio resuelve el contacto de prueba POR TELÉFONO
+ * (`upsertTestContact` en `runner.ts`). Si un escenario usara un número que ya
+ * pertenece a un cliente real del negocio, el Laboratorio le colgaría una
+ * conversación simulada A ESA PERSONA: mensajes falsos mezclados con su
+ * historial y un lead que no existe en el pipeline.
+ *
+ * No es validación de formulario: es integridad de los datos del inquilino, y
+ * por eso la comprobación es BLOQUEANTE y el índice único de abajo es el
+ * árbitro. La validación previa solo sirve para dar un mensaje legible.
+ * ═══════════════════════════════════════════════════════════════════════════
+ */
+export const labScenario = pgTable(
+  "lab_scenario",
+  {
+    id: text("id").primaryKey(),
+    organizationId: text("organization_id")
+      .notNull()
+      .references(() => organization.id, { onDelete: "cascade" }),
+    /**
+     * Clave estable dentro de la organización. Es lo que `agent_test_case`
+     * guarda en `persona`, así que NO se reutiliza: por eso el borrado es
+     * lógico (`enabled`) y no un DELETE.
+     */
+    key: text("key").notNull(),
+    label: text("label").notNull(),
+    description: text("description"),
+    /** El guion: las líneas del cliente simulado. Texto FIJO (FR-627). */
+    script: jsonb("script").notNull(),
+    /** Teléfono sintético, de un rango reservado. Ver la decisión de arriba. */
+    phone: text("phone").notNull(),
+    contactName: text("contact_name").notNull(),
+    origin: text("origin", { enum: ["generado", "manual"] })
+      .notNull()
+      .default("generado"),
+    /**
+     * Borrado LÓGICO. El reporte de una corrida vieja resuelve la etiqueta
+     * desde la clave: borrar la fila dejaría corridas históricas mostrando un
+     * identificador crudo en vez de un nombre (FR-632). Para el dueño es un
+     * borrado; para el reporte del mes pasado, sigue habiendo un nombre.
+     */
+    enabled: boolean("enabled").notNull().default(true),
+    position: integer("position").notNull().default(0),
+    /** Null si se escribió a mano en vez de generarse. */
+    generatedAt: timestamp("generated_at"),
+    createdAt: timestamp("created_at").notNull().defaultNow(),
+    updatedAt: timestamp("updated_at").notNull().defaultNow(),
+  },
+  (t) => [
+    uniqueIndex("lab_scenario_org_key_uq").on(t.organizationId, t.key),
+    // Dos escenarios de la misma organización no pueden compartir contacto de
+    // prueba. El ÍNDICE es el árbitro; la validación previa da el mensaje.
+    uniqueIndex("lab_scenario_org_phone_uq").on(t.organizationId, t.phone),
+    index("lab_scenario_org_idx").on(t.organizationId, t.position),
   ]
 );
 

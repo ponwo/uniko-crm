@@ -30,8 +30,20 @@ afterEach(() => {
   requireSession.mockReset();
 });
 
+/**
+ * Estos dos importan un route handler del App Router, y eso arrastra el grafo
+ * entero de la app —Drizzle, el esquema, Better Auth—. Tarda ~3 s la primera
+ * vez, y con el límite por defecto de 5 s el test pasaba aislado y caía dentro
+ * de la suite completa: intermitente, que es peor que no tenerlo.
+ *
+ * El tiempo NO está en lo que se afirma, sino en resolver módulos. Se sube el
+ * límite en vez de adelgazar la prueba: lo que comprueba —que el gate corre
+ * antes que la autenticación— exige cargar el handler de verdad.
+ */
+const TIMEOUT_POR_EL_GRAFO_DE_MODULOS = 30_000;
+
 describe("023 — la ruta del seed demo en producción", () => {
-  it("responde 404, no 401, y NO consulta la sesión (FR-803)", async () => {
+  it("responde 404, no 401, y NO consulta la sesión (FR-803)", { timeout: TIMEOUT_POR_EL_GRAFO_DE_MODULOS }, async () => {
     vi.stubEnv("WA_MOCK_ENABLED", "true");
     vi.stubEnv("NODE_ENV", "production");
 
@@ -46,7 +58,7 @@ describe("023 — la ruta del seed demo en producción", () => {
     ).not.toHaveBeenCalled();
   });
 
-  it("sin la bandera de mocks tampoco existe, ni en desarrollo", async () => {
+  it("sin la bandera de mocks tampoco existe, ni en desarrollo", { timeout: TIMEOUT_POR_EL_GRAFO_DE_MODULOS }, async () => {
     vi.stubEnv("WA_MOCK_ENABLED", "");
     vi.stubEnv("NODE_ENV", "development");
 

@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
+import Link from "next/link";
 import {
   AlertTriangle,
   CheckCircle2,
@@ -11,6 +12,7 @@ import {
   Sparkles,
   TrendingDown,
   TrendingUp,
+  Wand2,
   XCircle,
 } from "lucide-react";
 import { useEvents } from "@/components/use-events";
@@ -29,6 +31,16 @@ type Run = {
   startedAt: string;
   finishedAt: string | null;
   delta: number | null;
+  /** null si no hay con que comparar; si no, si el delta significa algo. */
+  comparable: boolean | null;
+  motivoNoComparable: "examen" | "rubrica" | "sin_registro" | null;
+};
+
+/** 021 Entrega 3 (FR-631) — lo que va a costar la proxima corrida. */
+type Estimacion = {
+  escenarios: number;
+  segundos: number;
+  aproximada: boolean;
 };
 
 type Hallazgo = {
@@ -57,6 +69,7 @@ const TIPO_LABELS: Record<Hallazgo["tipo"], string> = {
 export function LabClient() {
   const [runs, setRuns] = useState<Run[]>([]);
   const [aiConfigured, setAiConfigured] = useState(true);
+  const [proxima, setProxima] = useState<Estimacion | null>(null);
   const [selectedRunId, setSelectedRunId] = useState<string | null>(null);
   const [detail, setDetail] = useState<{ run: Run; cases: Case[] } | null>(null);
   const [progress, setProgress] = useState<{ done: number; total: number } | null>(null);
@@ -66,9 +79,14 @@ export function LabClient() {
   const refetchRuns = useCallback(async () => {
     const res = await fetch("/api/lab/runs").catch(() => null);
     if (!res?.ok) return;
-    const data = (await res.json()) as { runs: Run[]; aiConfigured: boolean };
+    const data = (await res.json()) as {
+      runs: Run[];
+      aiConfigured: boolean;
+      proximaCorrida?: Estimacion | null;
+    };
     setRuns(data.runs);
     setAiConfigured(data.aiConfigured);
+    setProxima(data.proximaCorrida ?? null);
     if (!selectedRunId && data.runs[0]) setSelectedRunId(data.runs[0].id);
   }, [selectedRunId]);
 
@@ -125,7 +143,7 @@ export function LabClient() {
   if (!aiConfigured) {
     return (
       <div className="flex h-full flex-col">
-        <Header running={false} launching={false} onLaunch={() => {}} disabled />
+        <Header proxima={null} running={false} launching={false} onLaunch={() => {}} disabled />
         <div className="m-6 rounded-lg border border-brand-soft bg-brand-tint p-8 text-center">
           <Sparkles className="mx-auto mb-2 h-8 w-8 text-primary" />
           <p className="font-medium">
@@ -146,6 +164,7 @@ export function LabClient() {
   return (
     <div className="flex h-full flex-col overflow-y-auto">
       <Header
+        proxima={proxima}
         running={running}
         launching={launching}
         onLaunch={() => void launch()}
@@ -191,11 +210,13 @@ export function LabClient() {
 }
 
 function Header({
+  proxima,
   running,
   launching,
   onLaunch,
   disabled,
 }: {
+  proxima: Estimacion | null;
   running: boolean;
   launching: boolean;
   onLaunch: () => void;
@@ -211,10 +232,24 @@ function Header({
           Sandbox interno — no envía mensajes reales
         </p>
       </div>
-      <Button onClick={onLaunch} disabled={disabled || running || launching}>
-        <Play className="h-4 w-4" />
-        {running ? "Corrida en curso…" : "Correr evaluación"}
-      </Button>
+      <div className="flex items-center gap-3">
+        {/* FR-631 — cuantos escenarios y cuanto tarda, ANTES de correr. */}
+        {proxima && !running && (
+          <p className="text-[11px] text-text-3">
+            {proxima.escenarios} escenarios · ~{proxima.segundos}s
+            {proxima.aproximada ? " (estimado)" : ""}
+          </p>
+        )}
+        <Link href="/lab/escenarios">
+          <Button variant="outline" size="sm">
+            <Wand2 className="h-4 w-4" /> Tus escenarios
+          </Button>
+        </Link>
+        <Button onClick={onLaunch} disabled={disabled || running || launching}>
+          <Play className="h-4 w-4" />
+          {running ? "Corrida en curso…" : "Correr evaluación"}
+        </Button>
+      </div>
     </header>
   );
 }
@@ -246,21 +281,7 @@ function HistoryList({
         >
           <div className="flex items-center justify-between">
             <ScoreBadge run={run} />
-            {run.delta !== null && run.delta !== 0 && (
-              <span
-                className={`flex items-center gap-0.5 text-xs font-medium ${
-                  run.delta > 0 ? "text-success" : "text-destructive"
-                }`}
-              >
-                {run.delta > 0 ? (
-                  <TrendingUp className="h-3.5 w-3.5" />
-                ) : (
-                  <TrendingDown className="h-3.5 w-3.5" />
-                )}
-                {run.delta > 0 ? "+" : ""}
-                {run.delta}
-              </span>
-            )}
+            {run.delta !== null && run.delta !== 0 && <Delta run={run} />}
           </div>
           <p className="mt-1 text-[11px] text-muted-foreground">
             {new Date(run.startedAt).toLocaleString("es-MX", {
@@ -273,6 +294,66 @@ function HistoryList({
         </button>
       ))}
     </div>
+  );
+}
+
+
+/**
+ * 021 Entrega 3 (FR-626, FR-616) — el delta, y si vale compararlo.
+ *
+ * Un delta entre examenes distintos no significa nada, y presentarlo a secas
+ * es la forma mas barata de mentir con un numero. Esta medido, no es teoria:
+ * la Entrega 2 llevo a LanCo de 42 a 75 sin que su agente cambiara —cambio la
+ * rubrica, y entre corridas tambien los guiones que se ejecutaron— y esta
+ * misma pantalla lo presento como mejora.
+ *
+ * El numero NO se esconde: esconderlo dejaria al dueno sin el dato. Se
+ * presenta apagado y con el motivo al lado, que es lo que le permite decidir
+ * si mirarlo.
+ */
+function Delta({ run }: { run: Run }) {
+  const delta = run.delta!;
+  const sube = delta > 0;
+
+  if (run.comparable === false) {
+    const motivo =
+      run.motivoNoComparable === "examen"
+        ? "otros escenarios"
+        : run.motivoNoComparable === "rubrica"
+          ? "otra rubrica"
+          : "sin registro";
+    return (
+      <span
+        className="flex items-center gap-1 text-xs text-text-3"
+        title={
+          "Esta corrida y la anterior no se midieron igual, asi que la " +
+          "diferencia no dice si el agente mejoro."
+        }
+      >
+        <AlertTriangle className="h-3.5 w-3.5" strokeWidth={1.7} />
+        <span className="line-through">
+          {sube ? "+" : ""}
+          {delta}
+        </span>
+        <span className="font-medium">{motivo}</span>
+      </span>
+    );
+  }
+
+  return (
+    <span
+      className={`flex items-center gap-0.5 text-xs font-medium ${
+        sube ? "text-success" : "text-destructive"
+      }`}
+    >
+      {sube ? (
+        <TrendingUp className="h-3.5 w-3.5" />
+      ) : (
+        <TrendingDown className="h-3.5 w-3.5" />
+      )}
+      {sube ? "+" : ""}
+      {delta}
+    </span>
   );
 }
 

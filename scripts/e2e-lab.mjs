@@ -123,6 +123,21 @@ if (kbAhora.length === 0) {
   console.log("  Conocimiento mínimo sembrado (horario).");
 }
 
+/*
+ * Los escenarios propios se retiran AQUÍ, antes de la primera corrida, y no
+ * en la sección de la Entrega 3.
+ *
+ * Lo destapó una falsificación: dejarlos para más tarde hacía que un residuo
+ * de la corrida anterior rompiera los checks de "seis casos" y "score 83",
+ * porque el runner ya concatena. Un arnés que solo pasa la primera vez no
+ * sirve — y este se encadena en `pnpm test:e2e`.
+ */
+const propiosPrevios = (await api("/api/lab/scenarios")).json?.escenarios ?? [];
+for (const e of propiosPrevios) {
+  await api(`/api/lab/scenarios/${e.id}`, { method: "DELETE" });
+}
+console.log(`  Escenarios propios de corridas anteriores retirados: ${propiosPrevios.length}`);
+
 const outboxAntes = await outboxLen();
 console.log(`  Outbox del wa-mock antes: ${outboxAntes}`);
 
@@ -261,6 +276,91 @@ ok(
   "y tras dos corridas completas el outbox sigue intacto",
   outboxFinal === outboxAntes,
   `${outboxAntes} → ${outboxFinal}`
+);
+
+// ── Entrega 3: los escenarios del negocio ────────────────────────────────
+//
+// Lo que se juega aquí:
+//   1. Que la generación produzca PROPUESTAS y no guarde nada hasta que se
+//      confirmen (FR-622).
+//   2. Que un escenario malformado del proveedor NO tire los buenos: el mock
+//      devuelve dos válidos y uno roto a propósito.
+//   3. Que el runner CONCATENE, no sustituya (FR-624).
+//   4. Que el histórico avise de que el examen cambió (FR-626) — el check que
+//      impide volver a presentar como mejora lo que fue otro examen.
+console.log("\n== Entrega 3: generar, confirmar y correr los escenarios del negocio ==");
+
+
+const generacion = await api("/api/lab/scenarios/generate", { method: "POST" });
+ok(
+  "generar devuelve propuestas desde el conocimiento",
+  generacion.status === 200 && (generacion.json?.propuestas ?? []).length === 2,
+  `status ${generacion.status}, ${(generacion.json?.propuestas ?? []).length} propuestas`
+);
+ok(
+  "un escenario malformado se descarta SIN tirar los buenos",
+  generacion.json?.descartados === 1,
+  `descartados: ${generacion.json?.descartados}`
+);
+
+const sinConfirmar = (await api("/api/lab/scenarios")).json?.escenarios ?? [];
+ok(
+  "generar NO guarda nada: son propuestas hasta que el dueño confirma (FR-622)",
+  sinConfirmar.length === 0,
+  `${sinConfirmar.length} escenarios guardados sin confirmar`
+);
+
+const confirmadas = await api("/api/lab/scenarios", {
+  method: "POST",
+  data: { escenarios: generacion.json?.propuestas ?? [] },
+});
+ok("confirmarlas las guarda", confirmadas.status === 201, `status ${confirmadas.status}`);
+const guardados = (await api("/api/lab/scenarios")).json?.escenarios ?? [];
+ok("y aparecen en la lista", guardados.length === 2, `${guardados.length}`);
+
+const inicio3 = await api("/api/lab/runs", { method: "POST" });
+const reporte3 = await esperarCorrida(inicio3.json?.runId);
+ok(
+  "la corrida ahora evalúa los seis del producto MÁS los dos propios (FR-624)",
+  (reporte3?.cases ?? []).length === 8,
+  `${(reporte3?.cases ?? []).length} casos`
+);
+ok(
+  "los propios se nombran con su etiqueta, no con su clave",
+  (reporte3?.cases ?? []).some((c) => c.personaLabel === "Pregunta por garantía"),
+  (reporte3?.cases ?? []).map((c) => c.personaLabel).join(" | ")
+);
+
+const hist = (await api("/api/lab/runs")).json ?? {};
+const ultima = (hist.runs ?? [])[0];
+ok(
+  "el histórico AVISA de que el examen cambió, en vez de presentar el delta a secas (FR-626)",
+  ultima?.comparable === false && ultima?.motivoNoComparable === "examen",
+  `comparable=${ultima?.comparable} motivo=${ultima?.motivoNoComparable}`
+);
+ok(
+  "y se anuncia lo que costará la próxima corrida (FR-631)",
+  (hist.proximaCorrida?.escenarios ?? 0) === 8 && (hist.proximaCorrida?.segundos ?? 0) > 0,
+  JSON.stringify(hist.proximaCorrida)
+);
+
+// Borrado LÓGICO: sale de la lista, pero el reporte viejo lo sigue nombrando.
+const aBorrar = guardados[0];
+await api(`/api/lab/scenarios/${aBorrar.id}`, { method: "DELETE" });
+const trasBorrar = (await api("/api/lab/scenarios")).json?.escenarios ?? [];
+ok("borrar lo quita de la lista", trasBorrar.length === 1, `${trasBorrar.length}`);
+const reporteViejo = await api(`/api/lab/runs/${inicio3.json?.runId}`);
+ok(
+  "pero el reporte de la corrida anterior lo sigue nombrando (FR-632)",
+  (reporteViejo.json?.cases ?? []).some((c) => c.personaLabel === aBorrar.label),
+  `se buscaba "${aBorrar.label}"`
+);
+
+const outboxE3 = await outboxLen();
+ok(
+  "y el sandbox sigue intacto con los escenarios del negocio",
+  outboxE3 === outboxAntes,
+  `${outboxAntes} → ${outboxE3}`
 );
 
 await browser.close();

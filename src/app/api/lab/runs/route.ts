@@ -4,6 +4,8 @@ import { getDb, schema } from "@/lib/db";
 import { scoped } from "@/lib/db/tenant";
 import { isAiConfigured } from "@/lib/env";
 import { RunConflictError, startRun } from "@/server/lab/runner";
+import { estimarCorrida, sonComparables } from "@/server/lab/conjunto";
+import { escenariosDe } from "@/server/lab/escenarios";
 
 export const dynamic = "force-dynamic";
 
@@ -21,6 +23,24 @@ export const GET = withAuth(async (session) => {
     const prev = runs
       .slice(i + 1)
       .find((r) => r.status === "done" && r.score !== null);
+
+    const hayDelta =
+      run.status === "done" && run.score !== null && prev?.score != null;
+
+    /*
+     * 021 Entrega 3 (FR-626, FR-616) — un delta entre exámenes distintos no
+     * significa nada, y presentarlo sin aviso es la forma más barata de mentir
+     * con un número.
+     *
+     * Está medido, no es teoría: la Entrega 2 llevó a LanCo de 42 a 75 sin que
+     * su agente cambiara —cambió la rúbrica, y entre corridas también los
+     * guiones que se ejecutaron— y la pantalla lo presentó como mejora.
+     *
+     * El delta se sigue devolviendo: esconderlo dejaría al dueño sin el dato.
+     * Lo que se añade es si vale compararlo, y por qué no cuando no.
+     */
+    const comparacion = hayDelta && prev ? sonComparables(run, prev) : null;
+
     return {
       id: run.id,
       status: run.status,
@@ -28,13 +48,27 @@ export const GET = withAuth(async (session) => {
       error: run.error,
       startedAt: run.startedAt.toISOString(),
       finishedAt: run.finishedAt?.toISOString() ?? null,
-      delta:
-        run.status === "done" && run.score !== null && prev?.score != null
-          ? run.score - prev.score
-          : null,
+      delta: hayDelta ? run.score! - prev!.score! : null,
+      /** null si no hay con qué comparar; si no, si el delta significa algo. */
+      comparable: comparacion ? comparacion.comparables : null,
+      /** `examen` | `rubrica` | `sin_registro` cuando no son comparables. */
+      motivoNoComparable: comparacion?.motivo ?? null,
     };
   });
-  return Response.json({ runs: withDelta, aiConfigured: isAiConfigured() });
+  /*
+   * 021 Entrega 3 (FR-631) — cuanto va a costar la proxima corrida. Una
+   * corrida pasa de seis escenarios a catorce sin que nadie avise, y
+   * descubrirlo esperando es una mala experiencia; con un proveedor de pago
+   * detras, tambien un coste no anunciado.
+   */
+  const conjunto = await escenariosDe(session.organizationId);
+  const proximaCorrida = await estimarCorrida(session.organizationId, conjunto);
+
+  return Response.json({
+    runs: withDelta,
+    aiConfigured: isAiConfigured(),
+    proximaCorrida,
+  });
 });
 
 export const POST = withAuth(async (session) => {

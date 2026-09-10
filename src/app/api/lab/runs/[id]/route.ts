@@ -2,7 +2,7 @@ import { asc, eq } from "drizzle-orm";
 import { apiError, withAuth } from "@/lib/api";
 import { getDb, schema } from "@/lib/db";
 import { scoped } from "@/lib/db/tenant";
-import { PERSONA_LABELS } from "@/server/lab/personas";
+import { etiquetasDe } from "@/server/lab/escenarios";
 
 export const dynamic = "force-dynamic";
 
@@ -31,6 +31,14 @@ export const GET = withAuth(async (session, _req: Request, ctx: Params) => {
     .where(eq(schema.agentTestCase.runId, id))
     .orderBy(asc(schema.agentTestCase.createdAt));
 
+  /*
+   * 021 Entrega 3 (FR-632) — las etiquetas se resuelven SIN filtrar por
+   * `enabled`: borrar un escenario lo quita del futuro, no del pasado. Un
+   * reporte de hace un mes tiene que seguir nombrando lo que se corrió, no
+   * enseñar un identificador crudo.
+   */
+  const etiquetas = await etiquetasDe(session.organizationId);
+
   return Response.json({
     run: {
       id: run.id,
@@ -43,7 +51,7 @@ export const GET = withAuth(async (session, _req: Request, ctx: Params) => {
     cases: cases.map((c) => ({
       id: c.id,
       persona: c.persona,
-      personaLabel: PERSONA_LABELS[c.persona] ?? c.persona,
+      personaLabel: etiquetas[c.persona] ?? c.persona,
       status: c.status,
       veredicto: c.veredicto,
       hallazgos: c.hallazgos ?? [],

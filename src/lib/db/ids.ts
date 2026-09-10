@@ -18,6 +18,8 @@ const prefixes = {
   template: "tpl",
   testRun: "run",
   testCase: "case",
+  // 021 Entrega 3 — escenarios del Laboratorio propios de la organización
+  labScenario: "esc",
   mediaAsset: "ma",
   // 015 — motor de agenda
   calendarSettings: "cal",
