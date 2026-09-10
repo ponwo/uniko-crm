@@ -87,16 +87,31 @@
 
 ### Functional Requirements
 
-- **FR-001**: System MUST [specific capability, e.g., "allow users to create accounts"]
-- **FR-002**: System MUST [specific capability, e.g., "validate email addresses"]
-- **FR-003**: Users MUST be able to [key interaction, e.g., "reset their password"]
-- **FR-004**: System MUST [data requirement, e.g., "persist user preferences"]
-- **FR-005**: System MUST [behavior, e.g., "log all security events"]
+<!--
+  NUMERACIÓN — léelo antes de copiar los ejemplos.
+
+  La banda de FR NO se elige: se deriva del número de feature (Principio VI de
+  .specify/memory/constitution.md). 017→FR-2xx, 018→FR-3xx, 019→FR-4xx,
+  020→FR-5xx, 021→FR-6xx, 022→FR-7xx, y así.
+
+  Los ejemplos de abajo usan la forma NNN a propósito, y NO FR-001: una
+  plantilla que enseña a empezar en FR-001 es el mecanismo exacto por el que la
+  banda se hereda del ejemplo en vez de derivarse de la feature. FR-001 está
+  además ocupada por 001-uniko-core, 015 y 016, que son anteriores a la regla.
+
+  Sustituye NNN por tu centena: la feature 023 escribe FR-801, FR-802, …
+-->
+
+- **FR-NNN1**: System MUST [specific capability, e.g., "allow users to create accounts"]
+- **FR-NNN2**: System MUST [specific capability, e.g., "validate email addresses"]
+- **FR-NNN3**: Users MUST be able to [key interaction, e.g., "reset their password"]
+- **FR-NNN4**: System MUST [data requirement, e.g., "persist user preferences"]
+- **FR-NNN5**: System MUST [behavior, e.g., "log all security events"]
 
 *Example of marking unclear requirements:*
 
-- **FR-006**: System MUST authenticate users via [NEEDS CLARIFICATION: auth method not specified - email/password, SSO, OAuth?]
-- **FR-007**: System MUST retain user data for [NEEDS CLARIFICATION: retention period not specified]
+- **FR-NNN6**: System MUST authenticate users via [NEEDS CLARIFICATION: auth method not specified - email/password, SSO, OAuth?]
+- **FR-NNN7**: System MUST retain user data for [NEEDS CLARIFICATION: retention period not specified]
 
 ### Key Entities *(include if feature involves data)*
 
@@ -111,6 +126,12 @@
 -->
 
 ### Measurable Outcomes
+
+<!--
+  Los criterios de éxito (SC) NO llevan banda: se numeran desde SC-001 en cada
+  feature y se citan siempre junto a la suya. La regla del Principio VI es sólo
+  para FR, que es lo que se cita suelto en código, commits y guiones.
+-->
 
 - **SC-001**: [Measurable metric, e.g., "Users can complete account creation in under 2 minutes"]
 - **SC-002**: [Measurable metric, e.g., "System handles 1000 concurrent users without degradation"]

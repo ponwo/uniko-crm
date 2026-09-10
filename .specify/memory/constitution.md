@@ -1,71 +1,58 @@
 <!--
 SYNC IMPACT REPORT
 ==================
-Versión: 1.5.0 → 1.5.1
+Versión: 1.6.0 → 1.7.0
+
+(La 1.6.0 —la banda de numeración de requisitos— entra en este mismo PR, en el
+commit anterior. Su propio informe está en ese commit; este documenta sólo lo
+que añade la 1.7.0.)
 
 Cambios:
-  - Principio II, Rationale → REDACCIÓN: dejaba de pie la premisa que el Cambio
-    2 de la 1.5.0 ya había corregido en el encabezado ("El producto se regala
-    para que agencias lo desplieguen en VPS de clientes… rompe la promesa
-    'gratis y tuyo'"). Pasa a apoyarse en la premisa vigente: cada instancia es
-    el despliegue de UN negocio y la flota multiplica lo que se meta en el
-    núcleo. El argumento no cambia —cada dependencia externa es costo, punto de
-    fallo y fuga de soberanía—, cambia el hecho sobre el que se apoya.
-  - Principio VIII, párrafo de apertura → REDACCIÓN: "Es un CRM … que las
-    agencias despliegan para negocios" pasa a "… desplegado una vez por
-    negocio". Se toca ÚNICAMENTE esa primera oración descriptiva; la que sigue
-    en el mismo párrafo ("Lo que no ayude a atender, organizar y convertir
-    conversaciones de WhatsApp de UN negocio se rechaza") SÍ es criterio de
-    aceptación y queda literal, igual que los tres bullets y el Rationale.
-  - Ningún otro Rationale de la constitución arrastraba la premisa: barrida
-    completa por "agencia", "gratis/gratuito", "open source" y "despliega".
-  - Principios I, III, IV, V, VI, VII, IX y X: íntegros (sin cambio).
-  - Encabezado, "Restricciones de Plataforma y Seguridad", "Flujo de Desarrollo
-    y Puertas de Calidad" y Governance: sin cambio.
+  - Principio VII, "Reglas" → REGLA NUEVA: cómo se marca un requisito derogado
+    por una feature posterior. Dos anotaciones obligatorias —en la spec que
+    deroga y JUNTO AL REQUISITO en la spec derogada—, con la forma concreta
+    (texto tachado + bloque DEROGADO con referencia y rationale), la propagación
+    a todos los artefactos de la spec derogada, y la regla de que ambas viajan
+    en el mismo PR que la derogación.
+  - Ningún otro principio se toca. Principios I, II, III, IV, V, VI, VIII, IX y
+    X: íntegros.
+  - Encabezado, "Restricciones de Plataforma y Seguridad", "Flujo de Desarrollo y
+    Puertas de Calidad" y Governance: sin cambio.
 
-Bump: PATCH (1.5.0 → 1.5.1) — refinamiento de redacción sin efecto semántico. No
-se añade, elimina ni redefine ningún principio, y ningún criterio de aceptación
-cambia de contenido: los dos párrafos tocados son texto de justificación. Un PR
-que pasaba el Constitution Check con la 1.5.0 lo pasa idéntico con la 1.5.1.
+Bump: MINOR (1.6.0 → 1.7.0) — se AÑADE una regla que antes no existía. Mismo
+criterio que la 1.6.0: no es PATCH porque a partir de aquí una spec puede
+incumplir algo que antes no podía incumplir, al no estar escrito; y no es MAJOR
+porque no elimina ni redefine ningún principio, y ninguna spec existente queda
+inválida.
 
 Motivación:
-  Deuda que la propia 1.5.0 dejó anotada como TODO diferido. El Cambio 2 de esa
-  enmienda corrigió la premisa del producto en el encabezado y en el tercer
-  bullet del Principio VIII, pero su alcance estaba acotado por la propuesta
-  ratificada, que decía explícitamente "el resto del Principio VIII queda
-  íntegro". El resultado era una constitución que afirmaba dos cosas distintas
-  sobre quién despliega Uniko según el párrafo que se leyera: el encabezado
-  hablaba de flota y el Rationale del II seguía hablando de un producto que "se
-  regala" a agencias. Que sea texto de justificación no lo vuelve inocuo: los
-  Rationale son lo que se lee para decidir los casos que la regla no previó.
-  No se toca la licencia MIT ni la atribución a Vocero CRM y a Kevin Belier en
-  LICENSE y en los agradecimientos del README: lo que dejó de ser cierto es la
-  distribución pública, no la licencia.
+  La 022 elimina el botón "Cargar datos de demostración", y con él deroga en
+  parte FR-075 de 001-uniko-core, que dice que la UI MUST ofrecerlo. Registrarlo
+  sólo en la spec que deroga no basta: a una spec vieja se llega buscando un FR
+  concreto, no leyéndola entera, así que quien abra la 001 dentro de un año
+  encontraría un MUST vigente que el producto incumple y ninguna pista de que
+  fue deliberado.
+  La forma no se inventa aquí: es la que ya usó el repositorio hermano
+  kosmo-CRM al retirar su propia siembra demo (commit 16d3f7c, FR-075 tachado
+  con bloque DEROGADO y rationale, propagado a plan, research, tasks, quickstart
+  y contracts). Allí se hizo por criterio, sin regla escrita que lo exigiera —
+  que es exactamente el motivo de escribirla aquí.
 
 Plantillas dependientes:
   - .specify/templates/plan-template.md — ✅ compatible (sin cambios).
-  - .specify/templates/spec-template.md — ✅ compatible (sin cambios).
   - .specify/templates/tasks-template.md — ✅ compatible (sin cambios).
+  - .specify/templates/spec-template.md — ✅ compatible (sin cambios): la
+    plantilla describe requisitos nuevos, no derogaciones.
   - .specify/templates/constitution-template.md — ✅ compatible (sin cambios).
-  - CLAUDE.md — ✅ compatible (sin cambios): su bloque de reglas no negociables
-    resume principios, y ninguno cambió de contenido.
-  - docs/despliegue-flota.md — ✅ compatible (sin cambios): ya se escribió sobre
-    la premisa de flota.
-  - README.md — ✅ actualizado en este mismo cambio: el público "Agencias de
-    IA/automatización … despliegas una instancia por cliente en su VPS" pasa a
-    "Quien opera una flota", y la sección Stack deja de decir "diseñado para que
-    una agencia lo modifique". Sin tocar Licencia ni Créditos.
-  - docs/getting-started.md — ✅ compatible (sin cambios): no menciona agencias
-    ni la premisa de distribución pública.
+  - CLAUDE.md — ✅ compatible (sin cambios): su resumen no entra en la mecánica
+    de las specs.
+  - specs/README.md — ✅ compatible (sin cambios).
 
 TODOs diferidos:
-  - Deuda documental heredada de la 1.3.0 (features entre `003` y la app 1.2.0
-    sin spec): sigue igual; esta enmienda no la toca.
-  - README, "Modo agencia (Tech Provider)": NO es la premisa corregida aquí sino
-    una capacidad real del producto (una plataforma de agencia que ya hizo el
-    Embedded Signup conecta su backend a la instancia). Se deja intacta a
-    propósito. Queda anotado para que una futura limpieza de la premisa no la
-    borre por parecido de nombre.
+  - No se hace una pasada retroactiva buscando requisitos ya derogados sin marca
+    en specs anteriores. Si aparece uno, se marca cuando aparezca: una revisión
+    completa del histórico costaría más de lo que rinde y esta regla existe para
+    lo que venga.
 -->
 
 # Uniko CRM Constitution
@@ -217,6 +204,42 @@ Reglas que sostienen lo anterior:
   encabezado. Es documentación, no diseño, y confundirlos hace creer a quien lo lea
   dentro de un año que esas decisiones se tomaron antes de programar.
 
+- **La banda de numeración de requisitos se deriva del número de feature, no se
+  elige.** El mapeo es:
+
+  | Feature | Banda | Feature | Banda |
+  |---|---|---|---|
+  | 017 | FR-2xx | 021 | FR-6xx |
+  | 018 | FR-3xx | 022 | FR-7xx |
+  | 019 | FR-4xx | 023 | FR-8xx |
+  | 020 | FR-5xx | 024 | FR-9xx |
+
+  Para una feature `NNN`, la centena es `(NNN − 15) × 100`. **El desplazamiento
+  de 15 es histórico y no significa nada**: es dónde estaba la numeración cuando
+  la 017 tomó FR-2xx. Si algún día la fórmula y la tabla discreparan, **manda la
+  tabla**: la fórmula es una comodidad para extenderla, no su fuente.
+
+  **Ancho y búsqueda.** Un identificador se escribe y se busca SIEMPRE completo
+  —`FR-701`, nunca `FR-70`—. De la feature 025 en adelante la banda pasa a
+  cuatro dígitos (025 → FR-10xx, 026 → FR-11xx, y así), y para que eso no rompa
+  las búsquedas por prefijo **la banda FR-1xx queda permanentemente sin
+  asignar**: sin ella, ningún identificador de cuatro dígitos puede confundirse
+  con uno de tres. Ninguna banda se reutiliza.
+
+  **La banda no depende del orden en que las features aterrizan.** Una spec
+  escrita antes que otra de número menor conserva la suya. Si se numerase por
+  orden de llegada, dos specs abiertas a la vez elegirían la misma banda — y ya
+  pasó: la 022 se escribió antes que la 021 y tomó FR-6xx, que no le tocaba. Se
+  renumeró antes de implementar nada. Una spec que decide su propia banda, o la
+  de otra feature, está legislando fuera de su alcance.
+
+  **Las features 001, 015 y 016 no se renumeran.** Las tres empiezan en FR-001 y
+  se pisan entre sí: son anteriores a esta regla. Un requisito citado en un PR,
+  en un commit o en un comentario del código —`FR-030` en
+  `src/server/lab/personas.ts`, `FR-060` en `src/server/auth/registration.ts`—
+  es una dirección estable, y reescribirla rompe más de lo que ordena. La regla
+  rige de la 017 en adelante, que es de donde ya venía sin estar escrita.
+
 **Rationale**: Especificar el comportamiento observable antes de codificar previene
 retrabajo y mantiene alineadas todas las fases del flujo. Los tres carriles existen
 porque un único ciclo, calibrado para una feature que define el producto entero, es
@@ -235,8 +258,49 @@ Las decisiones tomadas sin contexto suficiente se documentan para revisión huma
 - Los supuestos que condicionan el comportamiento se hacen explícitos para que un
   humano pueda revisarlos y revertirlos.
 
+- **Un requisito derogado se marca EN SU SITIO, no sólo donde se deroga.**
+  Cuando una feature deja sin efecto un requisito de una spec anterior —entero o
+  en parte— hacen falta **dos** anotaciones, y la segunda es la que se olvida:
+
+  1. **En la spec que deroga**: qué requisito, de qué feature, si entero o en
+     parte, y **por qué**. Una derogación sin motivo es indistinguible de un
+     descuido.
+  2. **En la spec derogada, junto al requisito**: el texto original **tachado**
+     (`~~…~~`) seguido de un bloque **`**DEROGADO**`** con la referencia —la
+     feature, el issue o el PR que lo deroga— y el **rationale**, no sólo la
+     etiqueta. Quien llega ahí necesita saber por qué, o volverá a proponerlo.
+
+  **Si la derogación es parcial, el tachado también.** Se tacha **sólo la parte
+  que deja de regir**, y el bloque dice cuál sigue vigente. Tachar el requisito
+  entero porque se derogó una de sus partes deja vigente en apariencia lo
+  contrario de lo que se decidió — y es un error más difícil de detectar que no
+  marcar nada, porque parece que alguien ya se ocupó.
+
+  **El texto original no se borra ni se reescribe: se tacha.** Era cierto cuando
+  se escribió y está citado en PRs, commits y comentarios del código;
+  reescribirlo convierte esas citas en mentiras. El tachado deja leer lo que
+  decía **y** que dejó de regir.
+
+  **La marca se propaga a TODOS los artefactos de la spec derogada** que
+  mencionen el requisito —plan, research, tasks, quickstart, contratos—, no sólo
+  al `spec.md`. Un `tasks.md` con una tarea viva de un requisito muerto manda a
+  alguien a implementarlo.
+
+  **Las anotaciones viajan en el mismo PR que la derogación**, no antes: un
+  requisito marcado como derogado por una feature que nunca llegó a `main` es
+  peor que no marcarlo.
+
+  **Sin la anotación (2) la regla no sirve para nada**, y por eso está escrita. A
+  una spec vieja se llega buscando un `FR-` concreto, no leyéndola entera: quien
+  la abra dentro de un año encuentra un MUST vigente que el producto incumple, y
+  no tiene forma de saber que alguien lo derogó a propósito. La anotación (1)
+  sólo la ve quien ya sabía que la derogación existe — es decir, quien no la
+  necesitaba.
+
 **Rationale**: Las decisiones implícitas bajo incertidumbre son la principal fuente
-de deuda oculta; hacerlas visibles permite corregirlas a tiempo.
+de deuda oculta; hacerlas visibles permite corregirlas a tiempo. Un requisito
+derogado sin marca es un caso particular de lo mismo: la decisión existe, pero
+no está donde se va a leer.
 
 ### VIII. Foco Vertical — CRM de Conversaciones y Leads de WhatsApp
 
@@ -404,4 +468,4 @@ práctica, convención o preferencia; ante un conflicto, gana la constitución.
 - **Propagación**: al enmendar la constitución se revisan y, si procede, se actualizan
   las plantillas dependientes (plan, spec, tasks).
 
-**Version**: 1.5.1 | **Ratified**: 2026-07-09 | **Last Amended**: 2026-09-05
+**Version**: 1.7.0 | **Ratified**: 2026-07-09 | **Last Amended**: 2026-09-09
