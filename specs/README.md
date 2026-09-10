@@ -20,6 +20,7 @@ producto** — y saberlo antes de leerla ahorra una confusión.
 | `021-laboratorio-del-negocio` | Ciclo completo | research, spec, plan, tasks — **en curso**: Entregas 1 y 2 en `main`, la 3 pendiente (es la que toca `drizzle/`) |
 | `022-guardia-seed-demo` | — | **CERRADA sin mergear.** Ver abajo |
 | `023-seed-demo-fuera-de-produccion` | Ligero | spec (incluye el cierre de la 022) |
+| `024-mocks-404-incondicional` | Ligero | spec — `/api/dev/*` responde 404 antes del enrutado por método |
 
 ### La 022, cerrada sin mergear
 

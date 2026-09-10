@@ -43,8 +43,11 @@ externas: el trabajo en segundo plano (agente, Laboratorio) es in-process.
 | UI | `src/components/` + `src/app/(app)/` |
 
 Los mocks del entorno de pruebas viven en `src/app/api/dev/` (wa-mock +
-ai-mock) tras un gate único (`src/lib/dev-guard.ts`): 404 incondicional en
-producción.
+ai-mock) tras dos capas: el middleware (`src/middleware.ts`, perímetro
+`/api/dev/:path*`, responde 404 ANTES del enrutado por método) y `mockGuard()`
+(`src/lib/dev-guard.ts`) dentro de cada handler. 404 incondicional en
+producción sea cual sea el método — un 405 ya delata que la ruta existe. Toda
+ruta de mock nueva va bajo ese prefijo; hay un test que lo exige.
 
 **Identidad de contacto**: Meta está migrando de teléfono a Business-Scoped
 User IDs, así que `from` puede no venir. La llave estable es
