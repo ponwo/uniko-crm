@@ -1,3 +1,6 @@
+import { desc, eq } from "drizzle-orm";
+import { getDb, schema } from "@/lib/db";
+import { scoped } from "@/lib/db/tenant";
 import { createHash } from "node:crypto";
 
 /**
@@ -85,4 +88,90 @@ export function sonComparables(
     return { comparables: false, motivo: "rubrica" };
   }
   return { comparables: true, motivo: null };
+}
+
+/**
+ * 021 Entrega 3 (FR-631) — cuánto va a costar la próxima corrida.
+ *
+ * Existe porque una corrida pasa de seis escenarios a catorce sin que nadie
+ * avise, y descubrirlo esperando es una mala experiencia — con un proveedor de
+ * pago detrás, también un coste no anunciado.
+ *
+ * Ser aproximada es aceptable; ser silenciosa no.
+ */
+export type Estimacion = {
+  escenarios: number;
+  segundos: number;
+  /** true si no hay histórico propio del que sacar la media. */
+  aproximada: boolean;
+};
+
+/**
+ * Duración media de un TURNO del agente, en milisegundos, cuando todavía no
+ * hay corridas terminadas de las que aprender.
+ *
+ * Observada y no constante en cuanto hay histórico, porque el turno depende del
+ * proveedor LLM configurado y su latencia varía en un orden de magnitud entre
+ * proveedores: una constante estaría mal para casi todos.
+ */
+const MS_POR_TURNO_SIN_HISTORICO = 6000;
+
+export async function estimarCorrida(
+  organizationId: string,
+  escenarios: { script: string[] }[]
+): Promise<Estimacion> {
+  const turnos = escenarios.reduce((n, e) => n + e.script.length, 0);
+  const db = getDb();
+
+  const previas = await db
+    .select({
+      id: schema.agentTestRun.id,
+      startedAt: schema.agentTestRun.startedAt,
+      finishedAt: schema.agentTestRun.finishedAt,
+    })
+    .from(schema.agentTestRun)
+    .where(
+      scoped(
+        schema.agentTestRun.organizationId,
+        organizationId,
+        eq(schema.agentTestRun.status, "done")
+      )
+    )
+    .orderBy(desc(schema.agentTestRun.startedAt))
+    .limit(5);
+
+  /*
+   * La media se saca POR CASO, no por corrida. Por corrida, la estimación no
+   * cambiaría aunque el conjunto pase de seis escenarios a catorce — que es
+   * justo lo que hay que anunciar. Cuántos casos tuvo cada corrida sí está
+   * guardado, así que la escala se puede calcular de verdad.
+   */
+  const porCaso: number[] = [];
+  for (const p of previas) {
+    if (!p.finishedAt) continue;
+    const ms = p.finishedAt.getTime() - p.startedAt.getTime();
+    if (ms <= 0) continue;
+    const casos = await db
+      .select({ id: schema.agentTestCase.id })
+      .from(schema.agentTestCase)
+      .where(eq(schema.agentTestCase.runId, p.id));
+    if (casos.length === 0) continue;
+    porCaso.push(ms / casos.length);
+  }
+
+  if (porCaso.length === 0) {
+    // Sin histórico utilizable: constante conservadora, y se DICE que lo es.
+    return {
+      escenarios: escenarios.length,
+      segundos: Math.round((turnos * MS_POR_TURNO_SIN_HISTORICO) / 1000),
+      aproximada: true,
+    };
+  }
+
+  const mediaPorCaso = porCaso.reduce((a, b) => a + b, 0) / porCaso.length;
+  return {
+    escenarios: escenarios.length,
+    segundos: Math.round((mediaPorCaso * escenarios.length) / 1000),
+    aproximada: false,
+  };
 }

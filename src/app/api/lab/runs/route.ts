@@ -4,7 +4,8 @@ import { getDb, schema } from "@/lib/db";
 import { scoped } from "@/lib/db/tenant";
 import { isAiConfigured } from "@/lib/env";
 import { RunConflictError, startRun } from "@/server/lab/runner";
-import { sonComparables } from "@/server/lab/conjunto";
+import { estimarCorrida, sonComparables } from "@/server/lab/conjunto";
+import { escenariosDe } from "@/server/lab/escenarios";
 
 export const dynamic = "force-dynamic";
 
@@ -54,7 +55,20 @@ export const GET = withAuth(async (session) => {
       motivoNoComparable: comparacion?.motivo ?? null,
     };
   });
-  return Response.json({ runs: withDelta, aiConfigured: isAiConfigured() });
+  /*
+   * 021 Entrega 3 (FR-631) — cuanto va a costar la proxima corrida. Una
+   * corrida pasa de seis escenarios a catorce sin que nadie avise, y
+   * descubrirlo esperando es una mala experiencia; con un proveedor de pago
+   * detras, tambien un coste no anunciado.
+   */
+  const conjunto = await escenariosDe(session.organizationId);
+  const proximaCorrida = await estimarCorrida(session.organizationId, conjunto);
+
+  return Response.json({
+    runs: withDelta,
+    aiConfigured: isAiConfigured(),
+    proximaCorrida,
+  });
 });
 
 export const POST = withAuth(async (session) => {
