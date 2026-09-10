@@ -16,25 +16,40 @@ export function aiMockCompletion(messages: InMessage[]): string {
 
   // Juez del Laboratorio: veredicto determinista por persona. Para cerrar el
   // loop del self-test, la persona fuera_de_kb pasa a verde si el CONOCIMIENTO
-  // configurado ya cubre garantías/devoluciones (sugerencia aplicada).
+  // configurado ya cubre cancelaciones/reembolsos (sugerencia aplicada).
+  //
+  // 021 — El gancho era "garantías y devoluciones" porque el KB del negocio de
+  // demostración (una ferretería) omitía justo eso, a propósito, para que el
+  // Laboratorio encontrara algo en la primera corrida. Retirada la ferretería
+  // de los seis guiones, el tema pasa a cancelaciones y reembolsos: lo tiene
+  // cualquier giro y ninguno lo monopoliza.
+  //
+  // La MECÁNICA no cambia, y es lo que hace determinista el loop del
+  // self-test: corres → sale rojo con sugerencia → la aplicas al KB → vuelves
+  // a correr y sube. La aritmética tampoco: 5 verdes + 1 rojo sobre 6 = 83,
+  // y 6/6 = 100 tras aplicarla, delta +17.
+  //
+  // Sigue siendo un gancho por TEMA, que es una atadura al guion de
+  // `fuera_de_kb`. Quitarla del todo pide que el mock despache por la FORMA
+  // del prompt, y eso llega con la generación de escenarios (Entrega 3).
   if (system.includes(JUDGE_MARKER)) {
     const kbSection =
       lastUser
         .split("CONOCIMIENTO CONFIGURADO:")[1]
         ?.split("TRANSCRIPT COMPLETO:")[0] ?? "";
-    const kbCoversWarranty = /garant|devoluc/i.test(kbSection);
-    if (lastUser.includes("fuera_de_kb") && !kbCoversWarranty) {
+    const kbCubreCancelaciones = /cancelac|reembols/i.test(kbSection);
+    if (lastUser.includes("fuera_de_kb") && !kbCubreCancelaciones) {
       return JSON.stringify({
         veredicto: "rojo",
         hallazgos: [
           {
             tipo: "fuera_de_kb",
             evidencia:
-              "El cliente preguntó por garantías y devoluciones y el conocimiento no lo cubre.",
+              "El cliente preguntó por cancelaciones y reembolsos y el conocimiento no lo cubre.",
             sugerencia: {
-              pregunta: "¿Cuál es la política de garantías y devoluciones?",
+              pregunta: "¿Cuál es la política de cancelaciones y reembolsos?",
               respuesta:
-                "Aceptamos devoluciones dentro de los 30 días con ticket de compra; la garantía depende del fabricante.",
+                "Puedes cancelar hasta 24 horas antes sin costo; los reembolsos se procesan en un plazo de 5 a 10 días hábiles.",
             },
           },
         ],
@@ -52,9 +67,15 @@ export function aiMockCompletion(messages: InMessage[]): string {
   }
 
   // Intención de compra → mover a Interesado.
+  //
+  // 021 — "quiero contratar" se AÑADE, no sustituye: es como cierra ahora el
+  // guion neutro de `comprador_decidido` ("lo compro" ataba la frase a un
+  // negocio de productos). Los términos viejos se quedan porque otros arneses
+  // los usan en sus propios mensajes.
   if (
     text.includes("lo compro") ||
     text.includes("quiero comprar") ||
+    text.includes("quiero contratar") ||
     text.includes("me lo llevo")
   ) {
     return JSON.stringify({
