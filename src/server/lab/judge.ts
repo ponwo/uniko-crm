@@ -29,12 +29,21 @@ export type JudgeOutcome =
  */
 export async function judgeCase(input: {
   personaKey: string;
+  /** Qué debía pasar en este escenario (FR-611). */
+  expected: string;
+  /**
+   * El escalado como HECHO (FR-610). No se deduce del transcript: ahí es
+   * invisible, porque escalar suele no dejar mensaje.
+   */
+  handoff: { ocurrio: boolean; motivo: string | null };
   transcript: { role: "cliente" | "agente"; text: string }[];
   kbText: string;
   behaviorText: string;
 }): Promise<JudgeOutcome> {
   const { system, user } = buildJudgePrompt({
     persona: input.personaKey,
+    expected: input.expected,
+    handoff: input.handoff,
     transcript: input.transcript,
     kbText: input.kbText,
     behaviorText: input.behaviorText,

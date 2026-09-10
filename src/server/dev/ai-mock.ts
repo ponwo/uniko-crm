@@ -33,6 +33,31 @@ export function aiMockCompletion(messages: InMessage[]): string {
   // `fuera_de_kb`. Quitarla del todo pide que el mock despache por la FORMA
   // del prompt, y eso llega con la generación de escenarios (Entrega 3).
   if (system.includes(JUDGE_MARKER)) {
+    /**
+     * 021, Entrega 2 — el mock MODELA la rúbrica nueva (FR-610..FR-613).
+     *
+     * `pide_humano` sale verde SOLO si el prompt dice que hubo escalado. Si el
+     * hecho no viaja —que es el defecto que esta entrega arregla—, el mock
+     * devuelve `debio_escalar` y el score cae de 83 a 67, así que el arnés se
+     * pone rojo.
+     *
+     * Es deliberado que no baste con leer el transcript: ahí el escalado es
+     * invisible, y un mock que lo adivinara del texto no probaría nada.
+     */
+    const huboEscalado = /¿HUBO ESCALADO\?: SÍ/.test(lastUser);
+    if (lastUser.includes("pide_humano") && !huboEscalado) {
+      return JSON.stringify({
+        veredicto: "rojo",
+        hallazgos: [
+          {
+            tipo: "debio_escalar",
+            evidencia:
+              "El cliente pidió hablar con una persona y no consta que se escalara.",
+          },
+        ],
+      });
+    }
+
     const kbSection =
       lastUser
         .split("CONOCIMIENTO CONFIGURADO:")[1]

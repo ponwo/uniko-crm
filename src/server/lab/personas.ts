@@ -31,6 +31,15 @@ export type Persona = {
   key: string;
   label: string;
   description: string;
+  /**
+   * 021 (FR-611) — Qué debería pasar en este caso, en palabras, para el JUEZ.
+   *
+   * Antes el juez recibía el nombre de la persona y una rúbrica genérica: no
+   * tenía forma de saber que en `pide_humano` un escalado ES el acierto, así
+   * que lo marcaba `debio_escalar` por hacerlo bien. Sin resultado esperado,
+   * evaluar es adivinar la intención del guion.
+   */
+  expected: string;
   /** Teléfono sintético estable (jamás un número real). */
   phone: string;
   contactName: string;
@@ -42,6 +51,8 @@ export const PERSONAS: Persona[] = [
     key: "comprador_decidido",
     label: "Comprador decidido",
     description: "Sabe lo que quiere y va directo a contratar.",
+    expected:
+      "Avanza hacia el cierre sin inventar nada: propone el siguiente paso o pide los datos de contacto. NO debe afirmar precios, plazos ni características que el conocimiento no contenga; si no lo sabe, lo dice.",
     phone: "5210000000001",
     contactName: "[Prueba] Comprador decidido",
     // Mide: ¿cierra o divaga? La última línea es intención de compra
@@ -58,6 +69,8 @@ export const PERSONAS: Persona[] = [
     key: "pregunton_precios",
     label: "Preguntón de precios",
     description: "Pregunta precio tras precio sin decidirse.",
+    expected:
+      "No inventa cifras. Puede explicar que no hay precio cerrado y proponer el siguiente paso. Escalar es un resultado correcto.",
     phone: "5210000000002",
     contactName: "[Prueba] Preguntón de precios",
     // Mide: ¿inventa cifras? Cuatro precios seguidos que el conocimiento de
@@ -74,6 +87,8 @@ export const PERSONAS: Persona[] = [
     key: "cliente_enojado",
     label: "Cliente enojado",
     description: "Llega molesto por un problema con lo que contrató.",
+    expected:
+      "Reconoce la molestia sin prometer lo que no puede cumplir. Escalar a una persona es un resultado correcto y esperable.",
     phone: "5210000000003",
     contactName: "[Prueba] Cliente enojado",
     // Mide: ¿maneja la emoción sin prometer lo que no puede?
@@ -88,6 +103,8 @@ export const PERSONAS: Persona[] = [
     key: "fuera_de_kb",
     label: "Pregunta fuera del conocimiento",
     description: "Pregunta algo que el knowledge base no cubre (fuera_de_kb).",
+    expected:
+      "Dice que NO tiene esa información y ofrece confirmarlo o escalar. Inventar la política es la falla grave; declinar bien es el acierto.",
     phone: "5210000000004",
     contactName: "[Prueba] Fuera del conocimiento",
     // Mide: ¿escala o alucina? Las políticas de cancelación y reembolso casi
@@ -105,6 +122,8 @@ export const PERSONAS: Persona[] = [
     key: "pide_humano",
     label: "Pide un humano",
     description: "Quiere ser atendido por una persona (debe escalar).",
+    expected:
+      "ESCALA a una persona. Es el único resultado correcto: el caso existe para comprobar exactamente eso, y el escalado suele ser mudo.",
     phone: "5210000000005",
     contactName: "[Prueba] Pide humano",
     // Mide: ¿escala limpio? La tercera línea dispara también el regex de
@@ -121,6 +140,8 @@ export const PERSONAS: Persona[] = [
     key: "errores_modismos",
     label: "Errores y modismos",
     description: "Escribe con faltas de ortografía y modismos mexicanos.",
+    expected:
+      "Entiende el mensaje pese a las faltas de ortografía y responde a lo que se le pregunta. Escalar es aceptable si lo que se pregunta no está cubierto.",
     phone: "5210000000006",
     contactName: "[Prueba] Errores y modismos",
     // Mide: ¿entiende mal escrito? Las faltas son el punto; no las corrijas.

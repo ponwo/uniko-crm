@@ -82,14 +82,82 @@ falsifica nadie es un arnés que afirma sin mirar.
 
 ---
 
-## Entrega 2 — El juez deja de castigar al agente por obedecer
+## Entrega 2 — El juez deja de castigar el escalado
 
-Se detalla al empezarla. Depende de mirar veredictos reales del juez con los
-guiones ya neutros (D4): escribir la rúbrica contra el fixture de ferretería
-sería repetir el error que esta feature arregla.
+> **El alcance cambió antes de escribir código**, con la corrida real de LanCo
+> del 2026-09-10. La premisa original —que la rúbrica castiga declinar bien—
+> **se cayó**: ese caso era el único verde. Lo que apareció es peor y es lo que
+> se implementa aquí. Evidencia completa en el spec, "La corrida de LanCo".
 
-Alcance conocido: FR-610, FR-611, FR-612, FR-613 · `buildJudgePrompt` en
-`src/server/ai/prompts.ts` · sin tocar `drizzle/`.
+### Fase 1: El hecho, antes de la rúbrica
+
+- [x] **T101** Verificar en el código que `judgeCase()` no recibe el escalado y
+      que `applyHandoff` puede no dejar mensaje (`farewell` opcional; el
+      respaldo por patrón nunca escribe). Sin esto, el diagnóstico es una
+      conjetura sobre un reporte.
+- [x] **T102** `Persona` gana `expected`: el resultado esperado del escenario,
+      en palabras, para el juez (FR-611). Las seis lo declaran; el de
+      `pide_humano` dice que escalar **es** el acierto.
+- [x] **T103** `runConversation()` devuelve `handoff: {ocurrio, motivo}`, leído
+      de `handoffAt`/`handoffReason` (FR-610). No se deduce del transcript: ahí
+      es invisible.
+- [x] **T104** `judgeCase()` y `buildJudgePrompt()` aceptan y transportan las
+      dos cosas.
+
+### Fase 2: La rúbrica
+
+- [x] **T105** Reescribir la rúbrica: prohibir deducir el escalado del texto
+      (FR-610); escalado esperado = acierto (FR-612); `debio_escalar` acotado a
+      que NO hubo escalado (FR-613); el final sin respuesta tras escalar no es
+      silencio (FR-614); declinar bien sigue sin ser hallazgo (FR-615).
+- [x] **T106** `tests/unit/judge-rubrica.test.ts`: 10 checks sobre el prompt y
+      sobre las personas. **Falsificado** — ver el registro.
+
+### Fase 3: Que el arnés proteja el arreglo
+
+- [x] **T107** El `ai-mock` **modela** la rúbrica nueva: `pide_humano` sale
+      verde solo si el prompt dice que hubo escalado. Sin el hecho, devuelve
+      `debio_escalar` y el score cae de 83 a 67.
+- [x] **T108** Check nuevo en `scripts/e2e-lab.mjs`: *"el juez NO lo castiga:
+      pide_humano sale verde y sin hallazgos"*.
+- [x] **T109** **Falsificar**: quitar el hecho del prompt y ver el arnés rojo.
+
+### Fase 4: Gate y cierre
+
+- [x] **T110** Los cuatro gates en verde.
+- [x] **T111** Arneses alcanzables en verde contra base limpia.
+- [x] **T112** Pendiente de verificación humana: la corrida de LanCo **con la
+      rúbrica nueva**, para confirmar contra modelos reales lo que el mock
+      afirma de forma determinista.
+
+---
+
+## Cómo salió de verdad — Entrega 2, 2026-09-10
+
+**La regla del plan se cobró su valor.** El plan (D4) decía que esta entrega se
+escribía mirando veredictos reales, no desde el diseño. Si se hubiera escrito
+desde el plan, habría arreglado **lo que ya funcionaba** y dejado intacto el
+defecto que de verdad hundía el score.
+
+**La falsificación, en dos frentes:**
+
+- **Unidad**: quitar la línea del escalado del prompt e invertir la regla de "no
+  lo deduzcas" pone rojos 4 de los 10 checks.
+- **Arnés**: quitar el hecho del prompt tumba 5 checks — el score cae **83 → 67**
+  y `pide_humano` sale rojo con `debio_escalar`, que es exactamente el fallo
+  observado en LanCo. El arnés ahora **protege el arreglo**; antes habría pasado
+  verde sin probar nada.
+
+| Gate | Resultado |
+|---|---|
+| `typecheck` · `lint` | limpios |
+| `test` (unidad) | **538 pasan**, 63 archivos (10 nuevos) |
+| `scripts/e2e-lab.mjs` | **20/20** (base limpia) |
+| `scripts/e2e-selftest.mjs` | **103/103**, sin daño colateral |
+
+**T112 queda pendiente y es real**: el mock afirma de forma determinista lo que
+un modelo real tiene que confirmar. La corrida de LanCo tras desplegar esto es
+la que cierra el círculo.
 
 ---
 

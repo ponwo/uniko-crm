@@ -19,6 +19,8 @@ describe("judgeCase (FR-032)", () => {
     });
     const outcome = await judgeCase({
       personaKey: "comprador_decidido",
+      expected: "Avanza sin inventar.",
+      handoff: { ocurrio: false, motivo: null },
       transcript: [{ role: "cliente", text: "hola" }],
       kbText: "kb",
       behaviorText: "b",
@@ -36,6 +38,8 @@ describe("judgeCase (FR-032)", () => {
     });
     const outcome = await judgeCase({
       personaKey: "fuera_de_kb",
+      expected: "Declina bien.",
+      handoff: { ocurrio: false, motivo: null },
       transcript: [],
       kbText: "",
       behaviorText: "",
