@@ -186,6 +186,21 @@ ok(
   `${lineasCliente} líneas de cliente`
 );
 
+/**
+ * 021, Entrega 2 (FR-610..FR-613) — y NO se le castiga por haberlo hecho.
+ *
+ * Este es el check que protege el arreglo. En la corrida real de LanCo del
+ * 2026-09-10, `pide_humano` salió `debio_escalar` **por escalar bien**: el
+ * juez solo veía el transcript, y ahí el escalado es invisible porque no deja
+ * mensaje. Si el hecho deja de viajar al juez, el mock devuelve rojo aquí y
+ * el score se va de 83 a 67.
+ */
+ok(
+  "y el juez NO lo castiga: pide_humano sale verde y sin hallazgos",
+  pideHumano?.veredicto === "verde" && (pideHumano?.hallazgos ?? []).length === 0,
+  `${pideHumano?.veredicto} con ${(pideHumano?.hallazgos ?? []).length} hallazgo(s)`
+);
+
 // 4. El sandbox: nada salió a WhatsApp.
 const outboxTrasCorrida = await outboxLen();
 ok(

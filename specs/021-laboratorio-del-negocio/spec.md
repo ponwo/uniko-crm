@@ -124,19 +124,48 @@ hacer.
 
 ### Entrega 2 — la rúbrica del juez
 
-- **FR-610** Declinar correctamente MUST contar como **verde**. Un agente que,
-  preguntado por algo que su conocimiento no cubre, dice que lo confirmará o
-  escala, hizo lo correcto y la rúbrica MUST decirlo.
-- **FR-611** El hallazgo `fuera_de_kb` MUST reservarse para el agente que
+> ## Revisión (2026-09-10): la corrida de LanCo corrigió esta entrega entera
+>
+> Estos requisitos se reescribieron **antes de implementar nada**, con la
+> evidencia de la primera corrida real —LanCo, agente y juez con modelos de
+> verdad, ya con los guiones neutros de la Entrega 1—. El detalle está en
+> "La corrida de LanCo" más abajo.
+>
+> **Lo que se cayó**: la premisa de que la rúbrica castiga declinar
+> correctamente. **No lo hace.** El único caso verde de la corrida es
+> justamente el agente declinando bien. Se conserva como FR-615, degradado de
+> prioridad, porque el enunciado sigue siendo correcto — solo que ya se cumple.
+>
+> **Lo que apareció, y es peor**: el juez **no sabe que hubo escalado**, y
+> castiga sistemáticamente que lo haya. Los FR-610 a FR-614 son nuevos y
+> nacen de ahí. El plan de esta feature decía que la rúbrica se escribía
+> mirando veredictos reales; esta revisión es esa regla cobrando su valor.
+
+- **FR-610** El juez MUST recibir el escalado como un **hecho**: si ocurrió y
+  por qué (`cliente`, `modelo`, `error`, `ventana`). Hoy recibe únicamente el
+  transcript, y en un transcript el escalado **es invisible** — `handoffAt` y
+  `handoffReason` viven en la conversación y nunca llegan a `judgeCase()`.
+- **FR-611** Cada escenario MUST declarar su **resultado esperado**, y el juez
+  MUST recibirlo. Hoy recibe el nombre de la persona y una rúbrica genérica,
+  sin saber qué debería pasar en ese caso concreto.
+- **FR-612** Un escalado que **coincide con el resultado esperado** MUST contar
+  como acierto, no como fallo. El caso `pide_humano` existe para comprobar que
+  el agente escala: penalizarlo por escalar invierte la medición.
+- **FR-613** El hallazgo `debio_escalar` MUST reservarse para cuando el cliente
+  pidió una persona y **NO hubo escalado**. Con FR-610 esto deja de ser una
+  deducción sobre el texto y pasa a ser una comprobación sobre un hecho.
+- **FR-614** Una conversación que termina **sin respuesta del agente porque
+  escaló** MUST no leerse como silencio ni como evasión. El escalado es mudo
+  por diseño: el `farewell` del modelo es opcional y el respaldo por patrón
+  (`matchesHandoffIntent`) no escribe ningún mensaje.
+- **FR-615** El hallazgo `fuera_de_kb` MUST reservarse para el agente que
   **respondió como si supiera** algo que no está en el conocimiento.
   `alucinacion` sigue siendo el caso más grave: afirmar datos concretos
-  inventados.
-- **FR-612** Cada escenario MUST llevar un **resultado esperado** que el juez
-  recibe. Hoy recibe el nombre de la persona y una rúbrica genérica, sin saber
-  qué debería pasar en ese caso concreto.
-- **FR-613** El cambio de rúbrica MUST quedar visible en el histórico: un score
+  inventados. *(Era FR-610. Se comprobó que ya se cumple; se conserva escrito
+  para que un cambio futuro de rúbrica no lo pierda.)*
+- **FR-616** El cambio de rúbrica MUST quedar visible en el histórico: un score
   de antes y uno de después no son comparables, y la pantalla no puede
-  presentarlos como si lo fueran.
+  presentarlos como si lo fueran. *(Era FR-613.)*
 
 ### Entrega 3 — escenarios propios generados
 
@@ -237,6 +266,70 @@ No es validación de formulario: es integridad de los datos del inquilino, y por
 eso FR-628 es **bloqueante**. Un escenario que no pasa la comprobación no se
 guarda. Los seis del producto viven en `5210000000001`…`0006`; los propios
 salen de un rango distinto para que las dos familias no se pisen.
+
+---
+
+## La corrida de LanCo — la evidencia que corrigió la Entrega 2
+
+Primera corrida del Laboratorio con los guiones neutros ya desplegados
+(`main` @ `912f3d7`), contra la instancia de pruebas, con agente y juez sobre
+modelos reales. **Score 42: 1 verde, 3 amarillos, 2 rojos.**
+
+### Lo que confirmó
+
+El caso `comprador_decidido` produjo una **alucinación real y bien cazada**:
+preguntado por *"¿Qué es lo más popular que tienen?"*, el agente afirmó
+*"lo que más nos piden suele ser automatización de flujos de trabajo,
+integración de CRM y software a medida"* — un dato concreto que el conocimiento
+no contiene. Una pregunta de ferretería nunca habría encontrado eso: **los
+guiones agnósticos de giro hacen su trabajo.**
+
+### Lo que refutó
+
+`fuera_de_kb` fue el **único verde, sin hallazgos**. El agente contestó *"sobre
+cancelaciones y reembolsos no tengo esa información a la mano, pero puedo
+confirmarlo con el equipo"* — declinó correctamente y la rúbrica no lo penalizó.
+La premisa de que el juez castiga declinar bien **no se sostiene**.
+
+### Lo que destapó
+
+| Caso | Qué hizo el agente | Veredicto del juez |
+|---|---|---|
+| `pide_humano` | escaló correctamente (mudo) | **`debio_escalar`** |
+| `errores_modismos` | escaló | `fuera_de_kb`, evidencia *"AGENTE: [sin respuesta]"* |
+| `pregunton_precios` | escaló | `fuera_de_kb` sobre una línea sin responder |
+| `cliente_enojado` | escaló **con** mensaje | `fuera_de_kb` |
+| `fuera_de_kb` | **no escaló**, declinó hablando | ✅ verde |
+
+**El único verde es el único caso donde el agente no escaló.** Todos los
+escalados se castigaron, y el caso que existe justo para medir el escalado es
+el que peor sale por hacerlo bien.
+
+Verificado en el código, no deducido del reporte:
+
+- `judgeCase()` recibe `{personaKey, transcript, kbText, behaviorText}`.
+  `handoffAt` y `handoffReason` existen en la conversación y **no viajan**.
+- El escalado es normalmente **mudo**: en `pipeline.ts` el `farewell` de la
+  acción `handoff` es opcional, y `matchesHandoffIntent()` escala sin escribir
+  mensaje. Un escalado exitoso le llega al juez como un silencio.
+
+Esto agrava lo que la investigación ya había anotado sobre `pide_humano` —que
+el patrón la atrapa antes del modelo y por tanto *no evalúa al agente*—: además
+**lo penaliza por acertar**.
+
+### Consecuencia para el score
+
+De los cinco hallazgos de la corrida, **uno es real**. Los otros cuatro son el
+juez leyendo escalados como silencios. Un 42 que debería ser bastante más alto
+no es solo un número injusto: es la clase de cosa que hace que nadie vuelva a
+abrir la herramienta.
+
+### Un hallazgo de producto que NO se decide aquí
+
+**¿Debería un escalado ser mudo?** Un cliente que pide una persona y no recibe
+nada tiene una mala experiencia, con independencia de lo que opine el juez. Eso
+es el pipeline del agente, no el Laboratorio. Queda anotado, sin decidir, para
+que no se cuele en esta entrega por parecido de tema.
 
 ---
 

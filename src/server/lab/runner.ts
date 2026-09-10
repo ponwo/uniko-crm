@@ -122,13 +122,15 @@ async function runAllCases(
       .set({ status: "running" })
       .where(eq(schema.agentTestCase.id, testCase.id));
 
-    const { transcript, conversationId } = await runConversation(
+    const { transcript, conversationId, handoff } = await runConversation(
       organizationId,
       persona
     );
 
     const outcome = await judgeCase({
       personaKey: persona.key,
+      expected: persona.expected,
+      handoff,
       transcript,
       kbText,
       behaviorText,
@@ -172,6 +174,12 @@ async function runConversation(
 ): Promise<{
   transcript: { role: "cliente" | "agente"; text: string }[];
   conversationId: string;
+  /**
+   * 021 (FR-610) — El escalado se DEVUELVE, no se deduce. En el transcript es
+   * invisible: escalar suele no dejar mensaje, así que un escalado correcto
+   * llegaba al juez como un silencio del agente y se penalizaba.
+   */
+  handoff: { ocurrio: boolean; motivo: string | null };
 }> {
   const db = getDb();
 
@@ -186,6 +194,11 @@ async function runConversation(
     isTest: true,
     aiEnabled: true,
   });
+
+  let handoff: { ocurrio: boolean; motivo: string | null } = {
+    ocurrio: false,
+    motivo: null,
+  };
 
   for (const line of persona.script) {
     const now = new Date();
@@ -208,11 +221,17 @@ async function runConversation(
     await runAgentTurn(convId);
 
     const convRows = await db
-      .select({ handoffAt: schema.conversation.handoffAt })
+      .select({
+        handoffAt: schema.conversation.handoffAt,
+        handoffReason: schema.conversation.handoffReason,
+      })
       .from(schema.conversation)
       .where(eq(schema.conversation.id, convId))
       .limit(1);
-    if (convRows[0]?.handoffAt) break; // primer handoff → fin del guion
+    if (convRows[0]?.handoffAt) {
+      handoff = { ocurrio: true, motivo: convRows[0].handoffReason ?? null };
+      break; // primer handoff → fin del guion
+    }
   }
 
   const messages = await db
@@ -223,6 +242,7 @@ async function runConversation(
 
   return {
     conversationId: convId,
+    handoff,
     transcript: messages
       .filter((m) => m.text)
       .map((m) => ({
