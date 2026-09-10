@@ -458,3 +458,65 @@ peor que no tenerlo. Se le puso límite propio, con el porqué escrito.
 **T226 queda pendiente y es real**: una corrida en LanCo con escenarios
 generados de su propio conocimiento. El mock afirma de forma determinista la
 mecánica; que los guiones generados sirvan es juicio sobre un modelo real.
+
+---
+
+## T226 — la corrida de LanCo con escenarios generados (2026-09-10)
+
+La verificación humana que cierra la 021, hecha por el dueño contra la
+instancia desplegada con modelos reales.
+
+**Qué generó desde el conocimiento de LanCo**: *Cazador de precios insistente*,
+*Comparador de proveedores agresivo*, *Desesperado por urgencia fuera de
+horario*, *Escéptico de las IAs*, *Pide cosas fuera de catálogo*, *Confundido
+que no sabe qué necesita*.
+
+Ninguno recita el KB. Son clientes difíciles, y varios apuntan justo a donde
+LanCo no tenía respuesta escrita. **La generación desde huecos hizo lo que
+prometía.**
+
+**El hallazgo, y por qué vale**: *Comparador de proveedores agresivo* salió en
+rojo con **cinco** hallazgos, y los cinco eran la misma familia — el agente no
+inventaba productos ni precios, **inventaba el proceso comercial**: que hay
+garantía documentada en la propuesta, que el diagnóstico es sin compromiso, que
+comparte casos de éxito. El conocimiento de LanCo describía *qué hace* pero no
+*cómo se compra*, y el agente rellenaba el hueco solo, de forma convincente.
+
+Ninguno de los seis genéricos habría encontrado eso: ninguno presiona con *"ya
+me quemaron otras dos agencias, ¿por qué tú no?"*.
+
+**El loop cerró, y con un delta que por fin significa algo**:
+
+| | |
+|---|---|
+| Antes (12 escenarios) | Score **33** — 2 verdes, 4 amarillos, **6 rojos** |
+| Tras aplicar 5 entradas al KB | Score **46** — 2 verdes, 7 amarillos, **3 rojos** |
+| Delta | **+13, SIN aviso de comparabilidad** |
+
+Ese "sin aviso" es el punto: mismo conjunto de escenarios, misma rúbrica, solo
+cambió el conocimiento. Es el primer delta de toda la 021 que mide lo que dice
+medir — los otros dos del histórico salen marcados (`otros escenarios`,
+`sin registro`).
+
+Y se nota en cómo habla. Antes: *"las condiciones de garantía y contrato se
+detallan por escrito en la propuesta formal"*. Después: *"sobre garantías y
+condiciones por escrito **no tengo la información exacta**, pero un consultor
+puede confirmártelo"*. Pasó de inventar a **declinar honestamente**, que es
+exactamente el comportamiento que la Entrega 2 enseñó al juez a premiar.
+
+### Lo que la corrida destapó, y no era del agente
+
+**El aviso de comparabilidad no salía cuando el delta era 0.** Se vio en una
+captura del histórico real: dos corridas de score 75 con exámenes distintos,
+una al lado de la otra, sin nada que lo dijera.
+
+Es peor que el caso que sí estaba cubierto. Un `−42` tachado ya invita a
+desconfiar; **dos scores iguales sin nada al lado se leen como "no cambió
+nada"**, cuando la verdad es que no se sabe si son comparables — que es justo
+la mentira silenciosa que FR-626 existía para quitar.
+
+La causa: la decisión vivía como condición de render (`delta !== 0 && …`), así
+que **ninguna prueba podía verla**. Arreglado extrayéndola a
+`src/lib/lab-comparacion.ts` como función pura, con su test —falsificado
+reintroduciendo el bug— y el módulo separado del que toca la base, porque lo
+consume un componente de cliente.

@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { selloDeConjunto, sonComparables } from "@/server/lab/conjunto";
+import { avisoDeComparacion, hayAlgoQueAvisar } from "@/lib/lab-comparacion";
 
 /**
  * 021 Entrega 3 — El sello del conjunto y la comparabilidad (FR-625, FR-626,
@@ -89,5 +90,70 @@ describe("cuándo dos corridas se pueden comparar (FR-626, FR-616)", () => {
     expect(
       sonComparables(base, { ...base, rubricVersion: null })
     ).toEqual({ comparables: false, motivo: "sin_registro" });
+  });
+});
+
+describe("qué se enseña junto a una corrida del histórico", () => {
+  const comparable = {
+    delta: 12,
+    comparable: true,
+    motivoNoComparable: null,
+  } as const;
+
+  it("comparables y con diferencia → solo el número", () => {
+    const a = avisoDeComparacion(comparable);
+    expect(a).toEqual({ numero: 12, motivo: null });
+    expect(hayAlgoQueAvisar(a)).toBe(true);
+  });
+
+  it("no comparables y con diferencia → número Y motivo", () => {
+    const a = avisoDeComparacion({
+      delta: -42,
+      comparable: false,
+      motivoNoComparable: "examen",
+    });
+    expect(a).toEqual({ numero: -42, motivo: "examen" });
+  });
+
+  /**
+   * EL FALLO QUE ESTE ARCHIVO EXISTE PARA FIJAR.
+   *
+   * Se vio en una captura de la instancia real, no en la suite: dos corridas
+   * con el MISMO score y exámenes distintos no enseñaban nada, porque la
+   * decisión estaba escrita como `delta !== 0 && …` en el render.
+   *
+   * Y es peor que el caso que sí estaba cubierto: un −42 tachado ya invita a
+   * desconfiar, pero dos 75 seguidos sin nada al lado se leen como "no cambió
+   * nada" — cuando la verdad es que no se sabe si son comparables.
+   */
+  it("MISMO score y examen distinto → el aviso sale igual, sin número", () => {
+    const a = avisoDeComparacion({
+      delta: 0,
+      comparable: false,
+      motivoNoComparable: "sin_registro",
+    });
+    expect(a).toEqual({ numero: null, motivo: "sin_registro" });
+    expect(
+      hayAlgoQueAvisar(a),
+      "Dos scores iguales de exámenes distintos se leerían como 'no cambió nada'."
+    ).toBe(true);
+  });
+
+  it("comparables y sin diferencia → no hay nada que decir", () => {
+    const a = avisoDeComparacion({
+      delta: 0,
+      comparable: true,
+      motivoNoComparable: null,
+    });
+    expect(hayAlgoQueAvisar(a)).toBe(false);
+  });
+
+  it("sin corrida anterior con la que comparar → tampoco", () => {
+    const a = avisoDeComparacion({
+      delta: null,
+      comparable: null,
+      motivoNoComparable: null,
+    });
+    expect(hayAlgoQueAvisar(a)).toBe(false);
   });
 });
