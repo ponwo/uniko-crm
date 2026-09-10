@@ -5,7 +5,9 @@ import { publish } from "@/server/events/bus";
 import { runAgentTurn } from "@/server/ai/pipeline";
 import { renderKb } from "@/server/ai/prompts";
 import { computeScore, judgeCase } from "@/server/lab/judge";
-import { PERSONAS, type Persona } from "@/server/lab/personas";
+import { type Persona } from "@/server/lab/personas";
+import { escenariosDe } from "@/server/lab/escenarios";
+import { selloDeConjunto, VERSION_RUBRICA } from "@/server/lab/conjunto";
 
 /**
  * Runner del Laboratorio (FR-030/FR-034): corrida en segundo plano DENTRO del
@@ -24,11 +26,26 @@ export class RunConflictError extends Error {}
 
 export async function startRun(organizationId: string): Promise<string> {
   const db = getDb();
+
+  /*
+   * 021 Entrega 3 — el conjunto se resuelve ANTES de crear la corrida, porque
+   * de él sale el sello con el que se guarda (FR-625). Es una lectura: no
+   * afecta al lock de concurrencia, que sigue siendo el INSERT de abajo.
+   */
+  const escenarios = await escenariosDe(organizationId);
+  const sello = selloDeConjunto(escenarios);
+
   let runId: string;
   try {
     const inserted = await db
       .insert(schema.agentTestRun)
-      .values({ id: newId("testRun"), organizationId, status: "running" })
+      .values({
+        id: newId("testRun"),
+        organizationId,
+        status: "running",
+        scenarioSet: sello,
+        rubricVersion: VERSION_RUBRICA,
+      })
       .returning();
     runId = inserted[0]!.id;
   } catch (err) {
@@ -40,7 +57,7 @@ export async function startRun(organizationId: string): Promise<string> {
   }
 
   await db.insert(schema.agentTestCase).values(
-    PERSONAS.map((p) => ({
+    escenarios.map((p) => ({
       id: newId("testCase"),
       organizationId,
       runId,
@@ -113,8 +130,10 @@ async function runAllCases(
   const total = cases.length;
   publishProgress(organizationId, runId, "running", done, total);
 
+  const escenarios = await escenariosDe(organizationId);
+
   for (const testCase of cases) {
-    const persona = PERSONAS.find((p) => p.key === testCase.persona);
+    const persona = escenarios.find((p) => p.key === testCase.persona);
     if (!persona) continue;
 
     await db
@@ -302,7 +321,7 @@ async function failRun(
     .update(schema.agentTestRun)
     .set({ status: "failed", error, finishedAt: new Date() })
     .where(eq(schema.agentTestRun.id, runId));
-  publishProgress(organizationId, runId, "failed", 0, PERSONAS.length);
+  publishProgress(organizationId, runId, "failed", 0, 0);
 }
 
 function publishProgress(
