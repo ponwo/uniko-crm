@@ -133,20 +133,99 @@ la misma pieza que la Entrega 3 necesita para otra cosa: el sello. Un cambio de
 rúbrica no cambia el conjunto de escenarios, así que el sello no basta por sí
 solo; hará falta versionar la rúbrica junto a él. **Se decide en la Entrega 2.**
 
-### D5. La generación (Entrega 3) — forma, no detalle
+### D5. El modelo de datos — la única parte irreversible
 
-- Tabla `lab_scenario` (org, clave, etiqueta, descripción, guion, teléfono,
-  origen, posición, habilitado) + columna del sello en `agent_test_run`.
-  Aditiva pura.
-- El runner deja de leer solo `PERSONAS` y **concatena** los propios (FR-624).
-- `PERSONA_LABELS` y `agent_test_case.persona` pasan a guardar una copia de lo
-  que se corrió: si los escenarios se editan, una corrida vieja tiene que
-  seguir siendo legible (FR-632).
-- Generación con `chatJson` y **el modelo del agente** (spec, "Decisión: quién
-  escribe las preguntas NO es el juez"), esquema Zod permisivo y validación
-  elemento a elemento para que un escenario roto no tire los ocho.
-- Rango de teléfonos reservado + comprobación bloqueante contra contactos
-  reales (FR-628).
+**Migración ADITIVA PURA.** Nada se transforma, nada se borra:
+
+| Qué | Dónde | Nulabilidad |
+|---|---|---|
+| Tabla `lab_scenario` | nueva | — |
+| `scenario_set` — el sello del conjunto | `agent_test_run` | **NULL** |
+| `rubric_version` — la versión de la rúbrica (FR-616) | `agent_test_run` | **NULL** |
+
+`lab_scenario`: `organization_id` NOT NULL, `key`, `label`, `description`,
+`script` (jsonb, las líneas del cliente), `phone`, `contact_name`, `origin`
+(`generado` | `manual`), `enabled`, `position`, `generated_at`, timestamps.
+Índices: único `(organization_id, key)`, único `(organization_id, phone)` —
+dos escenarios de un negocio no pueden compartir contacto de prueba, y el
+**índice es el árbitro**; la validación previa solo da el mensaje— y uno
+org-first por `(organization_id, position)`.
+
+**Las dos columnas son NULLABLE a propósito, y no por comodidad.** Las corridas
+anteriores a esta entrega no tienen sello ni versión de rúbrica. Rellenarlas
+con los valores de hoy afirmaría que se midieron contra el examen y la rúbrica
+actuales —y los seis guiones se reescribieron en la Entrega 1, y la rúbrica en
+la 2—. Un `null` dice *"de esta no se sabe"*, que es la verdad. En el histórico
+se muestra como "no registrado", nunca como un valor cualquiera.
+
+**Plan de reversión**: redesplegar el commit anterior deja la tabla y las dos
+columnas **sin usar e inertes**. Ningún dato existente se transforma ni se
+borra, así que no hace falta partir la entrega en dos.
+
+**Ensayo del Principio X: OBLIGATORIO** — es el primer cambio a `drizzle/`
+desde la 020. Procedimiento en
+[`specs/020-notificaciones-push/quickstart.md`](../020-notificaciones-push/quickstart.md):
+respaldo real restaurado en un PostgreSQL desechable, nunca sobre una instancia
+viva. En el PR: qué instancia, de qué fecha, qué hizo la migración y cuánto
+tardó.
+
+### D6. Los teléfonos de los escenarios propios — integridad del inquilino
+
+El Laboratorio resuelve el contacto de prueba **por teléfono**
+(`upsertTestContact`). Un escenario con un número que ya es de un cliente real
+le colgaría **a esa persona** una conversación simulada y le metería al pipeline
+un lead que no existe.
+
+- Rango reservado propio (`5219…`), **distinto** del `5210000000001..6` de los
+  seis, para que las dos familias no se pisen.
+- El número se **deriva por hash de la clave**, no al azar: con números
+  aleatorios la colisión no desaparece, solo se vuelve rara e irreproducible —
+  el peor tipo de fallo. Derivado, el mismo escenario da siempre el mismo
+  número y una colisión es un hecho estable que se puede ver.
+- Comprobación **bloqueante** contra contactos reales de la organización, en
+  las **dos formas** (`521…` y su normalizado `52…`): el contacto de prueba se
+  guarda sin normalizar y los reales entran normalizados desde el webhook.
+  Comparar una sola forma dejaría pasar justo la colisión que importa.
+
+### D7. La generación — propuestas, no escenarios
+
+`chatJson` con **el modelo del agente**, nunca el del juez (spec, "Decisión:
+quién escribe las preguntas NO es el juez"). Esquema Zod **permisivo** en los
+elementos y validación **uno a uno** después: con un esquema estricto, un solo
+escenario malformado tiraría los ocho y el dueño vería "no se pudo generar"
+con siete perfectos.
+
+No se persiste nada intermedio (FR-622). Que no exista estado guardado es lo
+que hace cierta la promesa de que el dueño revisa antes de que nada exista.
+
+El prompt pide **atacar los huecos** del conocimiento (FR-621), que es lo que
+desarma la circularidad de generar desde el KB: un guion que el agente contesta
+perfecto no enseña dónde falla.
+
+### D8. El sello y la versión de la rúbrica
+
+- **Sello**: `sha256` del JSON de los pares `(key, script)` de los escenarios
+  activos, **ordenados por clave**. Sobre el CONTENIDO, no sobre las claves:
+  editar una línea cambia el examen igual que añadir uno. Se serializa con JSON
+  y no concatenando, porque concatenar deja el hash ambiguo —clave `"ab"` con
+  guion `["c"]` y clave `"a"` con guion `["bc"]` darían el mismo material—.
+- **Versión de rúbrica** (FR-616): una constante que se sube a mano cuando
+  cambia `buildJudgePrompt`. El sello no la cubre: un cambio de rúbrica no
+  toca el conjunto de escenarios, y sin embargo hace incomparables dos scores.
+  La Entrega 2 lo demostró en vivo — el 42 → 75 de LanCo mezcla arreglo y
+  cambio de examen sin que nada lo diga.
+- El histórico **avisa** cuando dos corridas difieren en cualquiera de los dos
+  (FR-626), en vez de presentar un delta que no significa nada.
+
+### D9. El runner concatena, no sustituye
+
+`escenariosDe(org)` = los seis de `PERSONAS` **+** los propios habilitados
+(FR-624). Miden cosas distintas: los seis, comportamiento comparable entre
+negocios; los propios, si el conocimiento de ESE negocio tiene huecos.
+
+`agent_test_case.persona` guarda la clave, y la etiqueta se resuelve **sin
+filtrar por `enabled`**: borrar un escenario lo quita del futuro, no del pasado
+(FR-632). Por eso el borrado es **lógico**, no `DELETE`.
 
 ---
 

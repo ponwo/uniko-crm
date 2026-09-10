@@ -200,12 +200,93 @@ Laboratorio. Que es para lo que existe.
 
 ## Entrega 3 — El negocio genera sus escenarios
 
-Se detalla al empezarla. Depende de la Entrega 2.
+**Toca `drizzle/`.** Es el primer cambio de esquema desde la 020, así que
+arrastra el ensayo del Principio X y plan de reversión declarado en el PR.
+Diseño en [plan.md](plan.md), D5 a D9.
 
-Alcance conocido: FR-620..FR-632 · tabla `lab_scenario` + columna del sello ·
-**toca `drizzle/`**, así que arrastra el ensayo del Principio X
-([procedimiento](../020-notificaciones-push/quickstart.md)) y plan de reversión
-declarado en el PR.
+### ⛔ Regla de orden: la migración se ensaya ANTES de construir encima
+
+T204 (el ensayo) va antes que la Fase 2. Si el ensayo destapa algo, cambiar el
+esquema con medio producto construido encima cuesta el triple — y la migración
+es lo único de este proyecto que no se arregla volviendo atrás.
+
+### Fase 1: El esquema — la parte irreversible
+
+- [ ] **T201** `schema.ts`: tabla `lab_scenario` y las columnas
+      `scenario_set` y `rubric_version` en `agent_test_run`, **ambas
+      nullable** (D5). Índices únicos `(org, key)` y `(org, phone)`.
+- [ ] **T202** `pnpm db:generate` → migración nueva en `drizzle/`.
+- [ ] **T203** **Leer el SQL generado a mano**: que sea aditivo puro — sin
+      `DROP`, sin `ALTER … SET NOT NULL` sobre tabla con datos, sin
+      `DEFAULT` que reescriba filas. Drizzle acierta casi siempre; "casi" no
+      es un gate.
+- [ ] **T204** **Ensayo del Principio X**: respaldo real restaurado en un
+      PostgreSQL desechable, migración corrida contra esa copia, app arrancada
+      contra ella. Registrar instancia, fecha del respaldo, qué hizo y cuánto
+      tardó.
+
+### Fase 2: El modelo y sus guardarraíles
+
+- [ ] **T205** `src/server/lab/escenarios.ts`: rango de teléfonos reservado,
+      derivación por hash de la clave, comprobación bloqueante contra contactos
+      reales en las dos formas (D6, FR-628).
+- [ ] **T206** `validarGuion()`: entre 2 y 5 líneas, sin líneas vacías ni
+      larguísimas, y **rechazo de líneas que dependen del contexto** —el
+      cliente simulado no reacciona (FR-627).
+- [ ] **T207** CRUD: crear (con tope), editar, borrar **lógico** (FR-632).
+- [ ] **T208** Tests de T205–T207, **falsificados**.
+
+### Fase 3: El sello y la rúbrica versionada
+
+- [ ] **T209** `src/server/lab/conjunto.ts`: `selloDeConjunto()` sobre el
+      contenido, ordenado por clave, serializado con JSON (D8, FR-625).
+- [ ] **T210** Versión de rúbrica: constante junto a `buildJudgePrompt`, que se
+      sube a mano cuando el prompt cambia (FR-616).
+- [ ] **T211** El runner guarda las dos en `agent_test_run`.
+- [ ] **T212** El histórico **avisa** cuando dos corridas difieren en sello o
+      en rúbrica, en vez de mostrar un delta que no significa nada (FR-626).
+
+### Fase 4: El runner concatena
+
+- [ ] **T213** `escenariosDe(org)` = los seis **+** los propios habilitados
+      (D9, FR-624).
+- [ ] **T214** Las etiquetas del reporte se resuelven **sin filtrar por
+      `enabled`**: borrar quita del futuro, no del pasado (FR-632).
+
+### Fase 5: La generación
+
+- [ ] **T215** `buildScenarioPrompt()`: pide atacar los **huecos** del
+      conocimiento (FR-621) y guiones que se sostengan sin saber qué contestó
+      el agente (FR-627).
+- [ ] **T216** `src/server/lab/generar.ts`: `chatJson` con **el modelo del
+      agente**, esquema permisivo y validación uno a uno (D7, FR-622).
+- [ ] **T217** Los caminos infelices con su mensaje: sin proveedor (FR-629),
+      sin conocimiento (FR-630), respuesta inservible del proveedor.
+- [ ] **T218** El `ai-mock` sabe responder al prompt del generador de forma
+      determinista, o el self-test de esta entrega no puede existir.
+- [ ] **T219** Rutas: listar, crear desde propuestas, editar, borrar, generar.
+
+### Fase 6: La pantalla
+
+- [ ] **T220** Lista de escenarios propios, con su origen y su estado.
+- [ ] **T221** Revisar propuestas antes de confirmar: editar el texto y
+      descartar las que no sirvan (FR-623).
+- [ ] **T222** Antes de correr, **anunciar** cuántos escenarios y cuánto tarda
+      (FR-631).
+
+### Fase 7: Verificación
+
+- [ ] **T223** Los cuatro gates en verde.
+- [ ] **T224** El arnés `e2e-lab.mjs` extendido: generar, confirmar, correr con
+      los propios, y el aviso de sello distinto.
+- [ ] **T225** **Falsificar** lo nuevo del arnés.
+- [ ] **T226** Pendiente de verificación humana: una corrida real en LanCo con
+      escenarios generados de su propio conocimiento.
+
+### MVP
+
+**Fases 1 a 5.** Con eso el negocio ya genera y corre sus escenarios; la
+pantalla (Fase 6) es lo que lo hace usable sin `curl`.
 
 ---
 
