@@ -1,4 +1,4 @@
-import { JUDGE_MARKER } from "@/server/ai/prompts";
+import { JUDGE_MARKER, SCENARIO_MARKER } from "@/server/ai/prompts";
 
 /**
  * Proveedor LLM determinista para el self-test (contrato mocks.md).
@@ -13,6 +13,44 @@ export function aiMockCompletion(messages: InMessage[]): string {
   const system = messages.find((m) => m.role === "system")?.content ?? "";
   const lastUser =
     [...messages].reverse().find((m) => m.role === "user")?.content ?? "";
+
+  /**
+   * 021 Entrega 3 — el GENERADOR de escenarios, determinista.
+   *
+   * Devuelve siempre los mismos tres, y uno de ellos **malformado a
+   * propósito**: sirve para comprobar que la validación es por elemento y que
+   * un escenario roto no tira los buenos. Sin esto, el camino "el proveedor
+   * devolvió basura mezclada con cosas útiles" no se ejercita nunca.
+   *
+   * Los guiones son genéricos porque el mock no sabe de qué negocio se trata —
+   * y no hace falta: lo que el self-test comprueba es la mecánica de generar,
+   * revisar y confirmar, no la calidad del texto, que depende del modelo real.
+   */
+  if (system.includes(SCENARIO_MARKER)) {
+    return JSON.stringify({
+      escenarios: [
+        {
+          label: "Pregunta por garantía",
+          description: "Pregunta algo que el conocimiento probablemente no cubre.",
+          script: [
+            "Hola, ¿manejan algún tipo de garantía?",
+            "¿Y si algo sale mal después, qué pasa?",
+          ],
+        },
+        {
+          label: "Insiste tras un no",
+          description: "No acepta la primera negativa.",
+          script: [
+            "¿Me pueden hacer un descuento?",
+            "Ándale, es que lo necesito hoy",
+            "¿Ni aunque pague por adelantado?",
+          ],
+        },
+        // Malformado a propósito: sin `script`. Se descarta, los otros no.
+        { label: "Roto", description: "sin guion" },
+      ],
+    });
+  }
 
   // Juez del Laboratorio: veredicto determinista por persona. Para cerrar el
   // loop del self-test, la persona fuera_de_kb pasa a verde si el CONOCIMIENTO
@@ -31,7 +69,7 @@ export function aiMockCompletion(messages: InMessage[]): string {
   //
   // Sigue siendo un gancho por TEMA, que es una atadura al guion de
   // `fuera_de_kb`. Quitarla del todo pide que el mock despache por la FORMA
-  // del prompt, y eso llega con la generación de escenarios (Entrega 3).
+  // del prompt. El generador de la Entrega 3, aquí arriba, ya despacha así.
   if (system.includes(JUDGE_MARKER)) {
     /**
      * 021, Entrega 2 — el mock MODELA la rúbrica nueva (FR-610..FR-613).

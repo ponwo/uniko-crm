@@ -5,6 +5,11 @@ type KbEntry = typeof schema.kbEntry.$inferSelect;
 
 /** Marcador del prompt del juez: el ai-mock lo usa para despachar veredictos. */
 export const JUDGE_MARKER = "[JUEZ]";
+/** 021 Entrega 3 — marca del generador de escenarios, para el mock del self-test. */
+export const SCENARIO_MARKER = "[GENERADOR]";
+
+/** Cuántos escenarios pide el generador de una vez (FR-620). */
+export const MAX_ESCENARIOS_GENERADOS = 6;
 
 export function renderKb(entries: KbEntry[]): string {
   if (entries.length === 0) return "(knowledge base vacío)";
@@ -143,6 +148,48 @@ export function buildJudgePrompt(input: {
     `CONOCIMIENTO CONFIGURADO:\n${input.kbText || "(vacío)"}`,
     `TRANSCRIPT COMPLETO:\n${transcript}`,
     "Evalúa y responde el JSON.",
+  ].join("\n\n");
+
+  return { system, user };
+}
+
+/**
+ * 021 Entrega 3 (FR-620, FR-621) — Prompt del GENERADOR de escenarios.
+ *
+ * La regla 1 es la que desarma la objeción que casi mata esta feature. La
+ * investigación había descartado generar desde el conocimiento por circular:
+ * "casos derivados del KB prueban si el agente sabe recitar el KB, y por
+ * construcción no pueden descubrir lo que al KB le falta". Se resuelve
+ * **invirtiendo la instrucción**: se le pide que ataque los HUECOS. Un guion
+ * que el agente contesta perfecto no enseña dónde falla.
+ *
+ * La regla 3 no es estilo: el cliente simulado NO reacciona —dispara su
+ * siguiente línea diga lo que diga el agente—, así que un guion que presuponga
+ * una respuesta produce diálogos absurdos y evalúa al agente por no adivinar.
+ * `validarGuion()` la comprueba después, pero pedirla aquí ahorra descartes.
+ */
+export function buildScenarioPrompt(input: {
+  kbText: string;
+  behaviorText: string;
+  cuantos: number;
+}): { system: string; user: string } {
+  const system = [
+    `${SCENARIO_MARKER} Escribes GUIONES de clientes simulados para probar un agente de WhatsApp de un negocio. Respondes ÚNICAMENTE un objeto JSON.`,
+    'Esquema: {"escenarios":[{"label":"…","description":"…","script":["…","…"]}]}',
+    "",
+    "REGLAS, en orden de importancia:",
+    "1. Busca los HUECOS del conocimiento. La mitad o más de los guiones deben preguntar cosas que el conocimiento de abajo NO responde por completo. Un guion que el agente contesta perfecto no sirve para nada: no enseña dónde falla.",
+    "2. Pide casos DIFÍCILES: objeciones, clientes que insisten después de un no, peticiones fuera de lo que el negocio ofrece, preguntas ambiguas, alguien molesto.",
+    "3. CADA LÍNEA DEBE TENER SENTIDO SIN SABER QUÉ CONTESTÓ EL AGENTE. El cliente simulado no reacciona: sus líneas salen en orden fijo pase lo que pase. PROHIBIDO escribir «eso», «el segundo», «lo que dijiste», «entonces», «y ese» o cualquier referencia a una respuesta anterior. Cada línea se sostiene sola.",
+    "4. Entre 2 y 5 líneas por guion. Español de México, informal, como escribe un cliente real por WhatsApp.",
+    "5. `label` corto (máximo 80 caracteres) y descriptivo del TIPO de cliente, no del tema.",
+  ].join("\n");
+
+  const user = [
+    `Genera ${input.cuantos} escenarios.`,
+    `NEGOCIO — COMPORTAMIENTO CONFIGURADO:\n${input.behaviorText || "(sin configurar)"}`,
+    `NEGOCIO — CONOCIMIENTO CONFIGURADO:\n${input.kbText || "(vacío)"}`,
+    "Responde solo el JSON.",
   ].join("\n\n");
 
   return { system, user };
