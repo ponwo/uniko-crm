@@ -551,6 +551,11 @@ Ruta B literalmente (modo de pruebas interno) hasta ver la bandeja funcionando.
 
 - **FR-080**: Las rutas del entorno de pruebas interno (mock de WhatsApp y de IA) MUST
   responder 404 incondicional en producción.
+  > **Extendido por la [024](../024-mocks-404-incondicional/spec.md)** (FR-901):
+  > "incondicional" incluye el método. La guardia dentro del handler dejaba que
+  > Next respondiera 405 a los métodos no exportados, y eso confirmaba qué rutas
+  > existían; ahora un middleware responde 404 a todo `/api/dev/*` antes del
+  > enrutado.
 - **FR-081**: El registro MUST cerrarse tras la primera organización (salvo escape) y
   login/registro MUST tener limitación de tasa (= FR-060/FR-062).
 - **FR-082**: El Laboratorio MUST tener bloqueado el acceso a la API real de WhatsApp

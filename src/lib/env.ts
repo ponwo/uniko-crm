@@ -109,13 +109,12 @@ function stripEmpty(env: NodeJS.ProcessEnv): Record<string, string> {
   return out;
 }
 
-/** true si el entorno de pruebas interno (mocks) está habilitado y NO es producción. */
-export function isMockEnabled(): boolean {
-  return (
-    process.env.WA_MOCK_ENABLED === "true" &&
-    process.env.NODE_ENV !== "production"
-  );
-}
+/**
+ * true si el entorno de pruebas interno (mocks) está habilitado y NO es
+ * producción. Vive en `mock-flag.ts` (módulo hoja, apto para el runtime Edge
+ * del middleware de la 024); aquí se re-exporta para no mover a nadie.
+ */
+export { isMockEnabled } from "./mock-flag";
 
 /** true si hay proveedor de IA configurado (token presente y no vacío). */
 export function isAiConfigured(): boolean {
