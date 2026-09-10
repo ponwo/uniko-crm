@@ -337,11 +337,17 @@ Ruta B literalmente (modo de pruebas interno) hasta ver la bandeja funcionando.
 3. **Given** la instalación terminada, **When** finaliza, **Then** el instalador dice
    explícitamente: "entra a Configuración → WhatsApp para conectar tu número; ahí verás
    la URL exacta del webhook" — la conexión de WhatsApp NO es parte del despliegue.
-4. **Given** la base de datos vacía en el primer arranque, **When** el usuario entra,
-   **Then** ve un estado vacío con botón "Cargar datos de demostración" que puebla el
+4. ~~**Given** la base de datos vacía en el primer arranque, **When** el usuario entra,
+   **Then** ve un estado vacío con botón "Cargar datos de demostración" que puebla el~~
    negocio demo ("Ferretería El Martillo": ~8 contactos, conversaciones realistas en MXN,
    leads en el kanban, knowledge base lleno con 1–2 huecos INTENCIONALES —garantías y
    devoluciones— y una corrida de Laboratorio de ejemplo guardada).
+
+   > **DEROGADO EN PARTE** por [023](../023-seed-demo-fuera-de-produccion/spec.md),
+   > igual que FR-075: el botón sale del estado vacío. **Sigue vigente** qué
+   > siembra el seed y por qué caminos se llega a él (`pnpm seed:demo` o
+   > `POST /api/dev/seed-demo`, 404 en producción). El rationale completo está
+   > junto a FR-075.
 5. **Given** el README público, **When** una agencia lo lee, **Then** encuentra: qué es
    (con captura) → para quién → features (Laboratorio primero) → requisitos → apuntar el
    dominio a la VPS → instalación A y B → configuración de Meta paso a paso → modo
@@ -517,9 +523,29 @@ Ruta B literalmente (modo de pruebas interno) hasta ver la bandeja funcionando.
 - **FR-074**: `.env.example` MUST contener todas las variables con placeholders
   `REEMPLAZA_...`, guía inline y comando de generación de cada secreto; la variable del
   modo de pruebas interno MUST NOT aparecer en él.
-- **FR-075**: Con base de datos vacía, la UI MUST ofrecer "Cargar datos de demostración"
+- **FR-075**: ~~Con base de datos vacía, la UI MUST ofrecer "Cargar datos de demostración"~~
   (también vía script y variable), sembrando el negocio demo con los huecos intencionales
   del KB y una corrida de Laboratorio de ejemplo, de forma idempotente.
+
+  > **DEROGADO EN PARTE** por [023 — el seed demo sale de producción](../023-seed-demo-fuera-de-produccion/spec.md).
+  >
+  > **Qué deja de regir**: que la UI ofrezca el botón. Se retiró del estado vacío
+  > de la bandeja.
+  >
+  > **Qué SIGUE vigente**: el resto del requisito. El seed existe, siembra el
+  > negocio demo con sus huecos intencionales y su corrida de ejemplo, y sigue
+  > siendo idempotente. Se llega por `pnpm seed:demo` o por
+  > `POST /api/dev/seed-demo`, que responde **404 incondicional en producción**.
+  >
+  > **Por qué**: sembrar la demo es la única operación destructiva del producto
+  > —borra todo el `kb_entry` de la organización, todo el historial del
+  > Laboratorio y sobrescribe el perfil del agente— y su guardia comprobaba si
+  > había **contactos**, que es la tabla garantizadamente vacía justo en el
+  > negocio al que debía proteger: el que ya configuró su conocimiento y todavía
+  > no ha recibido su primer mensaje. Un clic sin confirmación, en el estado
+  > vacío que ve un negocio recién desplegado. Se retira el camino en vez de
+  > blindarlo: quitar la puerta elimina el riesgo entero, mientras que una
+  > guardia solo lo acota.
 
 **Seguridad de instancia pública (transversal, cada regla con test unitario)**
 

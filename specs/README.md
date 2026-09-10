@@ -14,6 +14,25 @@ producto** — y saberlo antes de leerla ahorra una confusión.
 | `015-motor-agenda-universal` | Ciclo completo | spec, plan, research, data-model, 2 contratos, quickstart, checklist, tasks + la enmienda constitucional que habilitó los conectores |
 | `016-atribucion-capi` | Ciclo completo | spec, plan, research, data-model, 2 contratos, quickstart, checklist, tasks |
 | `017-canal-messenger` | Ciclo completo | spec (sobre los cimientos de 014: mismo adaptador-por-canal y bandera) |
+| `018-reconexion-sse-resiliente` | Ciclo completo | spec, plan, research, data-model, contratos, quickstart, tasks |
+| `019-pwa-instalable` | Ciclo completo | spec, plan, research, data-model, contratos, quickstart, tasks |
+| `020-notificaciones-push` | Ciclo completo | spec, plan, research, data-model, contratos, quickstart, checklist, tasks + [ADR-003](../docs/adr-003-notificaciones-push.md) |
+| `021-laboratorio-del-negocio` | Ciclo completo | research, spec, plan, tasks — **en curso**: Entregas 1 y 2 en `main`, la 3 pendiente (es la que toca `drizzle/`) |
+| `022-guardia-seed-demo` | — | **CERRADA sin mergear.** Ver abajo |
+| `023-seed-demo-fuera-de-produccion` | Ligero | spec (incluye el cierre de la 022) |
+
+### La 022, cerrada sin mergear
+
+`022-guardia-seed-demo` iba a blindar la guardia del seed demo y se implementó
+entera —18 commits, en verde—. **No entra a `main`**: se decidió sacar el seed
+de producción en vez de protegerlo, porque quitar la puerta elimina el riesgo
+y una guardia solo lo acota. Lo hizo la
+[023](023-seed-demo-fuera-de-produccion/spec.md), que rescató el commit que
+valía la pena (el arreglo del Principio III) y documenta qué sobrevivió de la
+022 y qué se disolvió.
+
+Se dice aquí porque una rama abandonada en silencio hace creer, dentro de un
+año, que la feature se olvidó. Su análisis vive en la rama, cabeza `76ff482`.
 
 Los tres carriles —ciclo completo, ligero y exento— están definidos en el
 [Principio VI de la constitución](../.specify/memory/constitution.md). El

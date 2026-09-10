@@ -1,14 +1,13 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { Search, Sparkles, UserRound, X } from "lucide-react";
+import { Search, UserRound, X } from "lucide-react";
 import type { ConversationDto } from "@/lib/types";
 import { CHANNEL_LABEL, type Channel } from "@/lib/channels";
 import { ChannelBadge } from "@/components/channel-badge";
 import { matchesQuery } from "@/lib/search";
 import { cn } from "@/lib/utils";
 import { ContactAvatar } from "@/components/avatar";
-import { Button } from "@/components/ui/button";
 import { formatTime, previewText } from "./helpers";
 
 /* Puntos de etapa con la paleta de la landing: azul, ámbar, verde WhatsApp. */
@@ -21,20 +20,23 @@ const STAGE_DOT: Record<string, string> = {
 };
 const STAGE_DOT_FALLBACK = "#8391aa";
 
-function EmptyState({ onSeeded }: { onSeeded: () => void }) {
-  const [seeding, setSeeding] = useState(false);
-  const [failed, setFailed] = useState(false);
-
-  async function seed() {
-    setSeeding(true);
-    const res = await fetch("/api/seed/demo", { method: "POST" }).catch(
-      () => null
-    );
-    setSeeding(false);
-    if (res?.ok) onSeeded();
-    else setFailed(true);
-  }
-
+/**
+ * 023 — Aquí vivía el botón "Cargar datos de demostración", y por qué ya no.
+ *
+ * Sembrar la demo es una operación DESTRUCTIVA: borra todo el `kb_entry` de la
+ * organización, todo el historial del Laboratorio y sobrescribe el perfil del
+ * agente. Su única guardia miraba si había contactos — la tabla que está
+ * garantizadamente vacía justo en el negocio al que debía proteger: el que ya
+ * configuró su conocimiento y todavía no ha recibido su primer mensaje.
+ *
+ * Se retira el botón en vez de blindarlo. El seed solo servía para demostrar
+ * el producto, y el `POST` se movió a `/api/dev/seed-demo`, que devuelve 404
+ * incondicional en producción. Quitar el camino elimina el riesgo entero en
+ * lugar de acotarlo, que es lo que hace una guardia.
+ *
+ * Deroga FR-075 de `001-uniko-core` en su parte de UI — marcado allí.
+ */
+function EmptyState() {
   return (
     <div className="flex h-full flex-col items-center justify-center gap-3 p-6 text-center">
       <p className="font-serif text-[21px] italic leading-tight text-foreground">
@@ -44,17 +46,6 @@ function EmptyState({ onSeeded }: { onSeeded: () => void }) {
         Cuando alguien escriba a tu número de WhatsApp, su conversación
         aparecerá aquí en tiempo real.
       </p>
-      {!failed && (
-        <Button
-          size="sm"
-          variant="outline"
-          disabled={seeding}
-          onClick={() => void seed()}
-        >
-          <Sparkles className="h-4 w-4" strokeWidth={1.7} />
-          {seeding ? "Cargando demo…" : "Cargar datos de demostración"}
-        </Button>
-      )}
     </div>
   );
 }
@@ -64,14 +55,12 @@ export function ConversationList({
   channels,
   selectedId,
   onSelect,
-  onSeeded,
 }: {
   conversations: ConversationDto[] | null;
   /** Canales encendidos en esta instancia (ADR-001). */
   channels: readonly Channel[];
   selectedId: string | null;
   onSelect: (id: string) => void;
-  onSeeded: () => void;
 }) {
   const [query, setQuery] = useState("");
   const [filter, setFilter] = useState<"all" | "unread">("all");
@@ -245,7 +234,7 @@ export function ConversationList({
         {loading ? (
           <p className="p-6 text-center text-xs text-text-3">Cargando…</p>
         ) : conversations.length === 0 ? (
-          <EmptyState onSeeded={onSeeded} />
+          <EmptyState />
         ) : visible.length === 0 ? (
           <p className="p-6 text-center text-xs text-text-3">
             Sin resultados para este filtro.

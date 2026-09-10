@@ -181,4 +181,8 @@ DV-VC-04). Errores tipados → HTTP: `not_connected/reconnect_required → 409`,
 "Ferretería El Martillo": DELETE scoped a la org demo en orden inverso de FKs →
 reinsertar. KB con 1–2 huecos INTENCIONALES (garantías y devoluciones) para que el
 Laboratorio demuestre hallazgos reales en la primera corrida; incluye una corrida de
-ejemplo guardada. Ejecutable por botón (solo BD de dominio vacía) y `pnpm seed:demo`.
+ejemplo guardada. ~~Ejecutable por botón (solo BD de dominio vacía)~~ y `pnpm seed:demo`.
+
+> **DEROGADO EN PARTE** por [023](../023-seed-demo-fuera-de-produccion/spec.md): el botón salió de la UI. Sigue
+> vigente todo lo demás —qué siembra y sus huecos intencionales—, por
+> `pnpm seed:demo` o `POST /api/dev/seed-demo` (404 en producción).

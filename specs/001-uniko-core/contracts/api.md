@@ -29,7 +29,7 @@ Todas autenticadas por sesión Better Auth y scoped a la organización del usuar
 | `POST /api/settings/whatsapp/test` | probar conexión (valida token↔número, NO guarda) |
 | `GET /api/settings/webhook` | URL completa del webhook + estado firma |
 | `GET/POST /api/settings/team` | miembros / crear cuenta (owner only) |
-| `POST /api/seed/demo` | cargar demo (solo BD vacía de dominio; idempotente) |
+| ~~`POST /api/seed/demo`~~ → `POST /api/dev/seed-demo` | cargar demo (solo BD vacía de dominio; idempotente). **Movido por [023](../../023-seed-demo-fuera-de-produccion/spec.md)**: vive tras el gate de mocks y responde **404 incondicional en producción**. Ver FR-075 en el spec. |
 | `POST /api/auth/[...all]` | Better Auth (registro gated por 1ª org / `ALLOW_SIGNUP`) |
 
 Rate limiting in-process por IP en endpoints de auth (login/registro): ventana

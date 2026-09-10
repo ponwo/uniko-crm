@@ -26,6 +26,12 @@ porque no elimina ni redefine ningún principio, y ninguna spec existente queda
 inválida.
 
 Motivación:
+  [NOTA añadida el 2026-09-10, sin reescribir lo de abajo: la feature que
+  acabó derogando FR-075 fue la **023**, no la 022. La 022 se cerró sin
+  mergear —se decidió sacar el seed demo de producción en vez de blindarlo—
+  y la 023 hizo el trabajo, incluida esta derogación, que es el primer uso
+  real de esta regla. El texto original se conserva porque era cierto cuando
+  se escribió y está citado en el PR #15.]
   La 022 elimina el botón "Cargar datos de demostración", y con él deroga en
   parte FR-075 de 001-uniko-core, que dice que la UI MUST ofrecerlo. Registrarlo
   sólo en la spec que deroga no basta: a una spec vieja se llega buscando un FR

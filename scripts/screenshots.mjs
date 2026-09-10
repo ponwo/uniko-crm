@@ -72,9 +72,11 @@ if (!session.ok()) {
   process.exit(1);
 }
 
-// Demo (409 si ya hay datos: no pasa nada), número de prueba por el mock y la
+// Demo (409 si ya hay datos: no pasa nada) — la ruta vive tras el gate de
+// mocks desde la 023, así que esto EXIGE la app en modo desarrollo con
+// WA_MOCK_ENABLED=true. En producción responde 404 a propósito.
 // marca tal cual sale de la caja.
-await call("/api/seed/demo", { method: "POST" });
+await call("/api/dev/seed-demo", { method: "POST" });
 await call("/api/settings/whatsapp", {
   method: "PUT",
   data: { wabaId: "waba-demo", phoneNumberId: "pn-demo-001", token: "token-demo" },

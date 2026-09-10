@@ -14,8 +14,13 @@ pnpm db:migrate                                            # aplicar migraciones
 pnpm dev                                                   # http://localhost:3000
 ```
 
-Primer uso: registrarse (crea la organización) → botón "Cargar datos de demostración"
-(o `pnpm seed:demo`).
+Primer uso: registrarse (crea la organización) → `pnpm seed:demo`.
+
+> ~~botón "Cargar datos de demostración"~~ — **DEROGADO** por [023](../023-seed-demo-fuera-de-produccion/spec.md).
+> El botón salió del estado vacío: sembrar la demo borra el conocimiento y el
+> historial del Laboratorio de la organización, y su guardia no protegía al
+> negocio que tenía algo que perder. Queda el CLI y, en desarrollo,
+> `POST /api/dev/seed-demo`. Rationale completo junto a FR-075 en el spec.
 
 ## Modo de pruebas interno (self-test)
 

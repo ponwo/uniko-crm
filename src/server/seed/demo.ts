@@ -2,6 +2,7 @@ import { eq, inArray } from "drizzle-orm";
 import type { getDb } from "@/lib/db";
 import { schema } from "@/lib/db";
 import { newId } from "@/lib/db/ids";
+import { scoped } from "@/lib/db/tenant";
 
 /**
  * Negocio de demostración "Ferretería El Martillo" (FR-075).
@@ -136,39 +137,96 @@ export async function seedDemo(
 ): Promise<{ contacts: number; kbEntries: number }> {
   const demoPhones = DEMO_CONTACTS.map((c) => c.phone);
 
-  // --- Idempotencia: limpiar datos demo previos (orden inverso de FKs) ---
+  /*
+   * --- Idempotencia: limpiar datos demo previos (orden inverso de FKs) ---
+   *
+   * `scoped()` no es decoración: esta consulta buscaba los contactos SOLO por
+   * teléfono, sin `organization_id`. Los teléfonos de la demo son constantes
+   * del repo —los mismos en todas las instancias del mundo—, así que en una
+   * base con más de una organización esto encontraba, y borraba, los contactos
+   * demo de OTRO negocio: sus conversaciones, sus mensajes y sus leads.
+   *
+   * Hoy es inerte porque una instancia es un negocio, y esa es exactamente la
+   * suposición que el Principio III prohíbe hacer en una query.
+   */
   const prevContacts = await db
     .select({ id: schema.contact.id })
     .from(schema.contact)
-    .where(inArray(schema.contact.phone, demoPhones));
+    .where(
+      scoped(
+        schema.contact.organizationId,
+        organizationId,
+        inArray(schema.contact.phone, demoPhones)
+      )
+    );
   const prevIds = prevContacts.map((c) => c.id);
   if (prevIds.length > 0) {
+    // Los ids de aquí abajo ya vienen acotados por la consulta de arriba, pero
+    // el Principio III pide que el tenant se VEA en la query en vez de
+    // deducirse de dónde salió una lista: quien edite esto dentro de un año no
+    // va a reconstruir esa cadena.
     const prevConvs = await db
       .select({ id: schema.conversation.id })
       .from(schema.conversation)
-      .where(inArray(schema.conversation.contactId, prevIds));
+      .where(
+        scoped(
+          schema.conversation.organizationId,
+          organizationId,
+          inArray(schema.conversation.contactId, prevIds)
+        )
+      );
     const convIds = prevConvs.map((c) => c.id);
     if (convIds.length > 0) {
       await db
         .delete(schema.message)
-        .where(inArray(schema.message.conversationId, convIds));
+        .where(
+          scoped(
+            schema.message.organizationId,
+            organizationId,
+            inArray(schema.message.conversationId, convIds)
+          )
+        );
       await db
         .delete(schema.conversation)
-        .where(inArray(schema.conversation.id, convIds));
+        .where(
+          scoped(
+            schema.conversation.organizationId,
+            organizationId,
+            inArray(schema.conversation.id, convIds)
+          )
+        );
     }
-    await db.delete(schema.lead).where(inArray(schema.lead.contactId, prevIds));
-    await db.delete(schema.contact).where(inArray(schema.contact.id, prevIds));
+    await db
+      .delete(schema.lead)
+      .where(
+        scoped(
+          schema.lead.organizationId,
+          organizationId,
+          inArray(schema.lead.contactId, prevIds)
+        )
+      );
+    await db
+      .delete(schema.contact)
+      .where(
+        scoped(
+          schema.contact.organizationId,
+          organizationId,
+          inArray(schema.contact.id, prevIds)
+        )
+      );
   }
-  // KB y corridas demo previas
+  // KB y corridas demo previas. OJO: esto borra el KB ENTERO de la
+  // organización, no sólo las entradas de la demo — por eso la guardia de
+  // quién puede llegar hasta aquí importa tanto como el propio borrado.
   await db
     .delete(schema.kbEntry)
-    .where(eq(schema.kbEntry.organizationId, organizationId));
+    .where(scoped(schema.kbEntry.organizationId, organizationId));
   await db
     .delete(schema.agentTestCase)
-    .where(eq(schema.agentTestCase.organizationId, organizationId));
+    .where(scoped(schema.agentTestCase.organizationId, organizationId));
   await db
     .delete(schema.agentTestRun)
-    .where(eq(schema.agentTestRun.organizationId, organizationId));
+    .where(scoped(schema.agentTestRun.organizationId, organizationId));
 
   // --- Etapas (por nombre) ---
   const stages = await db
