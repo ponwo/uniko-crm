@@ -15,6 +15,7 @@ import {
   Wand2,
   XCircle,
 } from "lucide-react";
+import { avisoDeComparacion, hayAlgoQueAvisar } from "@/lib/lab-comparacion";
 import { useEvents } from "@/components/use-events";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -281,7 +282,7 @@ function HistoryList({
         >
           <div className="flex items-center justify-between">
             <ScoreBadge run={run} />
-            {run.delta !== null && run.delta !== 0 && <Delta run={run} />}
+            <Delta run={run} />
           </div>
           <p className="mt-1 text-[11px] text-muted-foreground">
             {new Date(run.startedAt).toLocaleString("es-MX", {
@@ -299,42 +300,49 @@ function HistoryList({
 
 
 /**
- * 021 Entrega 3 (FR-626, FR-616) — el delta, y si vale compararlo.
+ * 021 (FR-626, FR-616) — el delta, y si vale compararlo.
  *
- * Un delta entre examenes distintos no significa nada, y presentarlo a secas
- * es la forma mas barata de mentir con un numero. Esta medido, no es teoria:
- * la Entrega 2 llevo a LanCo de 42 a 75 sin que su agente cambiara —cambio la
- * rubrica, y entre corridas tambien los guiones que se ejecutaron— y esta
- * misma pantalla lo presento como mejora.
+ * Un delta entre exámenes distintos no significa nada, y presentarlo a secas
+ * es la forma más barata de mentir con un número. Está medido, no es teoría:
+ * la Entrega 2 llevó a LanCo de 42 a 75 sin que su agente cambiara —cambió la
+ * rúbrica— y esta misma pantalla lo presentó como mejora.
  *
- * El numero NO se esconde: esconderlo dejaria al dueno sin el dato. Se
- * presenta apagado y con el motivo al lado, que es lo que le permite decidir
- * si mirarlo.
+ * QUÉ enseñar lo decide `avisoDeComparacion()`, que es pura y está probada.
+ * Aquí vivía esa decisión como condición de render, y por eso se coló el fallo
+ * de los dos scores iguales con exámenes distintos: no enseñaba nada, que se
+ * lee como "no cambió nada". Ninguna prueba podía verlo.
+ *
+ * El número NO se esconde: esconderlo dejaría al dueño sin el dato. Se presenta
+ * apagado y tachado, con el motivo al lado.
  */
 function Delta({ run }: { run: Run }) {
-  const delta = run.delta!;
-  const sube = delta > 0;
+  const aviso = avisoDeComparacion(run);
+  if (!hayAlgoQueAvisar(aviso)) return null;
 
-  if (run.comparable === false) {
+  const sube = (aviso.numero ?? 0) > 0;
+
+  if (aviso.motivo) {
     const motivo =
-      run.motivoNoComparable === "examen"
+      aviso.motivo === "examen"
         ? "otros escenarios"
-        : run.motivoNoComparable === "rubrica"
-          ? "otra rubrica"
+        : aviso.motivo === "rubrica"
+          ? "otra rúbrica"
           : "sin registro";
     return (
       <span
         className="flex items-center gap-1 text-xs text-text-3"
         title={
-          "Esta corrida y la anterior no se midieron igual, asi que la " +
-          "diferencia no dice si el agente mejoro."
+          "Esta corrida y la anterior no se midieron igual, así que la " +
+          "diferencia no dice si el agente mejoró."
         }
       >
         <AlertTriangle className="h-3.5 w-3.5" strokeWidth={1.7} />
-        <span className="line-through">
-          {sube ? "+" : ""}
-          {delta}
-        </span>
+        {aviso.numero !== null && (
+          <span className="line-through">
+            {sube ? "+" : ""}
+            {aviso.numero}
+          </span>
+        )}
         <span className="font-medium">{motivo}</span>
       </span>
     );
@@ -352,7 +360,7 @@ function Delta({ run }: { run: Run }) {
         <TrendingDown className="h-3.5 w-3.5" />
       )}
       {sube ? "+" : ""}
-      {delta}
+      {aviso.numero}
     </span>
   );
 }
