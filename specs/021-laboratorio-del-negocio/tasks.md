@@ -212,18 +212,66 @@ es lo único de este proyecto que no se arregla volviendo atrás.
 
 ### Fase 1: El esquema — la parte irreversible
 
-- [ ] **T201** `schema.ts`: tabla `lab_scenario` y las columnas
+- [x] **T20' `schema.ts`: tabla `lab_scenario` y las columnas
       `scenario_set` y `rubric_version` en `agent_test_run`, **ambas
       nullable** (D5). Índices únicos `(org, key)` y `(org, phone)`.
-- [ ] **T202** `pnpm db:generate` → migración nueva en `drizzle/`.
-- [ ] **T203** **Leer el SQL generado a mano**: que sea aditivo puro — sin
+- [x] **T20' `pnpm db:generate` → migración nueva en `drizzle/`.
+- [x] **T20' **Leer el SQL generado a mano**: que sea aditivo puro — sin
       `DROP`, sin `ALTER … SET NOT NULL` sobre tabla con datos, sin
       `DEFAULT` que reescriba filas. Drizzle acierta casi siempre; "casi" no
       es un gate.
-- [ ] **T204** **Ensayo del Principio X**: respaldo real restaurado en un
+- [x] **T204** **Ensayo del Principio X**: respaldo real restaurado en un
       PostgreSQL desechable, migración corrida contra esa copia, app arrancada
-      contra ella. Registrar instancia, fecha del respaldo, qué hizo y cuánto
-      tardó.
+      contra ella. **HECHO el 2026-09-10** — registro abajo.
+
+#### El ensayo del Principio X — corrida del 2026-09-10
+
+Registrado tal como pasó.
+
+**Contra qué datos**: respaldo de **LanCo** —instancia real, en producción—,
+ejecución `fudmvgnalivsnhimvegduhsh` del 2026-09-10 20:56 UTC,
+`pg-dump-uniko-1789073816.dmp`, **106.697 bytes** (tamaño verificado contra lo
+que reporta Coolify **antes** de restaurar nada). Descargado por el dueño desde
+el panel: esa parte no se puede automatizar desde esta máquina y está explicado
+en el [quickstart de la 020](../020-notificaciones-push/quickstart.md).
+
+**Base desechable**: `uniko_ensayo_lanco_20260910` en el PostgreSQL 16 local.
+Nunca `uniko_dev`, nunca una instancia de la flota. **Borrada al terminar**, y
+comprobado: solo queda `uniko_dev`.
+
+**Venía por detrás de la migración**, que es lo que hace que el ensayo pruebe
+algo: 14 entradas en el diario de Drizzle (es decir, en la 0013), sin
+`lab_scenario` y sin las dos columnas nuevas.
+
+| Paso | Resultado | Tiempo |
+|---|---|---|
+| `pg_restore` del volcado | limpio, sin errores | **632 ms** |
+| `drizzle-kit migrate` | `migrations applied successfully` | **1.317 ms** |
+| `next start` contra la copia | `/api/health` → `{"ok":true}`, sin errores de arranque | — |
+
+**Que es aditiva, medido y no supuesto.** Inventario de la misma base antes y
+después:
+
+| | antes | después |
+|---|---|---|
+| organizaciones | 1 | **1** |
+| contactos | 8 | **8** |
+| conversaciones | 14 | **14** |
+| mensajes | 109 | **109** |
+| entradas de KB | 4 | **4** |
+| corridas del Laboratorio | 2 | **2** |
+| casos del Laboratorio | 12 | **12** |
+
+Y lo nuevo: `lab_scenario` creada y vacía con sus 4 índices, las 2 columnas
+presentes, y **las 2 corridas preexistentes con `scenario_set` y
+`rubric_version` en NULL** — que es exactamente lo que el diseño pide (D5): un
+null dice "de esta no se sabe" en vez de inventarles un examen.
+
+**Por qué este respaldo y no otro**: LanCo es la única instancia con corridas
+del Laboratorio (2 corridas, 12 casos). La migración añade columnas a
+`agent_test_run`, así que contra una base sin esas filas no se habría ejercido
+la forma de los datos que la migración toca — que es justo lo que el Principio X
+exige y lo que `seed:demo` no da.
 
 ### Fase 2: El modelo y sus guardarraíles
 
