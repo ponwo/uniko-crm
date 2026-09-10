@@ -87,8 +87,7 @@ docker compose up -d --build
 >
 > 1. Entra y **regístrate**: el primer registro crea tu organización (después
 >    el registro público se cierra solo).
-> 2. Pulsa **"Cargar datos de demostración"** si quieres explorar con la
->    Ferretería El Martillo.
+> 2. Tu bandeja empieza vacía: se llena cuando alguien escriba a tu número.
 > 3. Para conectar tu WhatsApp entra a **Configuración → WhatsApp**: ahí está
 >    el wizard y la URL exacta del webhook para el panel de Meta o para tu
 >    backend de agencia. La conexión del número NO es parte de esta

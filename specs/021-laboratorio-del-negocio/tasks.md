@@ -128,7 +128,17 @@ falsifica nadie es un arnés que afirma sin mirar.
 - [x] **T111** Arneses alcanzables en verde contra base limpia.
 - [x] **T112** Pendiente de verificación humana: la corrida de LanCo **con la
       rúbrica nueva**, para confirmar contra modelos reales lo que el mock
-      afirma de forma determinista.
+      afirma de forma determinista. **HECHA el 2026-09-10** — ver abajo.
+
+> **FR-616 NO entra en la Entrega 2, y esto es la corrección de un descuido.**
+> El requisito —que un cambio de rúbrica se vea en el histórico— se escribió en
+> el spec de la Entrega 2 y la entrega se dio por hecha sin él.
+>
+> No es un olvido de implementación: hacerlo bien exige **versionar la rúbrica
+> junto al sello del conjunto**, y eso es una columna en `agent_test_run` →
+> toca `drizzle/` → ensayo del Principio X. Pertenece a la **Entrega 3**, que
+> ya abre esa puerta para el sello. Lo que sí fue descuido es no haberlo dicho
+> aquí en su momento; se corrige en el PR de la 023.
 
 ---
 
@@ -155,9 +165,36 @@ defecto que de verdad hundía el score.
 | `scripts/e2e-lab.mjs` | **20/20** (base limpia) |
 | `scripts/e2e-selftest.mjs` | **103/103**, sin daño colateral |
 
-**T112 queda pendiente y es real**: el mock afirma de forma determinista lo que
-un modelo real tiene que confirmar. La corrida de LanCo tras desplegar esto es
-la que cierra el círculo.
+### T112 — la corrida de LanCo con la rúbrica nueva (2026-09-10)
+
+Corrida contra `main` @ `456df0d`, modelos reales. **Score 75: 3 verdes, 3
+amarillos, 0 rojos** (antes: 42, con 2 rojos).
+
+**La prueba no es el número, son dos casos casi controlados:**
+
+| Caso | Qué hizo el agente | Antes | Ahora |
+|---|---|---|---|
+| `pide_humano` | escaló, mudo — transcript de forma **idéntica** | `debio_escalar` | **limpio** |
+| `cliente_enojado` | escaló con mensaje, las dos veces | `fuera_de_kb` | **limpio** |
+
+Cambió el juez, no el agente. `errores_modismos` perdió además el hallazgo que
+citaba literalmente *"AGENTE: [sin respuesta]"*.
+
+**El control negativo aguantó**: la alucinación de `comprador_decidido` **sigue
+ahí**. La rúbrica dejó de castigar el escalado sin ablandarse con lo inventado —
+que era el riesgo de este cambio.
+
+**El +33 no es atribuible y se dice**: `pregunton_precios` y `errores_modismos`
+corrieron el guion completo esta vez y antes se cortaron. Son conversaciones
+distintas, no la misma medida repetida. Es FR-616 en carne viva: la pantalla
+presenta como mejora del agente lo que en parte es cambio de examen.
+
+**Lo que la corrida dejó de regalo**: quitado el ruido, casi todos los hallazgos
+restantes son la misma familia — el agente inventa alrededor del *diagnóstico
+gratuito* y el proceso de pago (*"el diagnóstico gratuito no expira"*, *"el
+consultor sí puede revisar paquetes"*, *"el pago se coordina directo con el
+equipo"*). Un hueco concreto del conocimiento de LanCo, encontrado por el
+Laboratorio. Que es para lo que existe.
 
 ---
 
