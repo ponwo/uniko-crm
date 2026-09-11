@@ -110,10 +110,15 @@ export type EnsureWebhookResult = {
 };
 
 /**
- * Registra el webhook de Uniko en Zernio, o actualiza el que ya apunte aquí.
+ * Registra el webhook de Uniko en Zernio, o actualiza los que ya apunten aquí.
  * Idempotente: dos guardados seguidos no crean dos webhooks. Conserva los
- * eventos que ya tuviera (el operador puede haber sumado `comment.received`
+ * eventos que ya tuvieran (el operador puede haber sumado `comment.received`
  * u otros para sus propias cosas): solo garantiza los de Uniko.
+ *
+ * TODOS los que apunten a la instancia, no el primero: quien dio de alta uno
+ * por canal a mano (LanCo, 2026-09-10) tiene dos, y Zernio firma cada uno con
+ * su propio secreto. Alinear solo uno dejaría al otro entregando con un
+ * secreto que Uniko ya no acepta — 401 silencioso, el peor modo de fallo.
  */
 export async function ensureUnikoWebhook(input: {
   token: string;
@@ -122,21 +127,24 @@ export async function ensureUnikoWebhook(input: {
 }): Promise<EnsureWebhookResult> {
   const urls = unikoCallbackUrls();
   const url = urls[input.channel];
-  const existing = (await listZernioWebhooks(input.token)).find((h) =>
-    isUnikoCallbackUrl(h.url, urls)
+  const ours = (await listZernioWebhooks(input.token)).filter(
+    (h) => h._id && isUnikoCallbackUrl(h.url, urls)
   );
 
-  if (existing?._id) {
-    if (!webhookNeedsUpdate(existing, input.secret)) {
-      return { id: existing._id, action: "unchanged", url: existing.url ?? url };
+  if (ours.length > 0) {
+    let touched = false;
+    for (const hook of ours) {
+      if (!webhookNeedsUpdate(hook, input.secret)) continue;
+      const events = Array.from(new Set([...(hook.events ?? []), ...UNIKO_WEBHOOK_EVENTS]));
+      await zernioFetch("/webhooks/settings", {
+        method: "PUT",
+        token: input.token,
+        body: { _id: hook._id, secret: input.secret, events, isActive: true },
+      });
+      touched = true;
     }
-    const events = Array.from(new Set([...(existing.events ?? []), ...UNIKO_WEBHOOK_EVENTS]));
-    await zernioFetch("/webhooks/settings", {
-      method: "PUT",
-      token: input.token,
-      body: { _id: existing._id, secret: input.secret, events, isActive: true },
-    });
-    return { id: existing._id, action: "updated", url: existing.url ?? url };
+    const first = ours[0]!;
+    return { id: first._id ?? null, action: touched ? "updated" : "unchanged", url: first.url ?? url };
   }
 
   const res = (await zernioFetch("/webhooks/settings", {

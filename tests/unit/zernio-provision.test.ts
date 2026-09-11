@@ -110,6 +110,18 @@ describe("025 · ensureUnikoWebhook contra la API (idempotente)", () => {
     expect((put.body as { events: string[] }).events.sort()).toEqual(["comment.received", "message.received"]);
   });
 
+  it("con DOS webhooks nuestros (uno por canal, dados de alta a mano): alinea los dos", async () => {
+    const calls = zernio([
+      { _id: "ig", url: URLS.instagram, secret: "s", events: ["message.received", "comment.received"], isActive: true },
+      { _id: "fb", url: URLS.messenger, secret: "", events: ["message.received", "comment.received"], isActive: true },
+    ]);
+    const r = await ensureUnikoWebhook({ token: "sk", channel: "instagram", secret: "s" });
+    expect(r.action).toBe("updated");
+    const puts = calls.filter((c) => c.method === "PUT");
+    expect(puts.map((c) => (c.body as { _id: string })._id)).toEqual(["fb"]);
+    expect(puts[0]!.body).toMatchObject({ secret: "s" });
+  });
+
   it("ya al día: no toca nada", async () => {
     const calls = zernio([{ _id: "h1", url: URLS.instagram, secret: "s", events: ["message.received"], isActive: true }]);
     const r = await ensureUnikoWebhook({ token: "sk", channel: "messenger", secret: "s" });
