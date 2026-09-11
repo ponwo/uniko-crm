@@ -2,7 +2,9 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import {
   parseZernioEvent,
   sendZernioMessage,
+  verifyZernioAccount,
   zernioAccountRef,
+  ZernioVerifyError,
 } from "@/server/zernio";
 import { resolveZernioSecret, zernioTargetChannel } from "@/server/zernio/dispatch";
 
@@ -96,5 +98,71 @@ describe("Zernio · respuesta del envío", () => {
       sendZernioMessage({ token: "sk_x", accountId: ACCOUNT, conversationId: null, text: "a" })
     ).rejects.toThrow(/hilo/);
     expect(fetchMock).not.toHaveBeenCalled();
+  });
+});
+
+describe("Zernio · verifyZernioAccount: cada causa de fallo con su nombre", () => {
+  afterEach(() => vi.unstubAllGlobals());
+
+  const cuentas = {
+    accounts: [
+      { _id: ACCOUNT, platform: "instagram", username: "lanco.dmd", displayName: "LanCo" },
+      { _id: "fb-1", platform: "facebook", username: null, displayName: "Página" },
+    ],
+  };
+
+  function zernio(handlers: Record<string, () => Response>) {
+    const fetchMock = vi.fn(async (url: string) => {
+      const path = new URL(url).pathname.replace(/^\/api\/v1/, "");
+      const h = handlers[path];
+      if (!h) throw new Error(`sin handler para ${path}`);
+      return h();
+    });
+    vi.stubGlobal("fetch", fetchMock);
+    return fetchMock;
+  }
+  const json = (body: unknown, status = 200) => () =>
+    new Response(JSON.stringify(body), { status });
+
+  it("llave válida + cuenta de la plataforma + Inbox contratado → devuelve el nombre", async () => {
+    zernio({ "/accounts": json(cuentas), "/inbox/conversations": json({ data: [] }) });
+    await expect(
+      verifyZernioAccount({ token: "sk_x", accountId: ACCOUNT, platform: "instagram" })
+    ).resolves.toEqual({ username: "lanco.dmd", displayName: "LanCo" });
+  });
+
+  it("llave válida pero el plan no incluye el Inbox → inbox_required (NO 'llave inválida')", async () => {
+    // El 403 literal de Zernio, el que se llevó la primera conexión real.
+    zernio({
+      "/accounts": json(cuentas),
+      "/inbox/conversations": json(
+        { error: "Inbox addon required. Upgrade to access inbox features.", code: "INBOX_REQUIRED" },
+        403
+      ),
+    });
+    const err = await verifyZernioAccount({ token: "sk_x", accountId: ACCOUNT, platform: "instagram" }).catch((e) => e);
+    expect(err).toBeInstanceOf(ZernioVerifyError);
+    expect(err.code).toBe("inbox_required");
+    expect(err.message).toMatch(/Inbox/);
+  });
+
+  it("la cuenta es de otra plataforma → platform_mismatch", async () => {
+    zernio({ "/accounts": json(cuentas) });
+    const err = await verifyZernioAccount({ token: "sk_x", accountId: "fb-1", platform: "instagram" }).catch((e) => e);
+    expect(err.code).toBe("platform_mismatch");
+  });
+
+  it("el accountId no es de esa llave → account_not_found", async () => {
+    zernio({ "/accounts": json(cuentas) });
+    const err = await verifyZernioAccount({ token: "sk_x", accountId: "nope", platform: "facebook" }).catch((e) => e);
+    expect(err.code).toBe("account_not_found");
+  });
+
+  it("llave rechazada → invalid_key; Zernio caído → platform_unavailable", async () => {
+    zernio({ "/accounts": json({ error: { message: "Invalid API key" } }, 401) });
+    expect((await verifyZernioAccount({ token: "sk_x", accountId: ACCOUNT, platform: "instagram" }).catch((e) => e)).code).toBe("invalid_key");
+    vi.unstubAllGlobals();
+    zernio({ "/accounts": json({ error: "boom" }, 502) });
+    expect((await verifyZernioAccount({ token: "sk_x", accountId: ACCOUNT, platform: "instagram" }).catch((e) => e)).code).toBe("platform_unavailable");
   });
 });

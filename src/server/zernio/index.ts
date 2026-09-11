@@ -185,6 +185,122 @@ export async function sendZernioMessage(input: {
   return { platformMessageId: String(id) };
 }
 
+/**
+ * Por qué NO se puede conectar, con nombre. Antes todo fallo de Zernio se
+ * traducía a "la API key no es válida", y la primera conexión real se estrelló
+ * con una llave perfectamente válida: la cuenta no tenía contratado el Inbox
+ * de Zernio (403 `INBOX_REQUIRED`), y el operador se pasó el rato revisando
+ * la llave. Cada causa tiene su mensaje, y la que es de compra lo dice.
+ */
+export class ZernioVerifyError extends Error {
+  code:
+    | "invalid_key"
+    | "account_not_found"
+    | "platform_mismatch"
+    | "inbox_required"
+    | "platform_unavailable";
+  constructor(code: ZernioVerifyError["code"], message: string) {
+    super(message);
+    this.name = "ZernioVerifyError";
+    this.code = code;
+  }
+}
+
+/** Plataforma de Zernio que corresponde a cada canal de Uniko. */
+export const ZERNIO_PLATFORM = { instagram: "instagram", messenger: "facebook" } as const;
+
+type ZernioAccount = {
+  _id?: string;
+  id?: string;
+  platform?: string;
+  username?: string | null;
+  displayName?: string | null;
+  isActive?: boolean;
+};
+
+/**
+ * Comprueba, ANTES de guardar, que la conexión puede funcionar:
+ *
+ * 1. La llave sirve y el `accountId` es una de sus cuentas, de la plataforma
+ *    del canal. Se lee de `/accounts`, que NO exige el addon de Inbox: así se
+ *    distingue "llave mala" de "cuenta equivocada" de "falta el Inbox".
+ * 2. El Inbox está contratado: `/inbox/conversations` es lo que usan el
+ *    webhook `message.received` y la respuesta, y sin él no entra ni sale
+ *    nada. Zernio responde 403 `INBOX_REQUIRED`.
+ *
+ * Devuelve el nombre visible de la cuenta para enseñarlo en la pantalla.
+ */
+export async function verifyZernioAccount(input: {
+  token: string;
+  accountId: string;
+  platform: (typeof ZERNIO_PLATFORM)[keyof typeof ZERNIO_PLATFORM];
+}): Promise<{ username: string | null; displayName: string | null }> {
+  let accounts: ZernioAccount[];
+  try {
+    const res = (await zernioFetch("/accounts", { token: input.token })) as
+      | { accounts?: ZernioAccount[]; data?: ZernioAccount[] }
+      | ZernioAccount[]
+      | null;
+    accounts = Array.isArray(res) ? res : (res?.accounts ?? res?.data ?? []);
+  } catch (err) {
+    throw translateVerify(err, "La API key de Zernio no es válida");
+  }
+
+  const account = accounts.find(
+    (a) => (a._id ?? a.id) === input.accountId
+  );
+  if (!account) {
+    throw new ZernioVerifyError(
+      "account_not_found",
+      `Esa API key no tiene ninguna cuenta con accountId ${input.accountId}: cópialo del panel de Zernio (Accounts)`
+    );
+  }
+  const platform = (account.platform ?? "").toLowerCase();
+  if (platform !== input.platform) {
+    throw new ZernioVerifyError(
+      "platform_mismatch",
+      `La cuenta ${input.accountId} es de ${platform || "otra plataforma"}, no de ${input.platform}`
+    );
+  }
+
+  try {
+    await zernioFetch(
+      `/inbox/conversations?limit=1&accountId=${encodeURIComponent(input.accountId)}`,
+      { token: input.token }
+    );
+  } catch (err) {
+    throw translateVerify(err, "La API key de Zernio no tiene acceso a la bandeja");
+  }
+
+  return {
+    username: account.username?.trim() || null,
+    displayName: account.displayName?.trim() || null,
+  };
+}
+
+function translateVerify(err: unknown, invalidMessage: string): ZernioVerifyError {
+  if (err instanceof MetaApiError) {
+    if (err.status === 0 || err.status >= 500) {
+      return new ZernioVerifyError(
+        "platform_unavailable",
+        "No se pudo contactar a Zernio; intenta de nuevo"
+      );
+    }
+    const code = (err.details as { code?: string } | null)?.code;
+    if (err.status === 403 && code === "INBOX_REQUIRED") {
+      return new ZernioVerifyError(
+        "inbox_required",
+        "La API key es válida, pero tu plan de Zernio no incluye la bandeja (Inbox): actívala en Zernio → Billing y vuelve a probar"
+      );
+    }
+    return new ZernioVerifyError("invalid_key", invalidMessage);
+  }
+  return new ZernioVerifyError(
+    "platform_unavailable",
+    "No se pudo contactar a Zernio; intenta de nuevo"
+  );
+}
+
 /** Comprueba que la llave sirve (se usa antes de guardar una conexión). */
 export async function verifyZernioToken(token: string): Promise<void> {
   await zernioFetch("/inbox/conversations?limit=1", { token });

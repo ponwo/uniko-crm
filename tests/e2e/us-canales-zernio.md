@@ -23,6 +23,9 @@ Entorno: app con `WA_MOCK_ENABLED=true`, `ZERNIO_BASE_URL` apuntando a
 |---|---|
 | La pantalla existe y enseña la URL de callback con el segmento secreto | "GET /settings/instagram → 200" + "…lleva el segmento secreto" |
 | Una API key que Zernio rechaza no se guarda | "…NO se guarda → 422" |
+| Llave válida pero sin el Inbox de Zernio contratado → mensaje que lo dice (no "llave inválida") | "…→ 422 inbox_required" |
+| El accountId es de otra plataforma / no es de esa llave | "…→ 422 platform_mismatch" + "…→ 422 account_not_found" |
+| El nombre de la cuenta se rellena desde `/accounts` | "el nombre de la cuenta sale de /accounts de Zernio" |
 | Sin `accountId` no hay a quién enrutar | "sin accountId no se puede enrutar → 422" |
 | En Zernio no hace falta IG_ID (Zernio no lo expone) | "PUT con API key válida y sin IG_ID → 200" |
 | El token nunca sale entero | "el token solo enseña su cola" |

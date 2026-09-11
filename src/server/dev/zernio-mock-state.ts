@@ -55,3 +55,31 @@ export function zernioTokenIsBad(authorization: string | null): boolean {
   const token = (authorization ?? "").replace(/^Bearer\s+/i, "");
   return token.length === 0 || token.endsWith("-invalid");
 }
+
+/**
+ * Una llave que termina en `-sin-inbox` es válida pero su plan no tiene el
+ * Inbox contratado: `/accounts` responde, `/inbox/*` da el 403 real de
+ * Zernio. Es la forma de fallo que se llevó la primera conexión de verdad.
+ */
+export function zernioTokenLacksInbox(authorization: string | null): boolean {
+  const token = (authorization ?? "").replace(/^Bearer\s+/i, "");
+  return token.endsWith("-sin-inbox");
+}
+
+/** Las cuentas que el arnés espera encontrar en la llave, por plataforma. */
+export const ZERNIO_MOCK_ACCOUNTS = [
+  {
+    _id: "zernio-ig-account-001",
+    platform: "instagram",
+    username: "negocio_demo",
+    displayName: "Negocio Demo",
+    isActive: true,
+  },
+  {
+    _id: "zernio-account-001",
+    platform: "facebook",
+    username: null,
+    displayName: "Página Demo",
+    isActive: true,
+  },
+] as const;
