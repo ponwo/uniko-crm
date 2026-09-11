@@ -75,7 +75,10 @@ export async function POST(req: Request, ctx: Ctx) {
       idempotencyKey: req.headers.get("idempotency-key"),
       at: new Date().toISOString(),
     });
-    return Response.json({ message: { id } });
+    // La forma real de la API: `{ data: { messageId, conversationId } }`.
+    return Response.json({
+      data: { messageId: id, conversationId: decodeURIComponent(path[2]!) },
+    });
   }
 
   return Response.json({});

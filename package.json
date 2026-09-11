@@ -19,7 +19,7 @@
     "lint": "eslint .",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
-    "test:e2e": "node --env-file=.env scripts/e2e-selftest.mjs && node --env-file=.env scripts/e2e-sse-reconexion.mjs && node --env-file=.env scripts/e2e-pwa.mjs && node --env-file=.env scripts/e2e-push.mjs && node --env-file=.env scripts/e2e-lab.mjs",
+    "test:e2e": "node --env-file=.env scripts/e2e-selftest.mjs && node --env-file=.env scripts/e2e-sse-reconexion.mjs && node --env-file=.env scripts/e2e-pwa.mjs && node --env-file=.env scripts/e2e-push.mjs && node --env-file=.env scripts/e2e-lab.mjs && node --env-file=.env scripts/e2e-instagram.mjs",
     "test:watch": "vitest",
     "db:generate": "drizzle-kit generate",
     "db:migrate": "drizzle-kit migrate",

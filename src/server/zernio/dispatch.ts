@@ -4,7 +4,7 @@ import { getInstagramCredentialsByAccountRef } from "@/server/instagram/credenti
 import { processZernioEvent } from "@/server/instagram/ingest";
 import { getMessengerCredentialsByAccountRef } from "@/server/messenger/credentials";
 import { processZernioMessengerEvent } from "@/server/messenger/ingest";
-import { parseZernioEvent, type ZernioEvent } from "@/server/zernio";
+import { parseZernioEvent, zernioAccountRef, type ZernioEvent } from "@/server/zernio";
 
 /**
  * 017 — Reparto de un evento de Zernio al canal que le toca.
@@ -39,7 +39,7 @@ export async function resolveZernioSecret(
   rawBody: string
 ): Promise<{ secret: string | null; accountRef: string | null; channel: Channel | null }> {
   const evt = parseZernioEvent(rawBody);
-  const accountRef = evt?.account?.id ?? null;
+  const accountRef = zernioAccountRef(evt);
   const channel = zernioTargetChannel(evt);
   if (!accountRef) return { secret: null, accountRef: null, channel };
 

@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { apiError, parseBody, withAuth } from "@/lib/api";
+import { MetaApiError } from "@/lib/meta/client";
 import {
   getInstagramCredentialsByOrg,
   saveInstagramCredentials,
@@ -9,6 +10,7 @@ import {
   channelDisabledResponse,
   isChannelEnabled,
 } from "@/server/channels/enabled";
+import { verifyZernioToken } from "@/server/zernio";
 
 export const dynamic = "force-dynamic";
 
@@ -31,7 +33,12 @@ export const GET = withAuth(async (session) => {
 
 const putSchema = z.object({
   source: z.enum(["zernio", "meta"]),
-  igUserId: z.string().trim().min(1),
+  /**
+   * IG_ID del perfil. Obligatorio con app propia de Meta (por él enruta su
+   * webhook); en modo Zernio no existe forma de conocerlo —su API expone
+   * username y accountId, no el id de la plataforma— así que es opcional.
+   */
+  igUserId: z.string().trim().min(1).nullish(),
   accountRef: z.string().trim().min(1).nullish(),
   username: z.string().trim().nullish(),
   token: z.string().trim().min(1),
@@ -40,14 +47,21 @@ const putSchema = z.object({
 
 /**
  * Guarda la conexión validando ANTES contra la plataforma, igual que el
- * wizard de WhatsApp: un token que no sirve no llega a la base.
+ * wizard de WhatsApp: un token que no sirve no llega a la base. Solo el
+ * propietario de la organización puede hacerlo.
  */
 export const PUT = withAuth(async (session, req: Request) => {
   if (!isChannelEnabled("instagram")) return channelDisabledResponse();
+  if (session.role !== "owner") {
+    return apiError(403, "forbidden", "Solo el propietario puede conectar el perfil");
+  }
   const body = await parseBody(req, putSchema);
   if (!body.ok) return body.response;
   const data = body.data;
 
+  if (data.source === "meta" && !data.igUserId) {
+    return apiError(422, "invalid_body", "En modo Meta hace falta el IG_ID del perfil");
+  }
   if (data.source === "zernio" && !data.accountRef) {
     return apiError(
       422,
@@ -61,10 +75,20 @@ export const PUT = withAuth(async (session, req: Request) => {
     return apiError(check.status, check.code, check.message);
   }
 
+  // `ig_user_id` es NOT NULL desde la 014 (entonces solo se pensó en Meta).
+  // En modo Zernio se rellena con el accountId: la ingesta de Meta descarta
+  // cualquier fila que no sea `source: "meta"`, así que ese valor jamás
+  // enruta nada, y un ObjectId de Zernio no puede coincidir con un IG_ID
+  // numérico. Relajar la columna es una migración aparte (Constitución X).
+  const igUserId = data.igUserId ?? data.accountRef;
+  if (!igUserId) {
+    return apiError(422, "invalid_body", "Falta el identificador del perfil");
+  }
+
   await saveInstagramCredentials({
     organizationId: session.organizationId,
     source: data.source,
-    igUserId: data.igUserId,
+    igUserId,
     accountRef: data.accountRef ?? null,
     username: check.username ?? data.username ?? null,
     token: data.token,
@@ -79,12 +103,20 @@ type Check =
   | { ok: false; status: number; code: string; message: string };
 
 async function verify(data: z.infer<typeof putSchema>): Promise<Check> {
-  const url =
-    data.source === "meta"
-      ? `${process.env.IG_GRAPH_BASE_URL ?? "https://graph.instagram.com"}/${
-          process.env.META_GRAPH_API_VERSION ?? "v25.0"
-        }/me?fields=id,username`
-      : `${process.env.ZERNIO_BASE_URL ?? "https://zernio.com/api/v1"}/inbox/conversations?limit=1`;
+  if (data.source === "zernio") {
+    try {
+      await verifyZernioToken(data.token);
+      return { ok: true, username: null };
+    } catch (err) {
+      return translate(err, "La API key de Zernio no es válida");
+    }
+  }
+
+  // Meta: el token debe ser de ESE perfil. Un token de otro guardaría
+  // credenciales que reciben webhooks de uno y contestan por otro.
+  const url = `${process.env.IG_GRAPH_BASE_URL ?? "https://graph.instagram.com"}/${
+    process.env.META_GRAPH_API_VERSION ?? "v25.0"
+  }/me?fields=id,username`;
 
   let res: Response;
   try {
@@ -105,28 +137,36 @@ async function verify(data: z.infer<typeof putSchema>): Promise<Check> {
       ok: false,
       status: 422,
       code: "invalid_token",
-      message:
-        data.source === "meta"
-          ? "El token de Instagram no es válido o no tiene permiso de mensajes"
-          : "La API key de Zernio no es válida",
+      message: "El token de Instagram no es válido o no tiene permiso de mensajes",
     };
   }
 
-  if (data.source === "meta") {
-    const json = (await res.json().catch(() => null)) as {
-      id?: string;
-      username?: string;
-    } | null;
-    if (json?.id && json.id !== data.igUserId) {
+  const json = (await res.json().catch(() => null)) as {
+    id?: string;
+    username?: string;
+  } | null;
+  if (json?.id && json.id !== data.igUserId) {
+    return {
+      ok: false,
+      status: 422,
+      code: "id_mismatch",
+      message: `El IG_ID del token es ${json.id}, no ${data.igUserId}`,
+    };
+  }
+  return { ok: true, username: json?.username ?? null };
+}
+
+function translate(err: unknown, invalidMessage: string): Check {
+  if (err instanceof MetaApiError) {
+    if (err.status === 0 || err.status >= 500) {
       return {
         ok: false,
-        status: 422,
-        code: "id_mismatch",
-        message: `El IG_ID del token es ${json.id}, no ${data.igUserId}`,
+        status: 503,
+        code: "platform_unavailable",
+        message: "No se pudo contactar la plataforma; intenta de nuevo",
       };
     }
-    return { ok: true, username: json?.username ?? null };
+    return { ok: false, status: 422, code: "invalid_token", message: invalidMessage };
   }
-
-  return { ok: true, username: null };
+  throw err;
 }

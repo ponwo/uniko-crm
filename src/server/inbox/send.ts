@@ -214,6 +214,12 @@ async function prepareSend(
 }
 
 async function persistOutbound(input: {
+  /**
+   * Id acuñado ANTES de llamar a la plataforma cuando el transporte admite
+   * llave de idempotencia (Zernio): así un reintento del mismo envío no
+   * manda el mensaje dos veces. Sin él se acuña aquí, como siempre.
+   */
+  id?: string;
   organizationId: string;
   conversationId: string;
   waMessageId: string | null;
@@ -237,7 +243,7 @@ async function persistOutbound(input: {
   const inserted = await db
     .insert(schema.message)
     .values({
-      id: newId("message"),
+      id: input.id ?? newId("message"),
       organizationId: input.organizationId,
       conversationId: input.conversationId,
       waMessageId: input.waMessageId,
@@ -279,10 +285,13 @@ export async function sendText(input: {
   const target = await prepareSend(input.conversationId, input.organizationId);
   const { credentials, recipient } = target;
 
+  // El id del mensaje se acuña antes de salir: en Zernio va como
+  // `Idempotency-Key`, y la fila se guarda después con ese mismo id.
+  const id = newId("message");
   const waMessageId = target.instagram
-    ? await callInstagramSend(target, input.text)
+    ? await callInstagramSend(target, input.text, id)
     : target.messenger
-      ? await callMessengerSend(target, input.text)
+      ? await callMessengerSend(target, input.text, id)
       : await callGraphSend(credentials!, {
           messaging_product: "whatsapp",
           to: recipient,
@@ -291,6 +300,7 @@ export async function sendText(input: {
         });
 
   const messageId = await persistOutbound({
+    id,
     organizationId: input.organizationId,
     conversationId: input.conversationId,
     waMessageId,
@@ -537,7 +547,8 @@ export async function callGraphSend(
  */
 async function callInstagramSend(
   target: SendTarget,
-  text: string
+  text: string,
+  idempotencyKey?: string
 ): Promise<string> {
   const creds = target.instagram!;
 
@@ -560,6 +571,7 @@ async function callInstagramSend(
       threadRef: target.conversation.channelThreadRef,
       text,
       humanAgentTag,
+      idempotencyKey,
     });
     return res.platformMessageId;
   } catch (err) {
@@ -589,7 +601,8 @@ async function callInstagramSend(
  */
 async function callMessengerSend(
   target: SendTarget,
-  text: string
+  text: string,
+  idempotencyKey?: string
 ): Promise<string> {
   const creds = target.messenger!;
 
@@ -614,6 +627,7 @@ async function callMessengerSend(
       threadRef: target.conversation.channelThreadRef,
       text,
       humanAgentTag,
+      idempotencyKey,
     });
     return res.platformMessageId;
   } catch (err) {

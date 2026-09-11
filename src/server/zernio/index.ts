@@ -74,8 +74,18 @@ export type ZernioEvent = {
     attachments?: { type?: string; url?: string }[];
     sender?: { id?: string; name?: string | null; username?: string | null };
   };
-  account?: { id?: string; platform?: string };
+  /**
+   * `accountId` es el campo canónico desde que Zernio lo unificó en todos
+   * sus eventos; `id` se mantiene por compatibilidad con el mismo valor.
+   * Ver `zernioAccountRef`.
+   */
+  account?: { id?: string; accountId?: string; platform?: string };
 };
+
+/** El accountId que enruta a la organización, lea la forma que lea Zernio. */
+export function zernioAccountRef(evt: ZernioEvent | null | undefined): string | null {
+  return evt?.account?.accountId ?? evt?.account?.id ?? null;
+}
 
 /**
  * Hora del mensaje en segundos, la que trae el evento y no la de llegada.
@@ -164,10 +174,14 @@ export async function sendZernioMessage(input: {
     }
   );
 
-  const id =
-    (res as { message?: { id?: string }; id?: string }).message?.id ??
-    (res as { id?: string }).id ??
-    `zernio_${Date.now()}`;
+  // La API responde `{ data: { messageId } }`; las otras dos formas son las
+  // que asumió la 017 antes de cotejar la doc, y no cuesta seguir leyéndolas.
+  const r = res as {
+    data?: { messageId?: string };
+    message?: { id?: string };
+    id?: string;
+  } | null;
+  const id = r?.data?.messageId ?? r?.message?.id ?? r?.id ?? `zernio_${Date.now()}`;
   return { platformMessageId: String(id) };
 }
 
