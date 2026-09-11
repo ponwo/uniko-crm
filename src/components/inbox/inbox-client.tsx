@@ -73,6 +73,9 @@ export function InboxClient({ channels }: { channels: readonly Channel[] }) {
   // recibir "hola" antes que el renglón siguiente. Sin esta cadena, dos POST
   // simultáneos pueden llegar a Meta en desorden.
   const sendQueue = useRef<Promise<unknown>>(Promise.resolve());
+  // Columna del hilo (cabecera + mensajes + compositor): es la superficie
+  // sobre la que se pueden soltar archivos para adjuntarlos, no solo la caja.
+  const threadPaneRef = useRef<HTMLElement>(null);
 
   const refetchConversations = useCallback(async () => {
     const res = await fetch("/api/conversations").catch(() => null);
@@ -328,8 +331,9 @@ export function InboxClient({ channels }: { channels: readonly Channel[] }) {
       </section>
 
       <section
+        ref={threadPaneRef}
         className={cn(
-          "flex min-w-0 flex-1 flex-col",
+          "relative flex min-w-0 flex-1 flex-col",
           !selected && "max-md:hidden"
         )}
       >
@@ -386,6 +390,7 @@ export function InboxClient({ channels }: { channels: readonly Channel[] }) {
             <MessageThread messages={thread} />
             <Composer
               conversation={selected}
+              dropZoneRef={threadPaneRef}
               onSend={sendText}
               onSent={() => {
                 if (selectedIdRef.current)
