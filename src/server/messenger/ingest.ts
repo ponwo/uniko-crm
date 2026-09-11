@@ -7,7 +7,7 @@ import {
   getMessengerCredentialsByPageId,
 } from "@/server/messenger/credentials";
 import { fetchMessengerProfileName } from "@/server/messenger/send";
-import { zernioSentAtSeconds, type ZernioEvent } from "@/server/zernio";
+import { zernioAccountRef, zernioSentAtSeconds, type ZernioEvent } from "@/server/zernio";
 
 /**
  * 017 — Adaptadores de entrada del canal de Messenger.
@@ -144,7 +144,7 @@ export function normalizeZernioEvent(payload: unknown): MessengerInbound[] {
   if (evt.event !== "message.received") return [];
   if (evt.message?.direction && evt.message.direction !== "incoming") return [];
 
-  const accountRef = evt.account?.id;
+  const accountRef = zernioAccountRef(evt);
   const psid = evt.message?.sender?.id;
   const messageId = evt.message?.id;
   if (!accountRef || !psid || !messageId) return [];

@@ -326,11 +326,22 @@ Por Zernio ese trámite ya está resuelto del lado de ellos.
 
 ### Instagram (DMs del perfil profesional)
 
-Mismo modelo, con dos fuentes posibles: una app propia de Meta (perfil del
-negocio como tester) o [Zernio](https://zernio.com) como API unificada. La
-conexión se guarda por la API de ajustes (`PUT /api/settings/instagram`) y el
-webhook vive en `/api/webhooks/ig/<token>`. El detalle está en
-[`specs/014-canal-instagram`](specs/014-canal-instagram/spec.md).
+Mismo modelo, con las mismas dos fuentes, y se conecta en **Configuración →
+Instagram**.
+
+**Con Zernio**: vincula el perfil profesional en el panel de Zernio, copia su
+`accountId`, y pégalo con la API key (y el secreto de webhook) en la pantalla.
+No hace falta el IG_ID: Zernio no lo expone y el enrutado va por `accountId`.
+Si ya diste de alta el webhook para Messenger, **no registres otro**: Zernio
+entrega todas las plataformas por el mismo endpoint y Uniko reparte cada
+mensaje a su canal, sea cual sea de las dos URLs la que pegaste. Usa el mismo
+secreto en las dos pantallas, porque Zernio firma con un secreto por endpoint.
+
+**Con app propia de Meta**: producto **Instagram**, token con
+`instagram_business_manage_messages`, el IG_ID del perfil, y el webhook
+(objeto `instagram`, campo `messages`) con la URL y el token de verificación
+que enseña la pantalla. El webhook vive en `/api/webhooks/ig/<token>`. El
+detalle está en [`specs/014-canal-instagram`](specs/014-canal-instagram/spec.md).
 
 ## Configuración de la IA
 

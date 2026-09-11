@@ -6,6 +6,7 @@ import {
 } from "@/server/instagram/credentials";
 import {
   parseZernioEvent,
+  zernioAccountRef,
   zernioSentAtSeconds,
   type ZernioEvent,
 } from "@/server/zernio";
@@ -36,7 +37,7 @@ export async function resolveZernioSecret(
 ): Promise<{ secret: string | null; accountRef: string | null }> {
   const parsed: ZernioEvent | null = parseZernioEvent(rawBody);
   if (!parsed) return { secret: null, accountRef: null };
-  const accountRef = parsed.account?.id ?? null;
+  const accountRef = zernioAccountRef(parsed);
   if (!accountRef) return { secret: null, accountRef: null };
   const creds = await getInstagramCredentialsByAccountRef(accountRef);
   return { secret: creds?.webhookSecret ?? null, accountRef };
@@ -52,7 +53,7 @@ export async function processZernioEvent(payload: unknown): Promise<void> {
   if (evt.event !== "message.received") return;
   if (evt.message?.direction && evt.message.direction !== "incoming") return;
 
-  const accountRef = evt.account?.id;
+  const accountRef = zernioAccountRef(evt);
   if (!accountRef) return;
 
   const creds = await getInstagramCredentialsByAccountRef(accountRef);
