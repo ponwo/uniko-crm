@@ -161,6 +161,8 @@ async function main() {
     ok("el webhook de Instagram → 404", wh.status === 404, String(wh.status));
     const info = await api("/api/settings/webhook");
     ok("la URL de callback de Instagram va en null", info.json?.instagramUrl === null);
+    const ca = await api("/api/settings/instagram/comment-automation");
+    ok("GET /api/settings/instagram/comment-automation → 404", ca.res.status === 404, String(ca.res.status));
     console.log(`\n===== ${checks - failures}/${checks} checks OK, ${failures} fallos =====`);
     process.exit(failures ? 1 : 0);
   }
@@ -183,6 +185,34 @@ async function main() {
   ok("segmento secreto equivocado → 404 sin efectos", wrong.status === 404, String(wrong.status));
 
   await fetch(`${BASE}/api/dev/zernio-mock/_reset`, { method: "POST" });
+  const zstate = async () => fetch(`${BASE}/api/dev/zernio-mock/_state`).then((r) => r.json());
+
+  console.log("\n== 025: Uniko registra su webhook en Zernio al guardar ==");
+  // Sin secreto escrito: en base fresca Uniko genera uno; en una re-corrida
+  // hereda el que ya guardó la corrida anterior (FR-1002). Ambas son la regla.
+  const antes = await api("/api/settings/instagram");
+  const fresca = !antes.json?.connection;
+  console.log(`  (${fresca ? "base fresca: debe generar secreto" : "re-corrida: debe heredar el secreto ya guardado"})`);
+  const primera = await api("/api/settings/instagram", {
+    method: "PUT",
+    body: JSON.stringify({ source: "zernio", accountRef: ACCOUNT, token: "sk_test-ok" }),
+  });
+  ok("PUT sin secreto → 200 con webhook registrado", primera.res.ok && primera.json?.webhook?.registered === true, JSON.stringify(primera.json));
+  ok("…creado (el mock estaba vacío)", primera.json?.webhook?.action === "created", JSON.stringify(primera.json?.webhook));
+  ok(fresca ? "…con secreto generado por Uniko" : "…con el secreto heredado de la corrida anterior (no genera otro)", primera.json?.webhook?.generatedSecret === fresca, JSON.stringify(primera.json?.webhook));
+  let zs = await zstate();
+  const hook0 = zs.webhooks?.[0];
+  ok("Zernio tiene UN webhook apuntando a la URL de callback de esta instancia", zs.webhooks?.length === 1 && hook0?.url?.endsWith(`/api/webhooks/ig/${VERIFY_TOKEN}`), JSON.stringify(zs.webhooks));
+  ok("…con el evento message.received, activo y el secreto que Uniko guardó", hook0?.events?.includes("message.received") && hook0?.isActive === true && (fresca ? /^[0-9a-f]{48}$/.test(hook0?.secret ?? "") : hook0?.secret === SECRET), JSON.stringify(hook0));
+  const generado = hook0?.secret;
+  const estado0 = await api("/api/settings/instagram");
+  ok("GET del canal dice que el webhook está registrado en Zernio", estado0.json?.zernioWebhook?.status === "registered", JSON.stringify(estado0.json?.zernioWebhook));
+  // El secreto generado es el que Uniko guardó: una entrega firmada con él pasa.
+  const evtGen = zernioEvent({ message: { id: `zmsg-gen-${RUN}`, text: "firmado con el secreto generado", sender: { id: `igsid-gen-${RUN}`, name: `Gen ${MARCA}` } } });
+  const rGen = await webhook(evtGen, { signature: sign(evtGen, generado) });
+  ok("una entrega firmada con el secreto generado → 200", rGen.status === 200, String(rGen.status));
+  const rGenMal = await webhook(evtGen, { signature: sign(evtGen, "otro") });
+  ok("…y con otro secreto → 401 (Uniko sí lo guardó)", rGenMal.status === 401, String(rGenMal.status));
 
   console.log("\n== Conexión por Zernio (validada contra su API) ==");
   const badZ = await api("/api/settings/instagram", {
@@ -248,6 +278,9 @@ async function main() {
   });
   ok("PUT con API key válida y sin IG_ID → 200", connZ.res.ok, JSON.stringify(connZ.json));
   ok("el nombre de la cuenta sale de /accounts de Zernio", connZ.json?.username === "negocio_demo", JSON.stringify(connZ.json));
+  ok(fresca ? "guardar con secreto explícito ACTUALIZA el webhook (no crea otro)" : "guardar con el mismo secreto deja el webhook como está (no crea otro)", connZ.json?.webhook?.action === (fresca ? "updated" : "unchanged") && connZ.json?.webhook?.generatedSecret === false, JSON.stringify(connZ.json?.webhook));
+  zs = await zstate();
+  ok("Zernio sigue con un solo webhook, ahora con el secreto escrito", zs.webhooks?.length === 1 && zs.webhooks?.[0]?.secret === SECRET, JSON.stringify(zs.webhooks));
   const stateZ = await api("/api/settings/instagram");
   ok(
     "la conexión queda en modo zernio con su cuenta",
@@ -304,12 +337,25 @@ async function main() {
     account: { id: FB_ACCOUNT, accountId: FB_ACCOUNT, platform: "facebook" },
     message: { id: `zmsg-fb-${RUN}`, conversationId: "zconv-fb-001", text: `de facebook por la URL de ig ${MARCA}`, sender: { id: `psid-${RUN}`, name: `Pepe FB ${MARCA}` } },
   });
-  // El secreto es el de la cuenta de Messenger: si ese canal no está
-  // conectado por Zernio en esta base, no hay secreto y la firma no se exige.
-  const fbSecret = FB_ON ? await messengerSecretOrNull() : null;
+  let fbSecret = null;
+  if (FB_ON) {
+    console.log("  (025: Messenger se conecta por API sin secreto: debe heredar el de Instagram)");
+    const connFb = await api("/api/settings/messenger", {
+      method: "PUT",
+      body: JSON.stringify({ source: "zernio", accountRef: FB_ACCOUNT, token: "sk_test-ok" }),
+    });
+    ok("Messenger por Zernio sin secreto → 200, webhook ya servía (unchanged) y sin generar otro secreto", connFb.res.ok && connFb.json?.webhook?.registered === true && connFb.json?.webhook?.action === "unchanged" && connFb.json?.webhook?.generatedSecret === false, JSON.stringify(connFb.json?.webhook));
+    zs = await zstate();
+    ok("sigue habiendo UN webhook en Zernio para los dos canales", zs.webhooks?.length === 1, JSON.stringify(zs.webhooks?.map((h) => h.url)));
+    const fbEvt = zernioEvent({ account: { id: FB_ACCOUNT, accountId: FB_ACCOUNT, platform: "facebook" }, message: { id: `zmsg-fbsec-${RUN}`, conversationId: "zconv-fb-sec", text: "firma compartida", sender: { id: `psid-sec-${RUN}`, name: `Sec ${MARCA}` } } });
+    const rFbSec = await webhook(fbEvt, { signature: sign(fbEvt, SECRET), route: "messenger" });
+    const rFbNo = await webhook(fbEvt, { route: "messenger" });
+    ok("Messenger verifica con el MISMO secreto que Instagram (firmado → 200, sin firma → 401)", rFbSec.status === 200 && rFbNo.status === 401, `${rFbSec.status}/${rFbNo.status}`);
+    fbSecret = SECRET;
+  }
   const rFb = await webhook(fbPorIg, { signature: sign(fbPorIg, fbSecret ?? SECRET) });
   ok("un evento de Facebook por la URL de Instagram → 200 (no se descarta en silencio)", rFb.status === 200, String(rFb.status));
-  if (FB_ON && fbSecret !== undefined) {
+  if (FB_ON) {
     const convFb = await waitForConversation((c) => c.contact?.name === `Pepe FB ${MARCA}`, 12);
     ok(
       "…y aterriza en la bandeja como Messenger",
@@ -322,6 +368,47 @@ async function main() {
       "…y sin Messenger encendido no entra como Instagram",
       !(todas.json?.conversations ?? []).some((c) => c.contact?.name === `Pepe FB ${MARCA}`)
     );
+  }
+
+  console.log("\n== 025: comentario → DM desde la pantalla ==");
+  const ca0 = await api("/api/settings/instagram/comment-automation");
+  ok("GET → disponible (Zernio) y sin automatización aún", ca0.json?.available === true && ca0.json?.automation === null, JSON.stringify(ca0.json));
+  const caBad = await api("/api/settings/instagram/comment-automation", {
+    method: "PUT",
+    body: JSON.stringify({ enabled: true, keywords: ["info"], dmMessage: "" }),
+  });
+  ok("sin texto de DM → 422", caBad.res.status === 422, String(caBad.res.status));
+  const ca1 = await api("/api/settings/instagram/comment-automation", {
+    method: "PUT",
+    body: JSON.stringify({ enabled: true, keywords: ["Info", "precio", "info", "más información"], dmMessage: "¡Hola! Vi tu comentario 👋", commentReply: "¡Te escribimos por DM! 📩" }),
+  });
+  ok("PUT encendida → 200", ca1.res.ok && ca1.json?.automation?.enabled === true, JSON.stringify(ca1.json));
+  zs = await zstate();
+  const auto = zs.automations?.find((a) => a.accountId === ACCOUNT);
+  ok("Zernio tiene UNA automatización para la cuenta de Instagram, creada por Uniko", zs.automations?.length === 1 && auto?.name?.startsWith("Uniko") && auto?.platform === "instagram", JSON.stringify(zs.automations));
+  ok("…modo palabra con tolerancia, keywords en minúscula y sin repetidas, con acento intacto", auto?.matchMode === "word" && auto?.typoTolerance === true && JSON.stringify(auto?.keywords) === JSON.stringify(["info", "precio", "más información"]), JSON.stringify(auto?.keywords));
+  ok("…con el DM y la respuesta pública (emojis intactos)", auto?.dmMessage === "¡Hola! Vi tu comentario 👋" && auto?.commentReply === "¡Te escribimos por DM! 📩", JSON.stringify([auto?.dmMessage, auto?.commentReply]));
+  const ca2 = await api("/api/settings/instagram/comment-automation");
+  ok("GET la lee de Zernio con sus estadísticas", ca2.json?.automation?.enabled === true && ca2.json?.automation?.keywords?.length === 3 && ca2.json?.automation?.stats !== undefined, JSON.stringify(ca2.json));
+  const ca3 = await api("/api/settings/instagram/comment-automation", {
+    method: "PUT",
+    body: JSON.stringify({ enabled: false, keywords: ["info"], dmMessage: "Texto nuevo", commentReply: null }),
+  });
+  zs = await zstate();
+  ok("apagar = isActive false y cambios aplicados, SIN borrar ni duplicar", ca3.res.ok && zs.automations?.length === 1 && zs.automations?.[0]?.isActive === false && zs.automations?.[0]?.dmMessage === "Texto nuevo" && zs.automations?.[0]?.commentReply === "", JSON.stringify(zs.automations));
+  const ca4 = await api("/api/settings/instagram/comment-automation", {
+    method: "PUT",
+    body: JSON.stringify({ enabled: true, keywords: ["info"], dmMessage: "Texto nuevo" }),
+  });
+  zs = await zstate();
+  ok("encender de nuevo reutiliza la misma (sigue siendo una)", ca4.res.ok && zs.automations?.length === 1 && zs.automations?.[0]?.isActive === true, JSON.stringify(zs.automations?.length));
+  if (FB_ON) {
+    const caFb = await api("/api/settings/messenger/comment-automation", {
+      method: "PUT",
+      body: JSON.stringify({ enabled: true, keywords: ["info"], dmMessage: "Hola desde la página" }),
+    });
+    zs = await zstate();
+    ok("Messenger crea la SUYA, aparte (dos en total, una por cuenta)", caFb.res.ok && zs.automations?.length === 2 && zs.automations?.some((a) => a.accountId === FB_ACCOUNT && a.platform === "facebook"), JSON.stringify(zs.automations?.map((a) => [a.accountId, a.platform])));
   }
 
   console.log("\n== Salida por Zernio ==");
@@ -347,18 +434,6 @@ async function main() {
 
   console.log(`\n===== ${checks - failures}/${checks} checks OK, ${failures} fallos =====`);
   process.exit(failures ? 1 : 0);
-}
-
-/**
- * El secreto de Messenger no se puede leer por la API (nunca sale), así que
- * el reparto cruzado solo se puede firmar si ESTE arnés conoce el que se
- * guardó. Convención compartida con e2e-messenger.mjs: el mismo SECRET.
- * Devuelve undefined si Messenger no está conectado por Zernio en esta base.
- */
-async function messengerSecretOrNull() {
-  const { res, json } = await api("/api/settings/messenger");
-  if (!res.ok || json?.connection?.source !== "zernio") return undefined;
-  return SECRET;
 }
 
 main().catch((err) => {

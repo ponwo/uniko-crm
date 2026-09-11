@@ -130,6 +130,17 @@ export async function markMessengerReconnectRequired(
     .where(eq(schema.messengerCredentials.organizationId, organizationId));
 }
 
+/** 025: ver `setInstagramWebhookSecret` — el secreto es compartido. */
+export async function setMessengerWebhookSecret(
+  organizationId: string,
+  webhookSecret: string
+): Promise<void> {
+  await getDb()
+    .update(schema.messengerCredentials)
+    .set({ webhookSecret, updatedAt: new Date() })
+    .where(eq(schema.messengerCredentials.organizationId, organizationId));
+}
+
 export function tokenLast4(token: string): string {
   return token.slice(-4);
 }

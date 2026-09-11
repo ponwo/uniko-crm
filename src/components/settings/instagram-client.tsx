@@ -14,6 +14,7 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { cn } from "@/lib/utils";
+import { CommentAutomationCard } from "@/components/settings/comment-automation-card";
 
 /**
  * 014 — Conexión del canal de Instagram.
@@ -36,6 +37,14 @@ type Connection = {
   accountRef: string | null;
   status: "connected" | "reconnect_required";
   tokenLast4: string;
+};
+
+/** 025: lo que Zernio dice del webhook de esta instancia, o lo que dijo al guardar. */
+type ZernioWebhookState = {
+  url: string;
+  status: "registered" | "missing" | "unknown";
+  generatedSecret?: boolean;
+  error?: string;
 };
 
 type WebhookInfo = {
@@ -68,6 +77,7 @@ const HELP: Record<Source, { title: string; items: string[] }> = {
 export function InstagramClient() {
   const [connection, setConnection] = useState<Connection | null>(null);
   const [webhook, setWebhook] = useState<WebhookInfo | null>(null);
+  const [zernioWebhook, setZernioWebhook] = useState<ZernioWebhookState | null>(null);
   const [loaded, setLoaded] = useState(false);
   const [source, setSource] = useState<Source>("zernio");
   const [igUserId, setIgUserId] = useState("");
@@ -86,6 +96,7 @@ export function InstagramClient() {
     ]).catch(() => [null, null]);
     if (c) {
       setConnection(c.connection);
+      setZernioWebhook(c.zernioWebhook ?? null);
       if (c.connection) {
         setSource(c.connection.source);
         // En modo Zernio el IG_ID guardado es el accountId (no hay otro): no
@@ -127,12 +138,23 @@ export function InstagramClient() {
       setError(data?.error?.message ?? "No se pudo conectar el perfil");
       return;
     }
-    const data = (await res.json()) as { username?: string | null };
+    const data = (await res.json()) as {
+      username?: string | null;
+      webhook?: { registered: boolean; url: string; generatedSecret: boolean; error?: string } | null;
+    };
     setToken("");
     setWebhookSecret("");
     setSaved(
       data.username ? `Perfil conectado: @${data.username}` : "Conexión guardada"
     );
+    if (data.webhook) {
+      setZernioWebhook({
+        url: data.webhook.url,
+        status: data.webhook.registered ? "registered" : "missing",
+        generatedSecret: data.webhook.generatedSecret,
+        error: data.webhook.error,
+      });
+    }
     void refetch();
   }
 
@@ -295,13 +317,7 @@ export function InstagramClient() {
             <CardTitle>Webhook de Instagram</CardTitle>
             <CardDescription>
               {source === "zernio" ? (
-                <>
-                  En Zernio, da de alta este endpoint con el evento{" "}
-                  <code>message.received</code> y, si usas secreto, el mismo que
-                  pegaste arriba. Si ya registraste el de Messenger, no hace
-                  falta otro: Zernio entrega todas las plataformas por el mismo
-                  webhook y Uniko reparte cada mensaje a su canal.
-                </>
+                <ZernioWebhookDescription state={zernioWebhook} />
               ) : (
                 <>
                   En tu app de Meta: Instagram → Configuración de la API →
@@ -346,7 +362,9 @@ export function InstagramClient() {
             <p className="flex items-start gap-2 text-xs text-text-2">
               <Info className="mt-0.5 h-3.5 w-3.5 shrink-0" />
               {source === "zernio"
-                ? "Con secreto configurado, cada entrega se verifica con su firma HMAC; sin él, la protección es el segmento secreto de la URL."
+                ? zernioWebhook?.status === "registered"
+                  ? "Cada entrega se verifica con la firma HMAC del secreto compartido entre Uniko y Zernio (generado por Uniko si no escribiste uno)."
+                  : "Con secreto configurado, cada entrega se verifica con su firma HMAC; sin él, la protección es el segmento secreto de la URL."
                 : webhook.signatureLayer
                   ? "Cada entrega se verifica con la firma del App Secret de tu app."
                   : "Define META_APP_SECRET en la instancia para que además se verifique la firma de cada entrega."}
@@ -354,6 +372,45 @@ export function InstagramClient() {
           </CardContent>
         </Card>
       )}
+
+      {connection?.source === "zernio" && connection.status === "connected" && (
+        <CommentAutomationCard channel="instagram" endpoint="/api/settings/instagram" />
+      )}
     </div>
+  );
+}
+
+/**
+ * 025: el estado del webhook en Zernio, en una frase. Antes la tarjeta decía
+ * "da de alta este endpoint" y el operador lo olvidaba: ahora Uniko lo
+ * registra al guardar y aquí se dice si quedó, o qué hacer si no.
+ */
+function ZernioWebhookDescription({ state }: { state: ZernioWebhookState | null }) {
+  if (state?.status === "registered") {
+    return (
+      <>
+        Registrado en Zernio por Uniko con el evento <code>message.received</code>
+        {state.generatedSecret ? " y un secreto generado" : ""}. No hay nada que
+        hacer en el panel de Zernio. Instagram y Messenger comparten este webhook.
+      </>
+    );
+  }
+  if (state?.status === "missing") {
+    return (
+      <>
+        <strong>No está dado de alta en Zernio.</strong>
+        {state.error ? ` Uniko no pudo registrarlo: ${state.error}.` : ""} Vuelve
+        a guardar la conexión para reintentarlo, o créalo a mano en Zernio →
+        Webhooks con esta URL, el evento <code>message.received</code> y el mismo
+        secreto que pegaste arriba.
+      </>
+    );
+  }
+  return (
+    <>
+      Uniko lo registra en Zernio al guardar la conexión (evento{" "}
+      <code>message.received</code>). Ahora mismo no se pudo comprobar su estado
+      en Zernio.
+    </>
   );
 }

@@ -40,6 +40,18 @@ Entorno: app con `WA_MOCK_ENABLED=true`, `ZERNIO_BASE_URL` apuntando a
 | Reentregas no duplican; `outgoing` no se ingiere | "el evento repetido NO duplica" + "un `outgoing` … no se ingiere" |
 | Un solo webhook para todas las plataformas: Facebook por la URL de IG aterriza como Messenger | "un evento de Facebook por la URL de Instagram → 200" + "…aterriza en la bandeja como Messenger" |
 
+## 025 — Uniko registra su webhook y gestiona comentario→DM
+
+| Comportamiento | Check |
+|---|---|
+| Al guardar sin secreto, Uniko crea el webhook en Zernio con `message.received` y un secreto generado (o hereda el que ya guardó la organización) | "PUT sin secreto → 200 con webhook registrado" + "…creado" + "…con secreto generado / heredado" |
+| El secreto generado es el que Uniko guardó (firma válida → 200, otra → 401) | "una entrega firmada con el secreto generado → 200" + "…y con otro secreto → 401" |
+| El GET del canal dice si el webhook está registrado | "GET del canal dice que el webhook está registrado en Zernio" |
+| Guardar con secreto explícito actualiza el webhook, no crea otro | "guardar con secreto explícito ACTUALIZA el webhook (no crea otro)" |
+| Messenger conectado después hereda el secreto y comparte el webhook | "Messenger por Zernio sin secreto → …unchanged…" + "sigue habiendo UN webhook" + "Messenger verifica con el MISMO secreto" |
+| Comentario→DM: crear, leer de Zernio, apagar sin borrar, encender sin duplicar; una por cuenta | sección "025: comentario → DM desde la pantalla" |
+| Canal apagado: la superficie 025 tampoco existe | "GET /api/settings/instagram/comment-automation → 404" |
+
 ## Salida
 
 | Comportamiento | Check |
