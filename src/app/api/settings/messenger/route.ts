@@ -10,7 +10,7 @@ import {
   channelDisabledResponse,
   isChannelEnabled,
 } from "@/server/channels/enabled";
-import { verifyZernioToken } from "@/server/zernio";
+import { verifyZernioAccount, ZernioVerifyError } from "@/server/zernio";
 
 export const dynamic = "force-dynamic";
 
@@ -97,10 +97,22 @@ type VerifyInput = Omit<z.infer<typeof putSchema>, "source"> & {
 async function verify(data: VerifyInput): Promise<Check> {
   if (data.source === "zernio") {
     try {
-      await verifyZernioToken(data.token);
-      return { ok: true, pageName: null };
+      const account = await verifyZernioAccount({
+        token: data.token,
+        accountId: data.accountRef!,
+        platform: "facebook",
+      });
+      return { ok: true, pageName: account.displayName };
     } catch (err) {
-      return translate(err, "La API key de Zernio no es válida");
+      if (err instanceof ZernioVerifyError) {
+        return {
+          ok: false,
+          status: err.code === "platform_unavailable" ? 503 : 422,
+          code: err.code,
+          message: err.message,
+        };
+      }
+      throw err;
     }
   }
 

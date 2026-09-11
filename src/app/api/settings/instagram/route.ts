@@ -1,6 +1,5 @@
 import { z } from "zod";
 import { apiError, parseBody, withAuth } from "@/lib/api";
-import { MetaApiError } from "@/lib/meta/client";
 import {
   getInstagramCredentialsByOrg,
   saveInstagramCredentials,
@@ -10,7 +9,7 @@ import {
   channelDisabledResponse,
   isChannelEnabled,
 } from "@/server/channels/enabled";
-import { verifyZernioToken } from "@/server/zernio";
+import { verifyZernioAccount, ZernioVerifyError } from "@/server/zernio";
 
 export const dynamic = "force-dynamic";
 
@@ -105,10 +104,22 @@ type Check =
 async function verify(data: z.infer<typeof putSchema>): Promise<Check> {
   if (data.source === "zernio") {
     try {
-      await verifyZernioToken(data.token);
-      return { ok: true, username: null };
+      const account = await verifyZernioAccount({
+        token: data.token,
+        accountId: data.accountRef!,
+        platform: "instagram",
+      });
+      return { ok: true, username: account.username };
     } catch (err) {
-      return translate(err, "La API key de Zernio no es válida");
+      if (err instanceof ZernioVerifyError) {
+        return {
+          ok: false,
+          status: err.code === "platform_unavailable" ? 503 : 422,
+          code: err.code,
+          message: err.message,
+        };
+      }
+      throw err;
     }
   }
 
@@ -154,19 +165,4 @@ async function verify(data: z.infer<typeof putSchema>): Promise<Check> {
     };
   }
   return { ok: true, username: json?.username ?? null };
-}
-
-function translate(err: unknown, invalidMessage: string): Check {
-  if (err instanceof MetaApiError) {
-    if (err.status === 0 || err.status >= 500) {
-      return {
-        ok: false,
-        status: 503,
-        code: "platform_unavailable",
-        message: "No se pudo contactar la plataforma; intenta de nuevo",
-      };
-    }
-    return { ok: false, status: 422, code: "invalid_token", message: invalidMessage };
-  }
-  throw err;
 }

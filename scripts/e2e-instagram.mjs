@@ -197,6 +197,37 @@ async function main() {
   });
   ok("sin accountId no se puede enrutar → 422", noAccount.res.status === 422, String(noAccount.res.status));
 
+  // Las tres causas con nombre: la primera fue la que se llevó la conexión
+  // real de LanCo (llave válida, plan sin Inbox) y se reportaba como "llave
+  // inválida".
+  const sinInbox = await api("/api/settings/instagram", {
+    method: "PUT",
+    body: JSON.stringify({ source: "zernio", accountRef: ACCOUNT, token: "sk_test-sin-inbox" }),
+  });
+  ok(
+    "llave válida sin el Inbox contratado → 422 inbox_required, con mensaje que lo dice",
+    sinInbox.res.status === 422 && sinInbox.json?.error?.code === "inbox_required" && /Inbox/.test(sinInbox.json?.error?.message ?? ""),
+    JSON.stringify(sinInbox.json)
+  );
+  const otraPlat = await api("/api/settings/instagram", {
+    method: "PUT",
+    body: JSON.stringify({ source: "zernio", accountRef: FB_ACCOUNT, token: "sk_test-ok" }),
+  });
+  ok(
+    "el accountId de la cuenta de Facebook en la pantalla de Instagram → 422 platform_mismatch",
+    otraPlat.res.status === 422 && otraPlat.json?.error?.code === "platform_mismatch",
+    JSON.stringify(otraPlat.json)
+  );
+  const noExiste = await api("/api/settings/instagram", {
+    method: "PUT",
+    body: JSON.stringify({ source: "zernio", accountRef: "zernio-no-existe", token: "sk_test-ok" }),
+  });
+  ok(
+    "un accountId que no es de esa llave → 422 account_not_found",
+    noExiste.res.status === 422 && noExiste.json?.error?.code === "account_not_found",
+    JSON.stringify(noExiste.json)
+  );
+
   const noIg = await api("/api/settings/instagram", {
     method: "PUT",
     body: JSON.stringify({ source: "meta", token: "IGAA-x" }),
@@ -216,6 +247,7 @@ async function main() {
     }),
   });
   ok("PUT con API key válida y sin IG_ID → 200", connZ.res.ok, JSON.stringify(connZ.json));
+  ok("el nombre de la cuenta sale de /accounts de Zernio", connZ.json?.username === "negocio_demo", JSON.stringify(connZ.json));
   const stateZ = await api("/api/settings/instagram");
   ok(
     "la conexión queda en modo zernio con su cuenta",

@@ -2,8 +2,10 @@ import { mockGuard } from "@/lib/dev-guard";
 import {
   nextZernioMessageId,
   resetZernioMock,
+  ZERNIO_MOCK_ACCOUNTS,
   zernioMockState,
   zernioTokenIsBad,
+  zernioTokenLacksInbox,
 } from "@/server/dev/zernio-mock-state";
 
 export const dynamic = "force-dynamic";
@@ -12,9 +14,9 @@ export const dynamic = "force-dynamic";
  * 017 — Zernio de mentira para el self-test. Tras `mockGuard()`: 404
  * incondicional en producción, indistinguible de una ruta inexistente.
  *
- * Imita lo único que Uniko usa de esa API —listar conversaciones (que es como
- * se valida la llave) y responder en una— y expone `_sent` y `_reset` para que
- * el arnés pueda afirmar sobre lo que recibió.
+ * Imita lo único que Uniko usa de esa API —listar cuentas y conversaciones
+ * (que es como se valida la conexión) y responder en una— y expone `_sent` y
+ * `_reset` para que el arnés pueda afirmar sobre lo que recibió.
  */
 
 type Ctx = { params: Promise<{ path: string[] }> };
@@ -23,6 +25,18 @@ function unauthorized(): Response {
   return Response.json(
     { error: { message: "Invalid API key" } },
     { status: 401 }
+  );
+}
+
+/** La respuesta literal de Zernio cuando el plan no incluye el Inbox. */
+function inboxRequired(): Response {
+  return Response.json(
+    {
+      error: "Inbox addon required. Upgrade to access inbox features.",
+      code: "INBOX_REQUIRED",
+      trialAvailable: false,
+    },
+    { status: 403 }
   );
 }
 
@@ -35,10 +49,16 @@ export async function GET(req: Request, ctx: Ctx) {
   if (route === "_sent") {
     return Response.json({ sent: zernioMockState().sent });
   }
-  if (zernioTokenIsBad(req.headers.get("authorization"))) return unauthorized();
+  const auth = req.headers.get("authorization");
+  if (zernioTokenIsBad(auth)) return unauthorized();
 
-  // GET /inbox/conversations → lo que usa la validación de la llave.
+  // GET /accounts → con qué cuentas puede hablar esta llave.
+  if (route === "accounts") {
+    return Response.json({ accounts: ZERNIO_MOCK_ACCOUNTS });
+  }
+  // GET /inbox/conversations → la prueba de que el Inbox está contratado.
   if (route === "inbox/conversations") {
+    if (zernioTokenLacksInbox(auth)) return inboxRequired();
     return Response.json({ data: [], hasMore: false });
   }
   return Response.json({});
@@ -53,7 +73,9 @@ export async function POST(req: Request, ctx: Ctx) {
     resetZernioMock();
     return Response.json({ ok: true });
   }
-  if (zernioTokenIsBad(req.headers.get("authorization"))) return unauthorized();
+  const auth = req.headers.get("authorization");
+  if (zernioTokenIsBad(auth)) return unauthorized();
+  if (zernioTokenLacksInbox(auth)) return inboxRequired();
 
   // POST /inbox/conversations/{id}/messages
   if (

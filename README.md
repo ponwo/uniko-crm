@@ -331,6 +331,8 @@ Instagram**.
 
 **Con Zernio**: vincula el perfil profesional en el panel de Zernio, copia su
 `accountId`, y pégalo con la API key (y el secreto de webhook) en la pantalla.
+Tu plan de Zernio debe incluir el **Inbox** (es un addon): sin él la llave es
+válida pero los DMs no entran ni salen, y la pantalla te lo dice con ese nombre.
 No hace falta el IG_ID: Zernio no lo expone y el enrutado va por `accountId`.
 Si ya diste de alta el webhook para Messenger, **no registres otro**: Zernio
 entrega todas las plataformas por el mismo endpoint y Uniko reparte cada
