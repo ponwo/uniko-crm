@@ -844,6 +844,50 @@ async function main() {
     outbox008.some((o) => o.type === "image" && JSON.stringify(o.body).includes("media-up-"))
   );
 
+  // Lote de adjuntos: el compositor sube varios archivos uno tras otro, en el
+  // orden elegido y con el pie solo en el primero (cada archivo es un mensaje
+  // propio en WhatsApp). Aquí se conduce ese mismo bucle contra la API.
+  const loteNombres = ["lote-1.jpg", "lote-2.jpg", "lote-3.jpg"];
+  const loteIds = [];
+  for (const [i, nombre] of loteNombres.entries()) {
+    const f = new FormData();
+    f.set("file", new Blob([JPEG_BYTES], { type: "image/jpeg" }), nombre);
+    if (i === 0) f.set("caption", "lote: pie del primero");
+    const r = await fetch(`${BASE}/api/conversations/${conv008.id}/messages/media`, {
+      method: "POST",
+      headers: { cookie, origin: BASE },
+      body: f,
+    });
+    const j = await r.json().catch(() => null);
+    if (r.status === 201 && j?.messageId) loteIds.push(j.messageId);
+  }
+  ok("lote de 3 imágenes seguidas: las 3 salen (201)", loteIds.length === 3);
+  const msgsLote = (await api(`/api/conversations/${conv008.id}/messages`)).json?.messages ?? [];
+  const enHilo = loteIds.map((id) => msgsLote.find((m) => m.id === id));
+  ok(
+    "las 3 aparecen en el hilo como imagen saliente disponible",
+    enHilo.every(
+      (m) => m?.type === "image" && m.direction === "out" && m.media?.fetchStatus === "available"
+    ),
+    JSON.stringify(enHilo.map((m) => m?.media))
+  );
+  const posiciones = enHilo.map((m) => msgsLote.indexOf(m));
+  ok(
+    "el hilo conserva el orden en que se eligieron",
+    posiciones.every((p, i) => p >= 0 && (i === 0 || p > posiciones[i - 1])),
+    JSON.stringify(posiciones)
+  );
+  ok(
+    "el pie va solo en la primera del lote",
+    enHilo[0]?.media?.caption === "lote: pie del primero" &&
+      enHilo.slice(1).every((m) => !m?.media?.caption)
+  );
+  const outboxLote = (await api("/api/dev/wa-mock/outbox")).json?.outbox ?? [];
+  ok(
+    "Graph recibió un type=image por cada archivo del lote",
+    outboxLote.filter((o) => o.type === "image").length >= 4
+  );
+
   // Camino infeliz: archivo que excede el límite (imagen > 5 MB) → 413 previo.
   const bigForm = new FormData();
   bigForm.set(

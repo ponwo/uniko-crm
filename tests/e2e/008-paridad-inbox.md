@@ -26,6 +26,31 @@ los pasos visuales de Playwright.
 | AC-3 límite de tamaño ANTES de enviar | "imagen de 6 MB → 413 too_large" |
 | AC-4 ventana cerrada = misma regla que texto | cubierto por los checks de ventana existentes (el pre-flight es compartido: `prepareSend`) |
 | AC-5 fallo del canal → mensaje failed visible | unit `media-send.test.ts` (persistencia failed) + sandbox |
+| AC-6 lote de adjuntos (varios a la vez, en orden, pie solo en el primero) | "lote de 3 imágenes seguidas: las 3 salen (201)" + "el hilo conserva el orden en que se eligieron" + "el pie va solo en la primera del lote" + outbox: un `type=image` por archivo |
+
+### Lote de adjuntos — pasos visuales (verificados en vivo con los mocks)
+
+El compositor acepta VARIOS archivos por envío: picker con `multiple`,
+soltar sobre toda la columna del hilo (cabecera + mensajes + caja), o pegar
+una imagen del portapapeles. Cada archivo sale como un mensaje propio, en el
+orden elegido; el texto va como pie del primero.
+
+1. Arrastrar archivos sobre el hilo → velo "Suelta para adjuntar" cubriendo la
+   columna; al soltar, aparece la tira de fichas (miniatura para imágenes,
+   icono + extensión para el resto), cada una con su ✕, la ficha «+» para
+   agregar más y el resumen "N adjuntos · tamaño · salen en orden…".
+2. Soltar los mismos archivos otra vez no duplica (dedup por
+   nombre+tamaño+fecha). Más de 30 → aviso "Máximo 30 adjuntos por envío…".
+3. Enviar con pie → el resumen dice "Enviando 1 de N…", las ✕ desaparecen
+   mientras sale el lote, el hilo va mostrando cada imagen conforme llega, el
+   texto se limpia tras el primero y la tira desaparece al terminar.
+4. Camino infeliz: lote con un archivo de 6 MB en medio → los anteriores
+   salen, el error nombra el archivo ("grande.png: El archivo excede el
+   límite…"), y ese archivo y los siguientes se QUEDAN en la tira para
+   quitarlos o reintentar. Un `image/*` corrupto cae al icono genérico.
+5. Cambiar de conversación descarta el lote pendiente (como WhatsApp Web);
+   con la ventana de 24 h cerrada no hay velo ni lote, y el drop no navega al
+   archivo.
 
 ## US3 — Previews entrantes (automatizado)
 
@@ -41,8 +66,9 @@ los pasos visuales de Playwright.
 1. Login → Inbox → conversación "Lead 008": el hilo muestra la burbuja manual
    con badge 📱 "Celular", la imagen enviada con miniatura y caption, la
    ubicación con enlace, y el adjunto roto con "contenido no disponible".
-2. Composer: clip 📎 abre el picker; imagen seleccionada muestra preview con
-   nombre/tamaño; el texto pasa a ser "pie del adjunto".
+2. Composer: clip 📎 abre el picker (multiselección); una imagen sola muestra
+   su ficha con nombre/tamaño y el texto pasa a ser "pie del adjunto"; varias
+   forman la tira del lote (ver "Lote de adjuntos" arriba).
 3. Panel de contacto: la conversación pausada muestra "Respondiste desde el
    teléfono — IA en pausa" y el botón de reactivar funciona.
 
