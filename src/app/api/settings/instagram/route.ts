@@ -10,6 +10,12 @@ import {
   isChannelEnabled,
 } from "@/server/channels/enabled";
 import { verifyZernioAccount, ZernioVerifyError } from "@/server/zernio";
+import {
+  getZernioConnection,
+  provisionWebhook,
+  sharedSecretFor,
+  webhookState,
+} from "@/server/zernio/connection";
 
 export const dynamic = "force-dynamic";
 
@@ -18,6 +24,8 @@ export const GET = withAuth(async (session) => {
   if (!isChannelEnabled("instagram")) return channelDisabledResponse();
   const creds = await getInstagramCredentialsByOrg(session.organizationId);
   if (!creds) return Response.json({ connection: null });
+  // 025: con Zernio, la pantalla dice si el webhook sigue dado de alta allá.
+  const conn = await getZernioConnection(session.organizationId, "instagram");
   return Response.json({
     connection: {
       source: creds.source,
@@ -27,6 +35,7 @@ export const GET = withAuth(async (session) => {
       status: creds.status,
       tokenLast4: tokenLast4(creds.token),
     },
+    zernioWebhook: conn ? await webhookState(conn) : null,
   });
 });
 
@@ -84,6 +93,17 @@ export const PUT = withAuth(async (session, req: Request) => {
     return apiError(422, "invalid_body", "Falta el identificador del perfil");
   }
 
+  // 025: con Zernio el secreto es compartido con Messenger, y si el operador
+  // no escribió ninguno se genera aquí: el webhook se registra con él abajo.
+  const shared =
+    data.source === "zernio"
+      ? await sharedSecretFor({
+          organizationId: session.organizationId,
+          channel: "instagram",
+          typed: data.webhookSecret ?? null,
+        })
+      : null;
+
   await saveInstagramCredentials({
     organizationId: session.organizationId,
     source: data.source,
@@ -91,10 +111,23 @@ export const PUT = withAuth(async (session, req: Request) => {
     accountRef: data.accountRef ?? null,
     username: check.username ?? data.username ?? null,
     token: data.token,
-    webhookSecret: data.webhookSecret ?? null,
+    webhookSecret: shared?.secret ?? data.webhookSecret ?? null,
   });
 
-  return Response.json({ ok: true, username: check.username ?? null });
+  // La conexión ya está guardada: registrar el webhook en Zernio es lo que
+  // sigue, y si falla se dice, no se deshace (Constitución II).
+  const webhook =
+    shared && data.accountRef
+      ? await provisionWebhook({
+          organizationId: session.organizationId,
+          channel: "instagram",
+          token: data.token,
+          secret: shared.secret,
+          generatedSecret: shared.generated,
+        })
+      : null;
+
+  return Response.json({ ok: true, username: check.username ?? null, webhook });
 });
 
 type Check =

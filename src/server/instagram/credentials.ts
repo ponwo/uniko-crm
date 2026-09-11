@@ -127,6 +127,20 @@ export async function markInstagramReconnectRequired(
     .where(eq(schema.instagramCredentials.organizationId, organizationId));
 }
 
+/**
+ * 025: el secreto del webhook es compartido con Messenger (un endpoint en
+ * Zernio, un secreto); cuando el otro canal lo fija, este se alinea.
+ */
+export async function setInstagramWebhookSecret(
+  organizationId: string,
+  webhookSecret: string
+): Promise<void> {
+  await getDb()
+    .update(schema.instagramCredentials)
+    .set({ webhookSecret, updatedAt: new Date() })
+    .where(eq(schema.instagramCredentials.organizationId, organizationId));
+}
+
 export function tokenLast4(token: string): string {
   return token.slice(-4);
 }

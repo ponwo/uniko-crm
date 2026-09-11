@@ -209,14 +209,31 @@ export class ZernioVerifyError extends Error {
 /** Plataforma de Zernio que corresponde a cada canal de Uniko. */
 export const ZERNIO_PLATFORM = { instagram: "instagram", messenger: "facebook" } as const;
 
-type ZernioAccount = {
+export type ZernioAccount = {
   _id?: string;
   id?: string;
   platform?: string;
   username?: string | null;
   displayName?: string | null;
   isActive?: boolean;
+  /** Perfil de Zernio al que pertenece: string o el objeto entero. */
+  profileId?: string | { _id?: string; name?: string } | null;
 };
+
+/** Las cuentas de una llave, en la forma que devuelva la API. */
+export async function listZernioAccounts(token: string): Promise<ZernioAccount[]> {
+  const res = (await zernioFetch("/accounts", { token })) as
+    | { accounts?: ZernioAccount[]; data?: ZernioAccount[] }
+    | ZernioAccount[]
+    | null;
+  return Array.isArray(res) ? res : (res?.accounts ?? res?.data ?? []);
+}
+
+export function zernioProfileId(account: ZernioAccount): string | null {
+  const p = account.profileId;
+  if (!p) return null;
+  return typeof p === "string" ? p : (p._id ?? null);
+}
 
 /**
  * Comprueba, ANTES de guardar, que la conexión puede funcionar:
@@ -237,11 +254,7 @@ export async function verifyZernioAccount(input: {
 }): Promise<{ username: string | null; displayName: string | null }> {
   let accounts: ZernioAccount[];
   try {
-    const res = (await zernioFetch("/accounts", { token: input.token })) as
-      | { accounts?: ZernioAccount[]; data?: ZernioAccount[] }
-      | ZernioAccount[]
-      | null;
-    accounts = Array.isArray(res) ? res : (res?.accounts ?? res?.data ?? []);
+    accounts = await listZernioAccounts(input.token);
   } catch (err) {
     throw translateVerify(err, "La API key de Zernio no es válida");
   }
@@ -311,10 +324,10 @@ export async function verifyZernioToken(token: string): Promise<void> {
  * interpretar — incluido `isAuthError`, que distingue una llave muerta de un
  * hipo transitorio y costó un incidente aprender.
  */
-async function zernioFetch(
+export async function zernioFetch(
   path: string,
   opts: {
-    method?: "GET" | "POST";
+    method?: "GET" | "POST" | "PUT" | "PATCH" | "DELETE";
     token: string;
     body?: unknown;
     headers?: Record<string, string>;

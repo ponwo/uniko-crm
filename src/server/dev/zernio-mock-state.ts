@@ -17,21 +17,67 @@ export type ZernioSentMessage = {
   at: string;
 };
 
+/** 025: lo que Uniko da de alta en Zernio, para que el arnés lo afirme. */
+export type ZernioMockWebhook = {
+  _id: string;
+  name: string;
+  url: string;
+  secret: string;
+  events: string[];
+  isActive: boolean;
+  failureCount: number;
+};
+
+export type ZernioMockAutomation = {
+  id: string;
+  name: string;
+  profileId: string;
+  accountId: string;
+  platform: string;
+  trigger: string;
+  keywords: string[];
+  matchMode: string;
+  typoTolerance: boolean;
+  dmMessage: string;
+  commentReply: string;
+  isActive: boolean;
+  stats: { triggered: number; dmsSent: number; dmsFailed: number };
+};
+
 type ZernioMockState = {
   seq: number;
   sent: ZernioSentMessage[];
+  webhooks: ZernioMockWebhook[];
+  automations: ZernioMockAutomation[];
 };
 
 const g = globalThis as unknown as { __unikoZernioMock?: ZernioMockState };
 
 export function zernioMockState(): ZernioMockState {
-  if (!g.__unikoZernioMock) g.__unikoZernioMock = { seq: 0, sent: [] };
+  if (!g.__unikoZernioMock) {
+    g.__unikoZernioMock = { seq: 0, sent: [], webhooks: [], automations: [] };
+  }
+  // Instancias creadas antes de la 025 (hot reload en dev) no traen las listas.
+  g.__unikoZernioMock.webhooks ??= [];
+  g.__unikoZernioMock.automations ??= [];
   return g.__unikoZernioMock;
 }
 
-/** Vacía lo enviado. El contador NO se reinicia: ver `nextZernioMessageId`. */
+/**
+ * Vacía lo enviado y lo dado de alta. El contador NO se reinicia: ver
+ * `nextZernioMessageId`.
+ */
 export function resetZernioMock(): void {
-  zernioMockState().sent = [];
+  const state = zernioMockState();
+  state.sent = [];
+  state.webhooks = [];
+  state.automations = [];
+}
+
+/** Un ObjectId de mentira con la forma que Zernio valida (24 hex). */
+export function nextZernioObjectId(): string {
+  const state = zernioMockState();
+  return (Date.now().toString(16) + (++state.seq).toString(16).padStart(6, "0") + "0".repeat(24)).slice(0, 24);
 }
 
 /**
@@ -66,6 +112,9 @@ export function zernioTokenLacksInbox(authorization: string | null): boolean {
   return token.endsWith("-sin-inbox");
 }
 
+/** El perfil de Zernio al que pertenecen las cuentas del arnés. */
+export const ZERNIO_MOCK_PROFILE = { _id: "zernio-profile-001", name: "Negocio Demo" } as const;
+
 /** Las cuentas que el arnés espera encontrar en la llave, por plataforma. */
 export const ZERNIO_MOCK_ACCOUNTS = [
   {
@@ -74,6 +123,7 @@ export const ZERNIO_MOCK_ACCOUNTS = [
     username: "negocio_demo",
     displayName: "Negocio Demo",
     isActive: true,
+    profileId: ZERNIO_MOCK_PROFILE,
   },
   {
     _id: "zernio-account-001",
@@ -81,5 +131,6 @@ export const ZERNIO_MOCK_ACCOUNTS = [
     username: null,
     displayName: "Página Demo",
     isActive: true,
+    profileId: ZERNIO_MOCK_PROFILE,
   },
 ] as const;

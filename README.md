@@ -293,14 +293,19 @@ Dos formas de traer los mensajes; se elige en **Configuración → Messenger**.
 
 1. Vincula la página de Facebook en el panel de [Zernio](https://zernio.com) y
    copia el `accountId` de esa cuenta. Crea una API key (Settings → API Keys;
-   se muestra una sola vez).
+   se muestra una sola vez). Tu plan debe incluir el **Inbox** de Zernio.
 2. En Uniko, **Configuración → Messenger**: elige *Zernio*, pega el
-   `accountId`, la API key y —recomendado— un secreto de webhook. Pulsa
-   *Probar y guardar*: la llave se valida contra Zernio antes de guardarse
-   cifrada, y la pantalla te enseña la URL de callback.
-3. En Zernio, da de alta ese endpoint con el evento `message.received` y el
-   mismo secreto. El webhook de Zernio entrega todas tus plataformas por la
-   misma URL; Uniko solo ingiere aquí lo de Facebook.
+   `accountId` y la API key, y pulsa *Probar y guardar*. La llave se valida
+   contra Zernio antes de guardarse cifrada, y **Uniko registra su webhook en
+   Zernio por ti** (evento `message.received`, con un secreto generado si no
+   escribiste uno). La pantalla dice si quedó registrado; si Zernio falló, te
+   enseña la URL para darlo de alta a mano.
+3. No hay paso 3. Instagram y Messenger comparten el webhook y el secreto.
+
+En esa misma pantalla puedes encender **Comentario → DM**: cuando alguien
+comenta una palabra clave en una publicación, Zernio le manda un DM (y una
+respuesta pública opcional); esa conversación entra a la bandeja y el agente
+la sigue. Los comentarios en sí no se ven en Uniko.
 
 **Con una app propia de Meta**:
 
@@ -330,14 +335,13 @@ Mismo modelo, con las mismas dos fuentes, y se conecta en **Configuración →
 Instagram**.
 
 **Con Zernio**: vincula el perfil profesional en el panel de Zernio, copia su
-`accountId`, y pégalo con la API key (y el secreto de webhook) en la pantalla.
-Tu plan de Zernio debe incluir el **Inbox** (es un addon): sin él la llave es
-válida pero los DMs no entran ni salen, y la pantalla te lo dice con ese nombre.
-No hace falta el IG_ID: Zernio no lo expone y el enrutado va por `accountId`.
-Si ya diste de alta el webhook para Messenger, **no registres otro**: Zernio
-entrega todas las plataformas por el mismo endpoint y Uniko reparte cada
-mensaje a su canal, sea cual sea de las dos URLs la que pegaste. Usa el mismo
-secreto en las dos pantallas, porque Zernio firma con un secreto por endpoint.
+`accountId`, y pégalo con la API key en la pantalla. Tu plan de Zernio debe
+incluir el **Inbox** (es un addon): sin él la llave es válida pero los DMs no
+entran ni salen, y la pantalla te lo dice con ese nombre. No hace falta el
+IG_ID: Zernio no lo expone y el enrutado va por `accountId`. El webhook lo
+registra Uniko al guardar, igual que en Messenger (y es el mismo para los dos
+canales: Zernio entrega todas las plataformas por un endpoint y Uniko reparte).
+La tarjeta **Comentario → DM** funciona igual que en Messenger.
 
 **Con app propia de Meta**: producto **Instagram**, token con
 `instagram_business_manage_messages`, el IG_ID del perfil, y el webhook
