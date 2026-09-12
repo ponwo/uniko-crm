@@ -21,6 +21,7 @@ producto** — y saberlo antes de leerla ahorra una confusión.
 | `022-guardia-seed-demo` | — | **CERRADA sin mergear.** Ver abajo |
 | `023-seed-demo-fuera-de-produccion` | Ligero | spec (incluye el cierre de la 022) |
 | `024-mocks-404-incondicional` | Ligero | spec — `/api/dev/*` responde 404 antes del enrutado por método |
+| `026-conector-inventario` | Ciclo completo | spec — conector `INVENTARIO` (bandera): botón "Inventario" con SSO al portal de MS-Stock y acción `check_stock` del agente; el contrato vive en el repo MS-Stock (feature 003). El número 025 quedó sin usar (el script de ramas lo saltó el 2026-09-12); no se reasigna |
 
 ### La 022, cerrada sin mergear
 
