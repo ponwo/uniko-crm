@@ -96,3 +96,41 @@ Uniko" → `http://localhost:3000`) y 3.4 con un producto real (`PLY-NEG`).
 Gate verde (matriz apagada/encendida), `pnpm test:e2e` verde con
 `inventarioChecks()`, self-test manual §3, contrato real §4 y verificación en la
 instancia de pruebas §5.2 registrados aquí.
+
+## Resultados del self-test local — 2026-09-12 (T021, T027, T031, T034)
+
+- **Gate**: `pnpm typecheck` ✓ · `eslint src tests` ✓ · `pnpm build` ✓ (rutas
+  `/api/inventario/sso`, `/api/inventario/status`, `/settings/inventario`) ·
+  `pnpm test` **657/657** con `INVENTARIO` vacía y con `on` (18 tests nuevos en 8
+  archivos). Nota local: Node 24 en la máquina (el repo pide 22; `pnpm` solo avisa);
+  `pnpm lint` a secas arrastra ruido de `.claude/worktrees/` (worktrees viejos,
+  ignorados por git, no por ESLint) — la CI corre sobre un checkout limpio.
+- **`pnpm test:e2e` con la bandera encendida**: **133/133**. Sección 026: los 5
+  casos felices de `check_stock` (línea exacta por producto, agotado, sin precio,
+  sin coincidencias, SKU exacto), la gorra inactiva nunca aparece, la frase del
+  modelo precede a los datos; degradación en `down`/`unauthorized`/`slow`/`garbage`
+  → solo "Déjame revisar." en 6.4 s / 6.5 s / 9.6 s / 6.4 s (6 s son la coalescencia
+  del agente; el `slow` suma el timeout de 3 s); botón: 401 sin sesión, 302 con
+  pase, el mock saluda por nombre, claims exactos (`sub`, `name`, `iss`, `aud`,
+  vida 120), `jti` nuevo por clic, `next` interno sí / externo no; estado:
+  `connected` / `unauthorized` / `unavailable`, sin llave ni secreto en `status` ni
+  en el HTML de Ajustes.
+- **Con la bandera apagada** (misma app, `INVENTARIO=`): **112/112**; las rutas y
+  la página → 404 y "¿tienen playera negra?" recibe el eco normal (el ai-mock no
+  propone `check_stock` porque el prompt no lo menciona).
+- **Hallazgo del arnés**: 26 fallos de la primera corrida eran estado viejo de la
+  base local (ids de mensaje ya ingeridos ⇒ ventana de 24 h cerrada), no producto:
+  con la base recreada (`DROP/CREATE` + `pnpm db:dev`) todo verde. Y el CRM
+  normaliza `521…` → `52…`: el outbox se filtra con el número "al cable".
+- **Navegador (Chromium 1280×800 y 375×812 @2x)**: renglón "Inventario" tras
+  Pipeline (`Bandeja · Pipeline · Inventario · Contactos · Agente · Laboratorio`),
+  `target=_blank`; en móvil dentro del cajón; clic ⇒ pestaña nueva "Inventario de
+  prueba — Operador E2E desde Uniko"; Ajustes → Inventario "Conectado"; sin
+  desbordamiento horizontal.
+- **§4 MS-Stock real en local** (`STOCK_BASE_URL=http://127.0.0.1:8000`, mismo
+  secreto): botón ⇒ **portal real** en 0.72 s con "Operador E2E desde Uniko" y
+  "Volver a Uniko" → `http://localhost:3000` (MS-Stock: `sso login ok`); Ajustes
+  "Conectado"; "¿cuánto cuesta la PLY-NEG?" ⇒ "Déjame revisar.\nPlayera negra
+  (PLY-NEG): 17 pieza — $199 MXN" (17 = existencia real de esa base, no la del
+  mock). Un intento previo falló porque en el puerto 8000 seguía viva una instancia
+  vieja de MS-Stock con otro secreto: el rechazo fue el esperado (`bad_signature`).

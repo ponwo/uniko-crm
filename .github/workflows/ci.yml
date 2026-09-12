@@ -59,17 +59,26 @@ jobs:
             agenda: ""
             atribucion: ""
             push: ""
+            inventario: ""
           - name: completo
             channels: "whatsapp,instagram,messenger"
             agenda: "on"
             atribucion: "on"
             push: "on"
+            inventario: "on"
 
     env:
       CHANNELS: ${{ matrix.config.channels }}
       AGENDA: ${{ matrix.config.agenda }}
       ATRIBUCION: ${{ matrix.config.atribucion }}
       PUSH: ${{ matrix.config.push }}
+      # 026 — Con el conector encendido, las tres STOCK_* son obligatorias al
+      # validar el entorno (env.ts). Valores de mentira: los tests unitarios no
+      # hacen red y el stock-mock solo existe con la app viva.
+      INVENTARIO: ${{ matrix.config.inventario }}
+      STOCK_BASE_URL: ${{ matrix.config.inventario == 'on' && 'http://localhost:3000/api/dev/stock-mock' || '' }}
+      STOCK_API_KEY: ${{ matrix.config.inventario == 'on' && 'ci-stock-key-0123456789abcdef0123456789' || '' }}
+      STOCK_SSO_SECRET: ${{ matrix.config.inventario == 'on' && 'ci-sso-secret-0123456789abcdef0123456789' || '' }}
 
     steps:
       - uses: actions/checkout@v7

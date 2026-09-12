@@ -98,8 +98,10 @@ Sobre el agente: la app funciona como CRM sin `OPENROUTER_API_TOKEN`, pero
 **el arnés de la 020 lo necesita** — sin agente no hay escalaciones, y sin
 escalaciones no hay nada que avisar. De ahí que esté en la plantilla.
 
-Lo que **no** hace falta: `CHANNELS`, `AGENDA`, `ATRIBUCION` y `PUSH` (los
-módulos opcionales van apagados y sus superficies responden 404). Todo lo demás
+Lo que **no** hace falta: `CHANNELS`, `AGENDA`, `ATRIBUCION`, `PUSH` e
+`INVENTARIO` (los módulos opcionales van apagados y sus superficies responden
+404). Para ejercitar el conector de inventario contra su mock, ver
+[inventario-conector.md](inventario-conector.md) (cuatro variables más). Todo lo demás
 del esquema tiene valor por defecto.
 
 ---

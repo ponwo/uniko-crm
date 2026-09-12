@@ -139,6 +139,19 @@ bot. Si Meta se cae, el lead se mueve igual: una conversión jamás vale un
 movimiento bloqueado. Los gotchas de Meta que cuesta descubrir solo están en
 [`docs/atribucion-capi.md`](docs/atribucion-capi.md).
 
+### 📦 Inventario con existencias reales (opcional, apagada por defecto)
+
+Un agente que dice "sí, tenemos" por intuición pierde la venta o la confianza.
+Con `INVENTARIO=on` el CRM se conecta a **MS-Stock** —un microservicio aparte,
+una instancia por negocio, con su propia base— y el agente **consulta antes de
+afirmar**: existencia, unidad y precio reales, pegados por el sistema para que no
+pueda inventarlos; si MS-Stock no responde, contesta sin inventario y la
+conversación sigue. El botón **Inventario** abre el portal de MS-Stock ya
+autenticado (un pase de un solo uso: MS-Stock no tiene usuarios, la identidad es
+la de Uniko), y Ajustes → Inventario dice si la conexión funciona. Variables,
+mock de pruebas y contrato en
+[`docs/inventario-conector.md`](docs/inventario-conector.md).
+
 ### 📄 Plantillas · 👥 Multi-usuario · 🔐 Self-hosted
 
 Plantillas con varias variables `{{1}}…{{n}}` y aprobación de Meta

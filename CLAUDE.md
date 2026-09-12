@@ -40,10 +40,11 @@ externas: el trabajo en segundo plano (agente, Laboratorio) es in-process.
 | La agenda (horarios, huecos, citas) | `src/server/agenda/` — detrás de la bandera `AGENDA` (`flag.ts`) |
 | Cómo se entrega la reunión (Zoom, Meet…) | `src/server/agenda/connectors/` + catálogo en `src/lib/agenda-connectors.ts` · guía: [docs/agenda-conectores.md](docs/agenda-conectores.md) |
 | La atribución de anuncios y el reporte a Meta | `src/server/attribution/` — detrás de la bandera `ATRIBUCION` (`flag.ts`) + `src/lib/meta/capi.ts` · guía: [docs/atribucion-capi.md](docs/atribucion-capi.md) |
+| El inventario (botón a MS-Stock y `check_stock` del agente) | `src/server/inventario/` — detrás de la bandera `INVENTARIO` (`flag.ts`); `client.ts` es el ÚNICO que conoce HTTP de MS-Stock; el contrato vive en el repo MS-Stock (`specs/003-sso-uniko/contracts/`) · guía: [docs/inventario-conector.md](docs/inventario-conector.md) |
 | UI | `src/components/` + `src/app/(app)/` |
 
 Los mocks del entorno de pruebas viven en `src/app/api/dev/` (wa-mock +
-ai-mock) tras dos capas: el middleware (`src/middleware.ts`, perímetro
+ai-mock + stock-mock) tras dos capas: el middleware (`src/middleware.ts`, perímetro
 `/api/dev/:path*`, responde 404 ANTES del enrutado por método) y `mockGuard()`
 (`src/lib/dev-guard.ts`) dentro de cada handler. 404 incondicional en
 producción sea cual sea el método — un 405 ya delata que la ruta existe. Toda
@@ -110,7 +111,8 @@ Ver [.specify/memory/constitution.md](.specify/memory/constitution.md).
 Ver `.env.example` (cada una con guía inline). Las claves: `APP_BASE_URL`,
 `DATABASE_URL`, `BETTER_AUTH_SECRET`, `ENCRYPTION_KEY` (32 bytes base64),
 `META_WEBHOOK_VERIFY_TOKEN` (segmento secreto del webhook), `META_APP_SECRET`
-(opcional, firma), y para IA:
+(opcional, firma), con `INVENTARIO=on` las tres `STOCK_*` (obligatorias solo
+entonces), y para IA:
 
 ```bash
 OPENROUTER_API_TOKEN=sk-or-...
