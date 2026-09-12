@@ -129,6 +129,30 @@ export function aiMockCompletion(messages: InMessage[]): string {
     return JSON.stringify({ action: "handoff", reason: "cliente" });
   }
 
+  /**
+   * 026 — Consulta de inventario, SOLO si el system prompt menciona la acción.
+   *
+   * Con la bandera apagada el esquema del turno no conoce `check_stock`: si el
+   * mock la devolviera igual, el parseo fallaría y el turno escalaría a humano
+   * por "fallo del proveedor" — la corrida `default` de la matriz se pondría
+   * roja por una regla del mock, no por el producto. Condicionar por el prompt
+   * es además lo que haría un modelo real: no puede nombrar lo que no le
+   * enseñaron.
+   */
+  if (system.includes("check_stock")) {
+    const m = lastUser.match(
+      /(?:tienen|tienes|hay|cu[aá]nto cuesta|precio de)\s+(.+?)\s*\??\s*$/i
+    );
+    if (m?.[1]) {
+      const query = m[1].replace(/^(?:el|la|los|las|un|una|unos|unas)\s+/i, "").trim();
+      return JSON.stringify({
+        action: "check_stock",
+        query,
+        reply: "Déjame revisar.",
+      });
+    }
+  }
+
   // Intención de compra → mover a Interesado.
   //
   // 021 — "quiero contratar" se AÑADE, no sustituye: es como cierra ahora el

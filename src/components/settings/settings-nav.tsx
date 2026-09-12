@@ -16,6 +16,9 @@ const TABS: Tab[] = [
 /** 015 — "Agenda" solo existe si esta instancia encendió la bandera. */
 const AGENDA_TAB: Tab = { href: "/settings/calendar", label: "Agenda" };
 
+/** 026 — "Inventario" solo con el conector encendido (bandera INVENTARIO). */
+const INVENTARIO_TAB: Tab = { href: "/settings/inventario", label: "Inventario" };
+
 /** 016 — Igual con "Anuncios" y la bandera ATRIBUCION. */
 const ADS_TAB: Tab = { href: "/settings/ads", label: "Anuncios" };
 
@@ -28,12 +31,14 @@ const AVISOS_TAB: Tab = { href: "/settings/avisos", label: "Avisos" };
 
 export function SettingsNav({
   agenda = false,
+  inventario = false,
   atribucion = false,
   instagram = false,
   messenger = false,
   avisos = false,
 }: {
   agenda?: boolean;
+  inventario?: boolean;
   atribucion?: boolean;
   instagram?: boolean;
   messenger?: boolean;
@@ -50,6 +55,7 @@ export function SettingsNav({
     ...(messenger ? [MESSENGER_TAB] : []),
     ...TABS.slice(1),
     ...(agenda ? [AGENDA_TAB] : []),
+    ...(inventario ? [INVENTARIO_TAB] : []),
     ...(atribucion ? [ADS_TAB] : []),
     ...(avisos ? [AVISOS_TAB] : []),
   ];

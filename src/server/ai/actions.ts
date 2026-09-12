@@ -47,16 +47,40 @@ const agendaActions = [
   }),
 ] as const;
 
+/**
+ * 026 — La acción del conector de inventario. Solo se registra si esta
+ * instancia tiene la bandera `INVENTARIO` encendida: donde no hay inventario,
+ * el modelo ni siquiera puede nombrarla.
+ *
+ * `query` es lo que el cliente pidió (nombre, parte del nombre o SKU); `reply`
+ * es una frase de entrada opcional, NO los datos: existencia y precio los pega
+ * el sistema con lo que MS-Stock devuelva. Así el agente no puede inventar
+ * existencias aunque quiera.
+ */
+const inventarioActions = [
+  z.object({
+    action: z.literal("check_stock"),
+    query: z.string().min(2).max(100),
+    reply: z.string().optional(),
+  }),
+] as const;
+
 export const AgentAction = z.discriminatedUnion("action", [
   ...baseActions,
   ...agendaActions,
+  ...inventarioActions,
 ]);
 
-/** El esquema que se le exige al modelo en ESTE turno. */
-export function agentActionSchema(agenda: boolean) {
-  return agenda
-    ? AgentAction
-    : z.discriminatedUnion("action", [...baseActions]);
+/**
+ * El esquema que se le exige al modelo en ESTE turno: solo las familias de
+ * acciones de los módulos encendidos en esta instancia.
+ */
+export function agentActionSchema(flags: { agenda: boolean; inventario: boolean }) {
+  return z.discriminatedUnion("action", [
+    ...baseActions,
+    ...(flags.agenda ? agendaActions : []),
+    ...(flags.inventario ? inventarioActions : []),
+  ]);
 }
 
 export type AgentActionType = z.infer<typeof AgentAction>;
@@ -80,7 +104,8 @@ export function degradeAction(action: AgentActionType): AgentActionType {
   if (
     action.action === "move_stage" ||
     action.action === "offer_slots" ||
-    action.action === "book_slot"
+    action.action === "book_slot" ||
+    action.action === "check_stock"
   ) {
     return action.reply
       ? { action: "reply", text: action.reply }

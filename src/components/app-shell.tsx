@@ -27,6 +27,7 @@ export function AppShell({
   theme,
   commit,
   agenda = false,
+  inventario = false,
   children,
 }: {
   branding: Branding;
@@ -37,6 +38,8 @@ export function AppShell({
   commit?: string;
   /** 015 — ¿esta instancia tiene agenda? Lo decide el servidor. */
   agenda?: boolean;
+  /** 026 — ¿esta instancia tiene el conector de inventario? Igual. */
+  inventario?: boolean;
   children: React.ReactNode;
 }) {
   const pathname = usePathname();
@@ -75,6 +78,7 @@ export function AppShell({
         role={role}
         theme={theme}
         agenda={agenda}
+        inventario={inventario}
         open={navOpen}
         onClose={() => setNavOpen(false)}
       />

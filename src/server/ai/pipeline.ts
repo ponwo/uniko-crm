@@ -19,6 +19,8 @@ import { avisarDeEscalacion } from "@/server/push/avisar";
 import { buildAgentSystemPrompt } from "@/server/ai/prompts";
 import { agendaEnabled } from "@/server/agenda/flag";
 import { bookSlot, offerSlots } from "@/server/agenda/agent";
+import { inventarioEnabled } from "@/server/inventario/flag";
+import { checkStockTurn } from "@/server/inventario/agent";
 
 /**
  * Turno del agente (FR-021..FR-025).
@@ -153,10 +155,11 @@ export async function runAgentTurn(conversationId: string): Promise<void> {
     .orderBy(asc(schema.pipelineStage.position));
 
   const agenda = agendaEnabled();
+  const inventario = inventarioEnabled();
   const messages: ChatMessage[] = [
     {
       role: "system",
-      content: buildAgentSystemPrompt({ profile, kb, stages, agenda }),
+      content: buildAgentSystemPrompt({ profile, kb, stages, agenda, inventario }),
     },
     ...history
       .filter((m) => m.text)
@@ -166,7 +169,7 @@ export async function runAgentTurn(conversationId: string): Promise<void> {
       })),
   ];
 
-  const result = await chatJson(agentActionSchema(agenda), messages);
+  const result = await chatJson(agentActionSchema({ agenda, inventario }), messages);
   if (!result.ok) {
     if (result.error === "not_configured") return;
     // Fallo persistente del proveedor o salida imposible → escalar (FR-022).
@@ -209,6 +212,27 @@ export async function runAgentTurn(conversationId: string): Promise<void> {
         console.error(`[agente] el motor de agenda falló: ${err}`);
         action = degradeAction(action);
       }
+    }
+  }
+
+  // 026 — Inventario. El sistema pega existencia y precio reales; si MS-Stock
+  // no responde, el turno degrada (el agente contesta sin inventario), nunca
+  // se tumba ni le cuenta al cliente que "el sistema falló" (FR-1112). Las
+  // conversaciones de prueba consultan igual: es solo lectura (FR-1113).
+  if (action.action === "check_stock") {
+    if (!inventario) {
+      action = degradeAction(action);
+    } else {
+      const turn = await checkStockTurn({ query: action.query, intro: action.reply });
+      if (turn.ok) {
+        await deliverReply(conversation, turn.text);
+        publish(organizationId, {
+          type: "conversation.updated",
+          data: { conversation: { id: conversationId } },
+        });
+        return;
+      }
+      action = degradeAction(action);
     }
   }
 

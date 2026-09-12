@@ -36,6 +36,11 @@ export function buildAgentSystemPrompt(input: {
    * token en hablar de horarios: la agenda no existe aquí.
    */
   agenda?: boolean;
+  /**
+   * 026 — ¿esta instancia tiene el conector de inventario? Apagado, el prompt
+   * no menciona existencias ni precios consultables: aquí no hay inventario.
+   */
+  inventario?: boolean;
 }): string {
   const { profile } = input;
   const stageNames = input.stages.map((s) => s.name).join(" | ");
@@ -43,6 +48,17 @@ export function buildAgentSystemPrompt(input: {
     ? [
         '- {"action":"offer_slots","reply":"..."} — ofrecer horarios para agendar (reply es solo la frase de entrada; los horarios los pone el sistema).',
         '- {"action":"book_slot","startUtc":"<uno de los horarios que el sistema ofreció, en ISO UTC>","reply":"..."} — agendar el horario que el cliente eligió.',
+      ]
+    : [];
+  const inventarioLines = input.inventario
+    ? [
+        '- {"action":"check_stock","query":"<lo que el cliente pidió: nombre, parte del nombre o SKU>","reply":"..."} — consultar existencia y precio reales en el inventario (reply es solo la frase de entrada; los datos los pega el sistema).',
+      ]
+    : [];
+  const inventarioRules = input.inventario
+    ? [
+        "- Antes de afirmar que hay existencia de algo o cuánto cuesta → check_stock. NUNCA inventes existencias ni precios: responde con lo que el sistema devuelva.",
+        "- Si el cliente da un SKU (código de producto), úsalo tal cual como query.",
       ]
     : [];
   const agendaRules = input.agenda
@@ -70,11 +86,13 @@ export function buildAgentSystemPrompt(input: {
       '- {"action":"move_stage","stage":"<nombre exacto de etapa>","reply":"..."} — mover el lead (reply opcional).',
       '- {"action":"handoff","reason":"...","farewell":"..."} — escalar a un humano (farewell opcional para despedirte).',
       ...agendaLines,
+      ...inventarioLines,
       "Reglas duras:",
       "- Si el cliente pide hablar con una persona/humano/asesor → handoff.",
       "- Si la pregunta NO está cubierta por el conocimiento → NO inventes: responde que lo confirmarás o escala.",
       "- Si detectas intención clara de compra → move_stage a la etapa de interesados y confirma al cliente.",
       ...agendaRules,
+      ...inventarioRules,
       "- JSON puro, sin markdown ni texto adicional.",
     ].join("\n"),
   ]

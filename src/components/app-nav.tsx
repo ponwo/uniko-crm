@@ -9,6 +9,7 @@ import {
   Inbox,
   Kanban,
   LogOut,
+  Package,
   Settings,
   Sparkles,
   Users,
@@ -28,6 +29,8 @@ type NavItem = {
   label: string;
   icon: typeof Inbox;
   badge?: boolean;
+  /** 026 — Abre fuera de la app (pestaña nueva) y nunca se pinta "activo". */
+  external?: boolean;
 };
 
 const NAV: NavItem[] = [
@@ -43,6 +46,18 @@ const AGENDA_ITEM: NavItem = {
   href: "/bookings",
   label: "Citas",
   icon: CalendarDays,
+};
+
+/**
+ * 026 — "Inventario" solo existe con el conector encendido. No es una pantalla
+ * de Uniko: la ruta emite un pase de un solo uso y manda al portal de MS-Stock
+ * en una pestaña nueva, así el CRM sigue donde estaba.
+ */
+const INVENTARIO_ITEM: NavItem = {
+  href: "/api/inventario/sso",
+  label: "Inventario",
+  icon: Package,
+  external: true,
 };
 
 /**
@@ -65,6 +80,7 @@ export function AppNav({
   theme,
   commit,
   agenda = false,
+  inventario = false,
   open = false,
   onClose,
 }: {
@@ -83,6 +99,8 @@ export function AppNav({
    * todavía debe ver la entrada igual.
    */
   agenda?: boolean;
+  /** 026 — ¿hay conector de inventario? Igual que la agenda: viene por prop. */
+  inventario?: boolean;
   /** Solo aplica por debajo de `lg`: en escritorio el lateral es fijo. */
   open?: boolean;
   onClose?: () => void;
@@ -117,9 +135,13 @@ export function AppNav({
   const settingsActive = pathname.startsWith("/settings");
   // Citas va después de Pipeline: es el paso siguiente de un trato, no una
   // sección aparte.
-  const items = agenda
-    ? [...NAV.slice(0, 2), AGENDA_ITEM, ...NAV.slice(2)]
-    : NAV;
+  // Inventario va justo después: es el otro "qué tengo para vender".
+  const items = [
+    ...NAV.slice(0, 2),
+    ...(agenda ? [AGENDA_ITEM] : []),
+    ...(inventario ? [INVENTARIO_ITEM] : []),
+    ...NAV.slice(2),
+  ];
 
   return (
     <aside
@@ -154,7 +176,22 @@ export function AppNav({
       <nav className="flex flex-col gap-0.5">
         {items.map((item) => {
           const active =
-            pathname === item.href || pathname.startsWith(`${item.href}/`);
+            !item.external &&
+            (pathname === item.href || pathname.startsWith(`${item.href}/`));
+          if (item.external) {
+            return (
+              <a
+                key={item.href}
+                href={item.href}
+                target="_blank"
+                rel="noopener"
+                className={navItemClass(false)}
+              >
+                <item.icon className="h-[17px] w-[17px] text-text-3" strokeWidth={1.8} />
+                <span className="flex-1">{item.label}</span>
+              </a>
+            );
+          }
           return (
             <Link key={item.href} href={item.href} className={navItemClass(active)}>
               <item.icon

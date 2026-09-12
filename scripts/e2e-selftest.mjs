@@ -1020,6 +1020,7 @@ async function main() {
   );
 
   await agendaChecks();
+  await inventarioChecks();
   await atribucionChecks();
 
   console.log(`\n===== ${checks - failures}/${checks} checks OK, ${failures} fallos =====`);
@@ -1460,6 +1461,222 @@ main().catch((err) => {
   console.error("ERROR FATAL:", err);
   process.exit(1);
 });
+
+/* ============================================================
+ * 026 — Conector INVENTARIO (tests/e2e/us-inventario.md)
+ *
+ * La bandera `INVENTARIO` decide qué mitad corre: apagada, se afirma que el
+ * conector NO EXISTE (404, ni acción, ni prompt); encendida, el botón con su
+ * pase, el agente consultando al stock-mock (feliz e infeliz) y el estado en
+ * Ajustes. Ambas mitades corren en la matriz de CI.
+ * ============================================================ */
+async function inventarioChecks() {
+  const encendida = /^(on|1|true|si|sí|yes)$/i.test(
+    (process.env.INVENTARIO ?? "").trim()
+  );
+  const STOCK = (process.env.STOCK_BASE_URL ?? "").replace(/\/+$/, "");
+  // El agente junta ráfagas con un debounce: se sondea, no se duerme.
+  const coalesce = Number(process.env.AGENT_COALESCE_MS ?? 6000);
+  const ventana = coalesce + 8000;
+
+  // El CRM normaliza 521… → 52… (identity.ts): por el cable sale sin el 1.
+  const alCable = (lead) => (lead.startsWith("521") ? `52${lead.slice(3)}` : lead);
+  const outboxDe = async (to) =>
+    ((await api("/api/dev/wa-mock/outbox")).json?.outbox ?? []).filter(
+      (o) => o.to === to || o.to === alCable(to)
+    );
+  const textoDe = (o) => o?.body?.text?.body ?? JSON.stringify(o?.body ?? "");
+  /** Manda un inbound y espera la PRIMERA respuesta del agente a ese lead. */
+  async function preguntar(lead, texto, n) {
+    const antes = (await outboxDe(lead)).length;
+    const t0 = Date.now();
+    await api("/api/dev/wa-mock/inbound", {
+      method: "POST",
+      body: JSON.stringify({
+        phoneNumberId: PN,
+        from: lead,
+        name: `Lead inventario ${n}`,
+        text: texto,
+        waMessageId: `wamid.e2e.026.${n}`,
+      }),
+    });
+    const hasta = Date.now() + ventana;
+    while (Date.now() < hasta) {
+      const ahora = await outboxDe(lead);
+      if (ahora.length > antes) {
+        return { text: textoDe(ahora[ahora.length - 1]), ms: Date.now() - t0 };
+      }
+      await sleep(400);
+    }
+    return { text: null, ms: Date.now() - t0 };
+  }
+
+  console.log("\n== 026: la bandera del conector de inventario ==");
+  const rutas = ["/api/inventario/sso", "/api/inventario/status"];
+  if (!encendida) {
+    for (const ruta of rutas) {
+      const res = (await api(ruta, { redirect: "manual" })).res;
+      ok(`${ruta} → 404 con el conector apagado`, res.status === 404, `status=${res.status}`);
+    }
+    const pagina = await fetch(`${BASE}/settings/inventario`, {
+      headers: { cookie },
+      redirect: "manual",
+    });
+    ok("/settings/inventario → 404 con el conector apagado", pagina.status === 404, `status=${pagina.status}`);
+
+    const perfilAntes = (await api("/api/agent/profile")).json?.profile;
+    await api("/api/agent/profile", { method: "PUT", body: JSON.stringify({ enabled: true }) });
+    const r = await preguntar("5214627026900", "¿tienen playera negra?", "off.1");
+    ok(
+      "apagado: '¿tienen playera negra?' recibe el eco de siempre (el agente no conoce check_stock)",
+      typeof r.text === "string" && r.text.includes("Respuesta de prueba"),
+      JSON.stringify(r)
+    );
+    await api("/api/agent/profile", {
+      method: "PUT",
+      body: JSON.stringify({ enabled: perfilAntes?.enabled ?? false }),
+    });
+    console.log("  (conector apagado: el resto de los checks de 026 no aplican)");
+    return;
+  }
+
+  const mockUp = await fetch(`${STOCK}/_state`);
+  if (!mockUp.ok) {
+    ok("stock-mock disponible en STOCK_BASE_URL", false, `${STOCK}/_state → ${mockUp.status}`);
+    return;
+  }
+  const modo = (mode) =>
+    fetch(`${STOCK}/_mode`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ mode }),
+    });
+  const reset = () => fetch(`${STOCK}/_reset`, { method: "POST" });
+  await reset();
+
+  /* ---------- US2: el agente consulta existencias reales ---------- */
+  console.log("\n== 026: check_stock del agente (US2) ==");
+  const perfilAntes = (await api("/api/agent/profile")).json?.profile;
+  await api("/api/agent/profile", { method: "PUT", body: JSON.stringify({ enabled: true }) });
+
+  const casos = [
+    ["5214627026001", "¿tienen playera negra?", "Playera negra (PLY-NEG): 7 pieza — $199 MXN", "un producto: nombre, SKU, existencia, unidad y precio"],
+    ["5214627026002", "¿tienen gorra?", "Gorra (GOR-01): 3 pieza — sin precio", "sin precio; la gorra inactiva no aparece"],
+    ["5214627026003", "¿tienen playera blanca?", "Playera blanca (PLY-BLA): agotado", "agotado"],
+    ["5214627026004", "¿tienen zapatos?", "No encontré productos para «zapatos»", "sin coincidencias"],
+    ["5214627026005", "¿cuánto cuesta la PLY-NEG?", "$199 MXN", "SKU exacto → precio"],
+  ];
+  let i = 0;
+  for (const [lead, pregunta, esperado, titulo] of casos) {
+    const r = await preguntar(lead, pregunta, `us2.${++i}`);
+    ok(`${titulo}`, typeof r.text === "string" && r.text.includes(esperado), JSON.stringify(r));
+  }
+  const gorra = await outboxDe("5214627026002");
+  ok(
+    "la gorra inactiva (GOR-02) nunca aparece",
+    !gorra.some((o) => textoDe(o).includes("GOR-02"))
+  );
+  ok(
+    "la frase del modelo precede a los datos",
+    (await outboxDe("5214627026001")).some((o) => textoDe(o).startsWith("Déjame revisar.\n"))
+  );
+
+  console.log("\n== 026: degradación cuando MS-Stock falla (US2, camino infeliz) ==");
+  const modos = ["down", "unauthorized", "slow", "garbage"];
+  let j = 0;
+  for (const m of modos) {
+    await modo(m);
+    const r = await preguntar(`521462702610${j}`, "¿tienen playera negra?", `us2.inf.${++j}`);
+    const limpio =
+      typeof r.text === "string" &&
+      r.text.trim() === "Déjame revisar." &&
+      !/error|503|unauthorized|timeout|inventario/i.test(r.text);
+    ok(
+      `modo ${m}: el agente responde solo con la frase del modelo, en ${r.ms} ms (< ${ventana})`,
+      limpio && r.ms < ventana,
+      JSON.stringify(r)
+    );
+  }
+  await reset();
+  await api("/api/agent/profile", {
+    method: "PUT",
+    body: JSON.stringify({ enabled: perfilAntes?.enabled ?? false }),
+  });
+
+  /* ---------- US1: el botón Inventario y el pase SSO ---------- */
+  console.log("\n== 026: botón Inventario → pase SSO (US1) ==");
+  const sinSesion = await fetch(`${BASE}/api/inventario/sso`, { redirect: "manual" });
+  ok("sin sesión → 401 y sin pase", sinSesion.status === 401, `status=${sinSesion.status}`);
+
+  const yo = (await api("/api/auth/get-session")).json?.user;
+  const sso = await api("/api/inventario/sso", { redirect: "manual" });
+  const location = sso.res.headers.get("location") ?? "";
+  ok(
+    "con sesión → 302 a STOCK_BASE_URL/portal/sso?token=",
+    sso.res.status === 302 && location.startsWith(`${STOCK}/portal/sso?token=`),
+    `status=${sso.res.status} location=${location.slice(0, 60)}`
+  );
+  const portal = await fetch(location);
+  const portalHtml = await portal.text();
+  ok(
+    "el portal (mock) acepta el pase y saluda por nombre",
+    portal.status === 200 && portalHtml.includes(`${yo?.name} desde Uniko`),
+    `status=${portal.status} html=${portalHtml.slice(0, 80)}`
+  );
+  const estado1 = (await (await fetch(`${STOCK}/_state`)).json()).lastSso;
+  ok(
+    "el pase lleva sub, name, iss=APP_BASE_URL, aud=STOCK_BASE_URL y vida 120 s",
+    estado1 &&
+      estado1.sub === yo?.id &&
+      estado1.name === yo?.name &&
+      estado1.iss === BASE &&
+      estado1.aud === STOCK &&
+      estado1.exp - estado1.iat === 120,
+    JSON.stringify(estado1)
+  );
+  const sso2 = await api("/api/inventario/sso?next=/portal/products/PLY-NEG", { redirect: "manual" });
+  await fetch(sso2.res.headers.get("location") ?? "");
+  const estado2 = (await (await fetch(`${STOCK}/_state`)).json()).lastSso;
+  ok("cada clic emite un pase distinto (jti nuevo)", estado2?.jti && estado2.jti !== estado1?.jti);
+  ok("next interno viaja en el pase", estado2?.next === "/portal/products/PLY-NEG", JSON.stringify(estado2?.next));
+  const sso3 = await api("/api/inventario/sso?next=https://evil.example", { redirect: "manual" });
+  await fetch(sso3.res.headers.get("location") ?? "");
+  const estado3 = (await (await fetch(`${STOCK}/_state`)).json()).lastSso;
+  ok("next externo NO viaja", estado3 && !("next" in estado3), JSON.stringify(estado3?.next));
+  ok(
+    "el pase no aparece en ningún cuerpo de respuesta de Uniko",
+    !(sso.json && JSON.stringify(sso.json).includes("token="))
+  );
+
+  /* ---------- US3: estado del conector ---------- */
+  console.log("\n== 026: estado del conector en Ajustes (US3) ==");
+  const t0 = Date.now();
+  const st = await api("/api/inventario/status");
+  ok(
+    "status → connected en < 5 s",
+    st.res.ok && st.json?.status === "connected" && Date.now() - t0 < 5000,
+    JSON.stringify(st.json)
+  );
+  ok("status expone la dirección, nunca la llave ni el secreto", st.json?.baseUrl === STOCK);
+  await modo("unauthorized");
+  ok("mock unauthorized → status unauthorized", (await api("/api/inventario/status")).json?.status === "unauthorized");
+  await modo("down");
+  ok("mock down → status unavailable", (await api("/api/inventario/status")).json?.status === "unavailable");
+  await reset();
+
+  const secretos = [process.env.STOCK_API_KEY ?? "", process.env.STOCK_SSO_SECRET ?? ""].filter(Boolean);
+  const ajustesHtml = await (await fetch(`${BASE}/settings/inventario`, { headers: { cookie } })).text();
+  ok(
+    "ni la llave ni el secreto aparecen en /settings/inventario ni en status",
+    secretos.every((s) => !ajustesHtml.includes(s) && !JSON.stringify(st.json).includes(s))
+  );
+  ok(
+    "/settings/inventario existe y muestra la dirección de MS-Stock",
+    ajustesHtml.includes("Probar conexión") && ajustesHtml.includes(STOCK),
+    ajustesHtml.slice(0, 120)
+  );
+}
+
 
 /* ============================================================
  * 016 — Atribución de anuncios y Conversions API (tests/e2e/us-atribucion.md)
