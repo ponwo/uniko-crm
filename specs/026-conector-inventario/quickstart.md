@@ -134,3 +134,23 @@ instancia de pruebas §5.2 registrados aquí.
   (PLY-NEG): 17 pieza — $199 MXN" (17 = existencia real de esa base, no la del
   mock). Un intento previo falló porque en el puerto 8000 seguía viva una instancia
   vieja de MS-Stock con otro secreto: el rechazo fue el esperado (`bad_signature`).
+
+## Resultados del despliegue en la instancia de pruebas — 2026-09-12 (T035–T036)
+
+- `main` = `e143555` → deploy por webhook de `uniko-lanco`; `INVENTARIO=on` creada por
+  MCP en Coolify (runtime) junto a las `STOCK_*` ya cargadas; el contenedor nuevo
+  arrancó con `[migrate] migraciones aplicadas` y `Ready` (sin error de entorno:
+  las tres variables validaron); `GET /api/health` → `{"ok":true,"commit":"e143555"}`.
+- Sin sesión: `GET /api/inventario/sso` → **401** y `GET /api/inventario/status` →
+  **401** (la superficie existe: bandera encendida); `/settings/inventario` → 307 al
+  login. `https://stock.lanco.cloud/health` → ok y su `/portal/sso` responde (400 sin
+  token): el destino del botón está vivo y con SSO encendido (feature 003).
+- **Pendiente de verificación humana** (Principio IX: lo que las herramientas no
+  pueden hacer sin credenciales del dueño — el registro está cerrado y una sesión
+  no se puede iniciar sin contraseña): entrar en `https://uniko.lanco.cloud`, pulsar
+  **Inventario** (debe abrir `https://stock.lanco.cloud/portal` con "<nombre> desde
+  Uniko"), Ajustes → Inventario → "Probar conexión" (debe decir "Conectado") y, en el
+  Laboratorio, preguntar "¿tienen PLY-NEG?" (debe responder con existencia y $199
+  MXN reales). El mismo flujo quedó verificado en local contra MS-Stock real (§4) y
+  en la instancia de pruebas de MS-Stock (feature 003, §8.3 de su quickstart).
+- No se promueve a `production` (puerta de promoción: señal explícita del dueño).

@@ -20,3 +20,4 @@ Vacío al inicio; se irá poblando.
 - [Worktree y arneses en la máquina de desarrollo](worktree-y-arneses-en-la-maquina-de-desarrollo.md) — Node 22 vía fnm, `pnpm install --offline`, base `uniko_dev_<NNN>` desechable para los arneses, `sse-mudo` no termina.
 - [Relevo de contenedor en Coolify](relevo-de-contenedor-en-coolify.md) — tras un deploy, ~1 min alternando viejo/502; exigir /api/health 10/10 antes de medir contra la instancia.
 - [Cola de CI en `main`](cola-de-ci-en-main.md) — las corridas se encolan; un runner colgado bloquea a los siguientes y el que espera se cancela, dejando commits sin el verde que exige la puerta de promoción.
+- [El conector de inventario consume el contrato de MS-Stock](conector-inventario-consume-el-contrato-de-ms-stock.md) — 026: contrato en el repo hermano; INVENTARIO=on solo en uniko-lanco; gotchas del arnés (base vieja, 521→52, ai-mock condicionado).
