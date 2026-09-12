@@ -154,3 +154,9 @@ instancia de pruebas §5.2 registrados aquí.
   MXN reales). El mismo flujo quedó verificado en local contra MS-Stock real (§4) y
   en la instancia de pruebas de MS-Stock (feature 003, §8.3 de su quickstart).
 - No se promueve a `production` (puerta de promoción: señal explícita del dueño).
+- **Verificación humana hecha (2026-09-12, el dueño)**: en `uniko.lanco.cloud`, el
+  agente confirmó existencia y precio de "Playera negra" y, de "Playera blanca",
+  solo el precio con la marca de **agotado** (existencia 0 en `stock.lanco.cloud`).
+  Es el comportamiento especificado en FR-1111 (`Playera blanca (PLY-BLA): agotado —
+  $199 MXN`): el precio es un dato del producto, no de la existencia. Con esto la
+  026 está **Hecha** de punta a punta en la instancia de pruebas.
