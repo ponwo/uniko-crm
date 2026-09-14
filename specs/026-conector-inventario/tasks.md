@@ -186,7 +186,7 @@ migración, sin cambio de prompt (la URL no llega al modelo).
 - [X] T045 Arnés: `inventarioChecks()` en `scripts/e2e-selftest.mjs` — `textoDe` entiende pies de imagen; casos: PLY-NEG ⇒ UN mensaje `image` con `link` = `image_url` del mock y `caption` = texto; gorra ⇒ solo texto; búsqueda "playera" ⇒ una sola imagen; `reject` ⇒ solo texto sin `failed` en `/api/conversations/:id/messages`; `slow` ⇒ el texto llega antes de 5 s + coalescencia; `failed` tardío vía `/api/dev/wa-mock/status` ⇒ texto de respaldo, una vez; guion `tests/e2e/us-inventario.md` §US2 con los casos 7–12
 - [X] T046 Gate (`pnpm typecheck && pnpm lint && pnpm build && pnpm test`) y `pnpm test:e2e` con `INVENTARIO=on` y con la bandera vacía (cero cambio); revisión en el navegador del hilo con la foto (escritorio y 375 px)
 - [X] T047 Docs: `docs/inventario-conector.md` (sección "Foto del producto"), `README.md` (una línea), `quickstart.md` §5 (verificación en vivo con `FOTO-TEST`)
-- [ ] T048 Despliegue en la instancia de pruebas: merge `--ff-only` a `main` y push (deploy automático de `uniko-lanco`); `/api/health` 10/10; verificación en vivo: "FOTO-TEST" por WhatsApp real ⇒ texto + imagen; producto sin foto ⇒ solo texto; registrar evidencia en `quickstart.md`; memoria; **no** promover a `production`
+- [ ] T048 (**bloqueado por señal del dueño**: el merge a `main` es acción hacia afuera; PR #28 abierta con CI verde el 2026-09-13) Despliegue en la instancia de pruebas: merge `--ff-only` a `main` y push (deploy automático de `uniko-lanco`); `/api/health` 10/10; verificación en vivo: "FOTO-TEST" por WhatsApp real ⇒ texto + imagen; producto sin foto ⇒ solo texto; registrar evidencia en `quickstart.md`; memoria; **no** promover a `production`
 
 ---
 
