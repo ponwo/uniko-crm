@@ -72,10 +72,23 @@ describe("026 — stock-mock", () => {
       price: 199,
       currency: "MXN",
       available: true,
+      // Foto (feature 004 de MS-Stock): URL absoluta y pública, servida por
+      // esta misma app en el entorno de pruebas.
+      image_url: "http://localhost:3000/icon-192.png",
     });
     const inactive = await get("v1/agent/products/GOR-02", { key: KEY });
     expect(inactive.status).toBe(404);
     expect((await inactive.json()).error.code).toBe("NOT_FOUND");
+  });
+
+  it("image_url: null en los productos sin foto, y en la búsqueda viaja igual que en el exacto", async () => {
+    const gorra = await (await get("v1/agent/products/GOR-01", { key: KEY })).json();
+    expect(gorra.image_url).toBeNull();
+    const body = await (await get("v1/agent/search", { key: KEY, query: "q=playera" })).json();
+    expect(body.results.map((p: { sku: string; image_url: string | null }) => [p.sku, p.image_url])).toEqual([
+      ["PLY-NEG", "http://localhost:3000/icon-192.png"],
+      ["PLY-BLA", null],
+    ]);
   });
 
   it("búsqueda sin acentos ni mayúsculas, q corta → 422, limit acota y marca truncated", async () => {

@@ -22,7 +22,9 @@ const negra: StockProduct = {
   price: 199,
   currency: "MXN",
   available: true,
+  image_url: null,
 };
+const FOTO = "https://img.stock.example/products/1/ply-neg.jpg";
 
 afterEach(() => lookup.mockReset());
 
@@ -74,10 +76,49 @@ describe("026 — checkStockTurn", () => {
     expect(lines[5]).toBe("Hay más coincidencias, ¿me dices cuál te interesa?");
   });
 
+  it("foto: la URL del primer producto va aparte, nunca dentro del texto", async () => {
+    lookup.mockResolvedValue({
+      ok: true,
+      data: { products: [{ ...negra, image_url: FOTO }], truncated: false },
+    });
+    const turn = await checkStockTurn({ query: "playera negra" });
+    expect(turn.imageUrl).toBe(FOTO);
+    expect(turn.text).toBe("Playera negra (PLY-NEG): 7 pieza — $199 MXN");
+    expect(turn.text).not.toContain("http");
+  });
+
+  it("foto: con varios resultados, a lo sumo la del primero", async () => {
+    lookup.mockResolvedValue({
+      ok: true,
+      data: {
+        products: [
+          { ...negra, image_url: FOTO },
+          { ...negra, sku: "PLY-BLA", name: "Playera blanca", image_url: "https://img.stock.example/2.jpg" },
+        ],
+        truncated: true,
+      },
+    });
+    const turn = await checkStockTurn({ query: "playera" });
+    expect(turn.imageUrl).toBe(FOTO);
+    expect(turn.text).not.toContain("http");
+  });
+
+  it("foto: si el primero no tiene, ninguna (aunque el segundo sí)", async () => {
+    lookup.mockResolvedValue({
+      ok: true,
+      data: {
+        products: [negra, { ...negra, sku: "PLY-BLA", image_url: FOTO }],
+        truncated: false,
+      },
+    });
+    const turn = await checkStockTurn({ query: "playera" });
+    expect(turn.imageUrl).toBeNull();
+  });
+
   it("sin coincidencias: lo dice y sigue siendo un turno válido", async () => {
     lookup.mockResolvedValue({ ok: true, data: { products: [], truncated: false } });
     const turn = await checkStockTurn({ query: "zapatos" });
-    expect(turn).toEqual({ ok: true, text: "No encontré productos para «zapatos»." });
+    expect(turn).toEqual({ ok: true, text: "No encontré productos para «zapatos».", imageUrl: null });
   });
 
   it("cualquier error del adaptador: ok=false y el texto es la frase del modelo o nada", async () => {
@@ -86,8 +127,9 @@ describe("026 — checkStockTurn", () => {
       expect(await checkStockTurn({ query: "x", intro: "Déjame revisar." })).toEqual({
         ok: false,
         text: "Déjame revisar.",
+        imageUrl: null,
       });
-      expect(await checkStockTurn({ query: "x" })).toEqual({ ok: false, text: "" });
+      expect(await checkStockTurn({ query: "x" })).toEqual({ ok: false, text: "", imageUrl: null });
     }
   });
 });

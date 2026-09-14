@@ -2,6 +2,7 @@ import { and, eq } from "drizzle-orm";
 import { getDb, schema } from "@/lib/db";
 import { describeSendError } from "@/lib/meta/send-errors";
 import { publish } from "@/server/events/bus";
+import { sendText } from "@/server/inbox/send";
 import type { WebhookStatus } from "@/server/inbox/webhook";
 
 /** Orden monotónico de estados: nunca degradar (un delivered tardío no pisa read). */
@@ -35,6 +36,9 @@ export async function applyStatusUpdate(
       id: schema.message.id,
       conversationId: schema.message.conversationId,
       status: schema.message.status,
+      type: schema.message.type,
+      text: schema.message.text,
+      origin: schema.message.origin,
     })
     .from(schema.message)
     .where(
@@ -69,4 +73,23 @@ export async function applyStatusUpdate(
       error,
     },
   });
+
+  // 026 — Foto del producto: Meta acepta la imagen por URL y solo después
+  // puede descubrir que no pudo descargarla; el cliente se quedaría sin el
+  // pie, que ES la respuesta del agente. Al aplicar ese `failed`, el texto
+  // sale solo, una vez: los estados son monotónicos, así que un webhook
+  // repetido no lo manda dos veces (FR-1120). Un fallo aquí no rompe el webhook.
+  if (next === "failed" && msg.origin === "ai" && msg.type === "image" && msg.text) {
+    try {
+      await sendText({
+        conversationId: msg.conversationId,
+        organizationId,
+        text: msg.text,
+        aiGenerated: true,
+      });
+    } catch (err) {
+      const motivo = err instanceof Error ? err.message : String(err);
+      console.error(`[agente] foto: Meta la reportó failed y el texto de respaldo tampoco salió (${motivo})`);
+    }
+  }
 }

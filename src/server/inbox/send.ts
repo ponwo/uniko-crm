@@ -432,6 +432,78 @@ export async function sendMediaMessage(input: {
   }
 }
 
+/**
+ * 026 — Foto por URL (contrato §4 de MS-Stock, "Foto del producto"). Un
+ * mensaje de imagen cuyo binario NO pasa por Uniko: Meta descarga `link` por
+ * su cuenta (sin descargar, reescalar ni proxear aquí). Se persiste como
+ * cualquier salida —asset `image` con `payload.url` y sin archivo local, y el
+ * mensaje con el pie como `text`, para que el historial del agente y el
+ * Laboratorio conserven lo que se dijo. Si Graph rechaza, no se persiste
+ * nada: quien llama decide el respaldo (mandar el texto solo) y el hilo no
+ * enseña un fallo que el cliente nunca vio.
+ */
+export async function sendImageLink(input: {
+  conversationId: string;
+  organizationId: string;
+  link: string;
+  caption?: string;
+  aiGenerated?: boolean;
+  /** Límite de espera de quien llama: la foto nunca retrasa la respuesta. */
+  signal?: AbortSignal;
+}): Promise<SendResult> {
+  const target = await prepareSend(input.conversationId, input.organizationId);
+  const caps = capabilitiesFor(target.conversation.channel);
+  // Solo WhatsApp manda imágenes por link hoy; en los demás canales quien
+  // llama ya mandó (o mandará) el texto solo.
+  if (!caps.outboundMedia || !target.credentials) {
+    throw new SendError(
+      "meta_error",
+      `Todavía no se pueden enviar imágenes por ${caps.label}; manda el texto`
+    );
+  }
+
+  const image: Record<string, unknown> = { link: input.link };
+  if (input.caption) image.caption = input.caption;
+  const waMessageId = await callGraphSend(
+    target.credentials,
+    {
+      messaging_product: "whatsapp",
+      to: target.recipient,
+      type: "image",
+      image,
+    },
+    input.signal
+  );
+
+  const db = getDb();
+  const assetRows = await db
+    .insert(schema.mediaAsset)
+    .values({
+      id: newId("mediaAsset"),
+      organizationId: input.organizationId,
+      kind: "image",
+      caption: input.caption ?? null,
+      payload: { url: input.link },
+      fetchStatus: "available",
+    })
+    .returning();
+  const asset = assetRows[0]!;
+
+  const messageId = await persistOutbound({
+    organizationId: input.organizationId,
+    conversationId: input.conversationId,
+    waMessageId,
+    type: "image",
+    text: input.caption ?? null,
+    status: caps.deliveryReceipts ? "pending" : "sent",
+    aiGenerated: input.aiGenerated,
+    origin: input.aiGenerated ? "ai" : "operator",
+    mediaAssetId: asset.id,
+    media: asset,
+  });
+  return { messageId };
+}
+
 export type LocationInput = {
   latitude: number;
   longitude: number;
@@ -511,12 +583,13 @@ export async function sendStructured(
 /** Llama a Graph /messages y traduce errores de Meta a SendError. */
 export async function callGraphSend(
   credentials: Credentials,
-  payload: unknown
+  payload: unknown,
+  signal?: AbortSignal
 ): Promise<string> {
   try {
     const res = await graphRequest<{ messages?: { id: string }[] }>(
       `${credentials.phoneNumberId}/messages`,
-      { method: "POST", token: credentials.token, body: payload }
+      { method: "POST", token: credentials.token, body: payload, signal }
     );
     const id = res.messages?.[0]?.id;
     if (!id) throw new SendError("meta_error", "Meta no devolvió ID de mensaje");

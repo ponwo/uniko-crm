@@ -21,14 +21,20 @@ export type MockProduct = {
   price: number | null;
   currency: string;
   active: boolean;
+  /**
+   * Foto principal (feature 004 de MS-Stock): ruta pública dentro de ESTA app
+   * (un PNG real que el navegador puede pintar), o null. La URL absoluta se
+   * arma con el origen de la petición, como haría MS-Stock con su CDN.
+   */
+  imagePath: string | null;
 };
 
 export const STOCK_MOCK_CATALOG: MockProduct[] = [
-  { sku: "PLY-NEG", name: "Playera negra", description: "Algodón 100%", stock: 7, unit: "pieza", price: 199, currency: "MXN", active: true },
-  { sku: "PLY-BLA", name: "Playera blanca", description: null, stock: 0, unit: "pieza", price: 199, currency: "MXN", active: true },
-  { sku: "GOR-01", name: "Gorra", description: null, stock: 3, unit: "pieza", price: null, currency: "MXN", active: true },
-  { sku: "TAZ-01", name: "Taza", description: "Cerámica", stock: 12, unit: "pieza", price: 89, currency: "MXN", active: true },
-  { sku: "GOR-02", name: "Gorra vieja", description: null, stock: 1, unit: "pieza", price: 50, currency: "MXN", active: false },
+  { sku: "PLY-NEG", name: "Playera negra", description: "Algodón 100%", stock: 7, unit: "pieza", price: 199, currency: "MXN", active: true, imagePath: "/icon-192.png" },
+  { sku: "PLY-BLA", name: "Playera blanca", description: null, stock: 0, unit: "pieza", price: 199, currency: "MXN", active: true, imagePath: null },
+  { sku: "GOR-01", name: "Gorra", description: null, stock: 3, unit: "pieza", price: null, currency: "MXN", active: true, imagePath: null },
+  { sku: "TAZ-01", name: "Taza", description: "Cerámica", stock: 12, unit: "pieza", price: 89, currency: "MXN", active: true, imagePath: "/icon-512.png" },
+  { sku: "GOR-02", name: "Gorra vieja", description: null, stock: 1, unit: "pieza", price: 50, currency: "MXN", active: false, imagePath: "/icon-192.png" },
 ];
 
 export type LastSso = {
@@ -83,8 +89,8 @@ export function normalize(text: string): string {
     .trim();
 }
 
-/** Forma pública, la misma que `/v1/agent/*` de MS-Stock. */
-export function toPublic(p: MockProduct) {
+/** Forma pública, la misma que `/v1/agent/*` de MS-Stock (contrato §4). */
+export function toPublic(p: MockProduct, origin: string) {
   return {
     sku: p.sku,
     name: p.name,
@@ -94,6 +100,7 @@ export function toPublic(p: MockProduct) {
     price: p.price,
     currency: p.currency,
     available: p.stock > 0,
+    image_url: p.imagePath ? `${origin}${p.imagePath}` : null,
   };
 }
 

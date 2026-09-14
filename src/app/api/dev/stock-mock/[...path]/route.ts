@@ -89,14 +89,14 @@ export async function GET(req: Request, ctx: Ctx) {
         return apiError(422, "VALIDATION_ERROR", "q debe tener entre 2 y 100 caracteres.");
       }
       const { results, truncated } = searchActive(q, limit);
-      return Response.json({ results: results.map(toPublic), truncated });
+      return Response.json({ results: results.map((p) => toPublic(p, url.origin)), truncated });
     }
 
     const m = route.match(/^v1\/agent\/products\/([^/]+)$/);
     if (m && m[1]) {
       const product = findActiveBySku(decodeURIComponent(m[1]));
       if (!product) return apiError(404, "NOT_FOUND", "Producto no encontrado.");
-      return Response.json(toPublic(product));
+      return Response.json(toPublic(product, url.origin));
     }
   }
 

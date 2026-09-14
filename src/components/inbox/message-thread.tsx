@@ -41,9 +41,19 @@ type ContactPayload = {
   phone?: string;
 };
 
+/**
+ * 026 — Una imagen enviada por URL (foto del producto) no tiene archivo en el
+ * volumen: se pinta desde su URL pública, la misma que recibió el cliente.
+ */
+function linkedImageUrl(media: MessageMediaDto): string | null {
+  if (media.kind !== "image") return null;
+  const url = (media.payload as { url?: unknown } | null)?.url;
+  return typeof url === "string" ? url : null;
+}
+
 /** 008 — Previsualización del adjunto de un mensaje, por tipo. */
 function MediaBlock({ media }: { media: MessageMediaDto }) {
-  const src = `/api/media/${media.assetId}`;
+  const src = linkedImageUrl(media) ?? `/api/media/${media.assetId}`;
 
   if (media.kind === "location") {
     const loc = (media.payload ?? {}) as LocationPayload;

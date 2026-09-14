@@ -249,6 +249,29 @@ export async function POST(req: Request, ctx: Params) {
         }
       }
     }
+    // 026 — Imagen por link (foto del producto): el modo infeliz del mock
+    // reproduce a Meta rechazando el link o tardando más de lo que el motor
+    // espera. Como Meta, en `slow` el mensaje SÍ queda registrado aunque el
+    // CRM ya haya cortado la espera.
+    const link = (body.image as { link?: unknown } | undefined)?.link;
+    if (body.type === "image" && typeof link === "string") {
+      if (state.mediaMode === "reject") {
+        return Response.json(
+          {
+            error: {
+              message: "(#100) Param image['link'] is not a valid URL",
+              type: "OAuthException",
+              code: 100,
+              fbtrace_id: "mock",
+            },
+          },
+          { status: 400 }
+        );
+      }
+      if (state.mediaMode === "slow") {
+        await new Promise((r) => setTimeout(r, 7_000));
+      }
+    }
     const n = nextN();
     const waMessageId = nextOutboundWamid();
     state.outbox.push({
