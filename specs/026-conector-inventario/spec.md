@@ -132,6 +132,23 @@ bandera y comprobar que el esquema de acciones del turno no incluye `check_stock
    pregunta por un producto, **Then** el agente consulta igual (es solo lectura) y el
    Laboratorio muestra la respuesta con los datos; ninguna consulta de prueba escribe
    nada en MS-Stock.
+9. **(Foto, 2026-09-13)** **Given** el producto resuelto trae `image_url` distinto
+   de `null` (MS-Stock feature 004), **When** el agente ejecuta `check_stock` por
+   WhatsApp, **Then** el cliente recibe en el mismo turno **un** mensaje de imagen
+   por URL (`link = image_url`) con el texto del producto como pie (`caption`), y
+   ningún mensaje de texto aparte; la foto la sirve la URL pública tal cual (Uniko no
+   la descarga, reescala ni proxea).
+10. **Given** `image_url` es `null` (producto sin foto, o instancia sin fotos) o el
+    canal no admite imágenes, **When** el agente responde, **Then** se envía solo el
+    texto, exactamente como antes de esta extensión.
+11. **Given** el envío de la imagen falla (Meta la rechaza, no responde en 5 s, o la
+    reporta `failed` después de aceptarla), **When** el agente responde, **Then** el
+    cliente recibe el texto solo, sin ningún mensaje de error y sin retraso más allá
+    del límite; el fallo queda en el registro del servidor.
+12. **Given** una búsqueda con varios resultados, **When** se responde, **Then** se
+    envía a lo sumo la foto del **primer** producto (o ninguna), nunca una ráfaga de
+    imágenes; y `image_url` jamás forma parte del prompt del modelo ni se guarda
+    fuera del mensaje enviado.
 
 ---
 
@@ -197,6 +214,15 @@ apagada, la sección no existe y su ruta responde como inexistente.
 - **Conversaciones de prueba del Laboratorio**: `check_stock` es solo lectura, así que
   sí consulta; ninguna acción de esta feature escribe en MS-Stock, en modo prueba ni
   en modo real.
+- **`image_url` con forma inválida** (no es una URL http/https): se trata como
+  `null` — una foto mal formada nunca cuesta el texto ni degrada el turno.
+- **Pie demasiado largo** (más de 1024 caracteres, el límite de WhatsApp): se envía el
+  texto como mensaje aparte y la foto sin pie; nunca se recorta el texto.
+- **Meta acepta la imagen y la reporta `failed` después** (no pudo descargar la URL):
+  al recibir ese estado, Uniko envía el texto que iba en el pie como mensaje de
+  texto; una sola vez por mensaje (los estados son monotónicos).
+- **Conversación de prueba del Laboratorio con foto**: se persiste el mensaje de
+  imagen (URL + pie) sin tocar la API, como cualquier salida del sandbox.
 
 ## Requirements *(mandatory)*
 
@@ -268,6 +294,25 @@ apagada, la sección no existe y su ruta responde como inexistente.
   con contrato propio (como el cliente Graph API o el adaptador LLM); el dominio del
   agente MUST NOT conocer rutas ni formas HTTP de MS-Stock.
 
+**Foto del producto** (extensión 2026-09-13; contrato §4 "Foto del producto")
+
+- **FR-1118**: El adaptador MUST aceptar `image_url` (URL pública http/https o
+  `null`; ausente o malformada ⇒ `null`) en la forma del producto, sin que su
+  ausencia o forma inválida invalide la respuesta.
+- **FR-1119**: Cuando el primer producto resuelto trae `image_url`, el motor MUST
+  enviar por WhatsApp un único mensaje de imagen por URL (`link = image_url`) con el
+  texto del turno como pie, en lugar del mensaje de texto; MUST NOT descargar,
+  reescalar ni proxear la foto; MUST NOT enviar más de una imagen por turno; y en
+  canales sin imágenes salientes MUST enviar solo el texto.
+- **FR-1120**: La foto MUST NOT bloquear ni retrasar la respuesta: si el envío de
+  la imagen falla o supera 5 s, o Meta la reporta `failed` después de aceptarla,
+  el motor MUST enviar el texto solo (una vez), registrar el motivo en el servidor y
+  MUST NOT mostrar al cliente ningún error.
+- **FR-1121**: `image_url` MUST NOT incluirse en el prompt del modelo ni
+  persistirse fuera del mensaje enviado (se usa en el turno; cambia cuando el
+  negocio sube una foto nueva). En conversaciones de prueba el mensaje de imagen
+  se persiste sin tocar la API.
+
 **Estado del conector (Ajustes)**
 
 - **FR-1115**: Con la bandera encendida, Ajustes MUST mostrar una sección
@@ -323,6 +368,12 @@ apagada, la sección no existe y su ruta responde como inexistente.
 - **SC-007**: En la instancia de pruebas (`uniko.lanco.cloud` ↔ `stock.lanco.cloud`),
   el botón entra al portal real y una pregunta por `PLY-NEG` en el Laboratorio
   responde con sus datos reales.
+- **SC-008** (foto): en el self-test, una pregunta por un producto con foto produce
+  exactamente un mensaje saliente de tipo imagen con `link` = la `image_url` del mock
+  y el texto como pie; sin foto, solo texto; con el envío de imagen rechazado o lento,
+  el texto llega solo dentro del mismo límite de tiempo de la degradación y sin
+  mensaje fallido visible; en la instancia de pruebas, `FOTO-TEST` recibe texto +
+  imagen por WhatsApp real.
 
 ## Assumptions
 
@@ -349,3 +400,7 @@ apagada, la sección no existe y su ruta responde como inexistente.
   inventario dentro de Uniko; configurar el conector desde la UI; restringir el botón
   por rol. Cada una sería una feature nueva (y las escrituras, también del lado
   MS-Stock).
+- **Foto del producto (2026-09-13)**: fuera de alcance subir, reemplazar o quitar
+  fotos desde Uniko (portal o API de MS-Stock), galería de varias imágenes y cachear
+  imágenes. La URL enviada queda en el mensaje del hilo (es lo que se mandó, y es
+  permanente por contrato); no se reutiliza en turnos posteriores.

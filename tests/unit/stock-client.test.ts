@@ -14,6 +14,7 @@ import {
  */
 
 const KEY = "k".repeat(40);
+/** Forma del contrato §4 (con `image_url`, desde la feature 004 de MS-Stock). */
 const PRODUCT = {
   sku: "PLY-NEG",
   name: "Playera negra",
@@ -23,6 +24,7 @@ const PRODUCT = {
   price: 199,
   currency: "MXN",
   available: true,
+  image_url: "https://img.stock.example/products/1/ply-neg.jpg",
 };
 
 function json(body: unknown, status = 200) {
@@ -60,6 +62,25 @@ describe("026 — adaptador de MS-Stock", () => {
     const [url, init] = fetchMock.mock.calls[0] as [string, RequestInit];
     expect(url).toBe("https://stock.example/v1/agent/products/PLY-NEG");
     expect(new Headers(init.headers).get("x-api-key")).toBe(KEY);
+  });
+
+  it("image_url: ausente (MS-Stock anterior a la 004), null o rota ⇒ null; nunca invalida", async () => {
+    const { image_url: _omit, ...sinFoto } = PRODUCT;
+    void _omit;
+    const casos: [unknown, string | null][] = [
+      [sinFoto, null],
+      [{ ...sinFoto, image_url: null }, null],
+      [{ ...sinFoto, image_url: "no es una url" }, null],
+      [{ ...sinFoto, image_url: "ftp://img.example/x.jpg" }, null],
+      [{ ...sinFoto, image_url: 42 }, null],
+      [{ ...sinFoto, image_url: "http://localhost:3000/icon-192.png" }, "http://localhost:3000/icon-192.png"],
+    ];
+    for (const [body, esperado] of casos) {
+      vi.stubGlobal("fetch", vi.fn().mockResolvedValue(json(body)));
+      const r = await getProduct("PLY-NEG");
+      expect(r.ok).toBe(true);
+      if (r.ok) expect(r.data.image_url).toBe(esperado);
+    }
   });
 
   it("mapea los status a errores tipados sin lanzar", async () => {

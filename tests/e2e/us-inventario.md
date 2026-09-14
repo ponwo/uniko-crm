@@ -43,6 +43,32 @@ Con `INVENTARIO=on`, todo lo de abajo.
    `unauthorized` ni `timeout` en el texto; el servidor registra
    `[agente] inventario: <motivo>`.
 
+**Foto del producto** (extensión 2026-09-13; contrato §4 "Foto del producto").
+El stock-mock devuelve `image_url` para `PLY-NEG` (`{origen}/icon-192.png`) y
+`null` para el resto; el wa-mock tiene un modo para las imágenes por link
+(`POST /api/dev/wa-mock/media-mode` → `ok | reject | slow`).
+
+7. "¿tienen playera negra?" → sale **un solo** mensaje, de tipo `image`, con
+   `image.link` = la `image_url` del producto (Uniko no descarga ni proxea) y
+   `image.caption` = el texto completo del turno ("Déjame revisar." + la línea
+   del producto). No sale ningún mensaje de texto aparte; la URL no aparece en
+   ningún texto.
+8. "¿tienen gorra?" (sin foto) → solo texto, como siempre.
+9. "¿tienen playera?" (dos resultados) → **una** imagen (la del primero) con
+   las dos líneas en el pie; nunca una ráfaga.
+10. En el hilo del Inbox el mensaje queda como `image` con `media.payload.url`
+    = la URL pública, el pie como `text`, marcado IA y sin `failed`;
+    `GET /api/media/{assetId}` responde **302** a esa URL (no sirve bytes).
+11. **Meta rechaza el link** (modo `reject`) → sale solo el texto, dentro del
+    mismo tiempo, y el hilo no enseña ningún mensaje fallido. **Meta tarda**
+    (modo `slow`, más de 5 s) → el texto sale solo antes de coalescencia + 5 s
+    + margen.
+12. **Meta acepta y después reporta `failed`** (`POST /api/dev/wa-mock/status`
+    con el `waMessageId` de la foto y `errorCode: 131053`) → el pie sale como
+    mensaje de texto, generado por IA, **una sola vez** (un `failed` repetido
+    no lo manda de nuevo); en el hilo la foto queda `failed` con su motivo y
+    el texto de respaldo después.
+
 ## US1 — Abrir el inventario desde Uniko sin llave
 
 1. Sin sesión, `GET /api/inventario/sso` → **401** y no emite pase.

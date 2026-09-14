@@ -21,3 +21,4 @@ Vacío al inicio; se irá poblando.
 - [Relevo de contenedor en Coolify](relevo-de-contenedor-en-coolify.md) — tras un deploy, ~1 min alternando viejo/502; exigir /api/health 10/10 antes de medir contra la instancia.
 - [Cola de CI en `main`](cola-de-ci-en-main.md) — las corridas se encolan; un runner colgado bloquea a los siguientes y el que espera se cancela, dejando commits sin el verde que exige la puerta de promoción.
 - [El conector de inventario consume el contrato de MS-Stock](conector-inventario-consume-el-contrato-de-ms-stock.md) — 026: contrato en el repo hermano; INVENTARIO=on solo en uniko-lanco; gotchas del arnés (base vieja, 521→52, ai-mock condicionado).
+- [Foto del producto (026) — PR #28 pendiente](foto-producto-026-pr28-pendiente.md) — implementada y verificada en local el 2026-09-13; falta merge → deploy uniko-lanco → FOTO-TEST por WhatsApp real; decisiones de diseño fuera del contrato

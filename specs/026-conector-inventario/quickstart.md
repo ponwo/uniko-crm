@@ -90,6 +90,10 @@ Uniko" → `http://localhost:3000`) y 3.4 con un producto real (`PLY-NEG`).
    al final de este archivo.
 3. **No** promover a `production` en esta feature (puerta de promoción: señal
    explícita del dueño).
+4. **Foto del producto (extensión 2026-09-13)**: en la instancia de pruebas, por
+   WhatsApp real, pedir "FOTO-TEST" (producto con foto en `stock.lanco.cloud`) ⇒
+   texto + imagen en el mismo turno; un producto sin foto ⇒ solo texto; con el envío
+   de la imagen fallando ⇒ solo texto y ningún error visible. Registrar abajo.
 
 ## Criterio de "Hecho"
 
@@ -160,3 +164,26 @@ instancia de pruebas §5.2 registrados aquí.
   Es el comportamiento especificado en FR-1111 (`Playera blanca (PLY-BLA): agotado —
   $199 MXN`): el precio es un dato del producto, no de la existencia. Con esto la
   026 está **Hecha** de punta a punta en la instancia de pruebas.
+
+## Resultados de la foto del producto — 2026-09-13 (T038–T047, extensión)
+
+- Gate verde (`typecheck`, `lint`, `build`, 671 tests). `e2e-selftest.mjs`: **147/147**
+  con `INVENTARIO=on` (14 checks nuevos de la foto) y **112/112** con la bandera vacía;
+  `e2e-lab.mjs`: **36/36** encendida (escenario propio "¿tienen playera negra?" corre
+  en el sandbox: el mensaje queda `type: image` con `payload.url` y el pie como texto,
+  el outbox del wa-mock no crece) y 32/32 apagada. Bases desechables
+  `uniko_dev_026f` / `uniko_dev_026off`.
+- Evidencia del camino infeliz en el log del servidor: `[agente] foto: no se pudo
+  enviar la imagen ((#100) Param image['link'] is not a valid URL); sale solo el
+  texto` (rechazo) y `(... Meta no está disponible ahora)` (espera cortada a los 5 s:
+  el texto salió en 11.4 s = 6 s de coalescencia + 5 s de límite).
+- Hilo revisado en el navegador (1440 px y 375 px): imagen + pie marcado IA; en el
+  caso `failed` tardío, la foto con "No se entregó. Media upload error (Meta 131053)"
+  y el texto de respaldo después.
+- CI de la PR #28 verde en `default` y `completo`.
+- **Pendiente (señal del dueño)**: merge a `main` ⇒ deploy de `uniko-lanco`;
+  `/api/health` 10/10; por WhatsApp real "FOTO-TEST" ⇒ texto + imagen (la foto la
+  sirve la URL pública de `stock.lanco.cloud`/Cloudflare); producto sin foto ⇒ solo
+  texto. La consulta directa a `stock.lanco.cloud/v1/agent/products/FOTO-TEST` con la
+  llave no se pudo hacer desde esta sesión (el modo automático bloquea usar la llave
+  en `curl`); la forma de `image_url` la valida el adaptador en el turno.

@@ -1485,7 +1485,10 @@ async function inventarioChecks() {
     ((await api("/api/dev/wa-mock/outbox")).json?.outbox ?? []).filter(
       (o) => o.to === to || o.to === alCable(to)
     );
-  const textoDe = (o) => o?.body?.text?.body ?? JSON.stringify(o?.body ?? "");
+  // Un texto sale como `text.body`; la foto del producto (§4) lleva el texto
+  // como pie de la imagen: para el guion, el "texto" de ese mensaje es su pie.
+  const textoDe = (o) =>
+    o?.body?.text?.body ?? o?.body?.image?.caption ?? JSON.stringify(o?.body ?? "");
   /** Manda un inbound y espera la PRIMERA respuesta del agente a ese lead. */
   async function preguntar(lead, texto, n) {
     const antes = (await outboxDe(lead)).length;
@@ -1579,6 +1582,161 @@ async function inventarioChecks() {
   ok(
     "la frase del modelo precede a los datos",
     (await outboxDe("5214627026001")).some((o) => textoDe(o).startsWith("Déjame revisar.\n"))
+  );
+
+  /* ---------- Foto del producto (contrato §4, FR-1119..FR-1121) ---------- */
+  console.log("\n== 026: foto del producto en check_stock ==");
+  // El stock-mock arma image_url con el origen de la petición: la app misma.
+  const FOTO = `${new URL(STOCK).origin}/icon-192.png`;
+  const mediaMode = (mode) =>
+    api("/api/dev/wa-mock/media-mode", { method: "POST", body: JSON.stringify({ mode }) });
+  /** Hilo persistido de un lead (lo que ve el operador en el Inbox). */
+  async function hiloDe(nombre) {
+    const convs = (await api("/api/conversations")).json?.conversations ?? [];
+    const conv = convs.find((c) => c.contact?.name === nombre);
+    if (!conv) return { conv: null, mensajes: [] };
+    const mensajes = (await api(`/api/conversations/${conv.id}/messages`)).json?.messages ?? [];
+    return { conv, mensajes };
+  }
+
+  const negra = await outboxDe("5214627026001");
+  ok(
+    "PLY-NEG (con foto): UN solo mensaje saliente, de tipo image",
+    negra.length === 1 && negra[0].type === "image",
+    JSON.stringify(negra.map((o) => o.type))
+  );
+  ok(
+    "la imagen va por link = image_url del producto, sin descargar ni proxear",
+    negra[0]?.body?.image?.link === FOTO,
+    JSON.stringify(negra[0]?.body?.image)
+  );
+  ok(
+    "el texto del turno viaja como pie de la foto (frase del modelo + datos)",
+    negra[0]?.body?.image?.caption === "Déjame revisar.\nPlayera negra (PLY-NEG): 7 pieza — $199 MXN",
+    JSON.stringify(negra[0]?.body?.image?.caption)
+  );
+  const gorra1 = await outboxDe("5214627026002");
+  ok(
+    "producto sin foto (gorra): solo texto, como siempre",
+    gorra1.length === 1 && gorra1[0].type === "text",
+    JSON.stringify(gorra1.map((o) => o.type))
+  );
+  const varias = await preguntar("5214627026006", "¿tienen playera?", "foto.varias");
+  const variasOut = await outboxDe("5214627026006");
+  ok(
+    "búsqueda con varios resultados: a lo sumo UNA imagen (la del primero) con todas las líneas en el pie",
+    variasOut.length === 1 &&
+      variasOut[0].type === "image" &&
+      variasOut[0].body?.image?.link === FOTO &&
+      typeof varias.text === "string" &&
+      varias.text.includes("Playera negra (PLY-NEG)") &&
+      varias.text.includes("Playera blanca (PLY-BLA): agotado"),
+    JSON.stringify({ tipos: variasOut.map((o) => o.type), texto: varias.text })
+  );
+  ok(
+    "image_url nunca aparece en el texto que recibe el cliente",
+    [...negra, ...gorra1, ...variasOut].every((o) => !textoDe(o).includes("icon-192")),
+  );
+
+  // Lo que ve el operador: el hilo guarda la imagen por URL con el pie como texto.
+  const hiloNegra = await hiloDe("Lead inventario us2.1");
+  const fotoEnHilo = hiloNegra.mensajes.filter((m) => m.direction === "out").at(-1);
+  ok(
+    "el hilo del Inbox guarda el mensaje como image con la URL pública y el pie como texto",
+    fotoEnHilo?.type === "image" &&
+      fotoEnHilo?.media?.kind === "image" &&
+      fotoEnHilo?.media?.payload?.url === FOTO &&
+      fotoEnHilo?.media?.caption === fotoEnHilo?.text &&
+      fotoEnHilo?.aiGenerated === true &&
+      fotoEnHilo?.status !== "failed",
+    JSON.stringify(fotoEnHilo)
+  );
+  if (fotoEnHilo?.media?.assetId) {
+    const ver = await fetch(`${BASE}/api/media/${fotoEnHilo.media.assetId}`, {
+      headers: { cookie },
+      redirect: "manual",
+    });
+    ok(
+      "/api/media del asset por URL redirige (302) a la URL pública, sin servir bytes",
+      ver.status === 302 && ver.headers.get("location") === FOTO,
+      `status=${ver.status} location=${ver.headers.get("location")}`
+    );
+  }
+
+  // Meta rechaza el link ⇒ solo texto, sin retraso y sin fallo visible.
+  await mediaMode("reject");
+  const rechazo = await preguntar("5214627026007", "¿tienen playera negra?", "foto.reject");
+  const rechazoOut = await outboxDe("5214627026007");
+  ok(
+    `Meta rechaza la imagen: sale solo el texto (${rechazo.ms} ms) y ninguna imagen`,
+    rechazoOut.length === 1 &&
+      rechazoOut[0].type === "text" &&
+      rechazo.text === "Déjame revisar.\nPlayera negra (PLY-NEG): 7 pieza — $199 MXN",
+    JSON.stringify({ tipos: rechazoOut.map((o) => o.type), texto: rechazo.text })
+  );
+  const hiloRechazo = await hiloDe("Lead inventario foto.reject");
+  ok(
+    "y el hilo no enseña ningún mensaje fallido (el cliente nunca vio un error)",
+    hiloRechazo.mensajes.length > 0 &&
+      hiloRechazo.mensajes.every((m) => m.status !== "failed") &&
+      hiloRechazo.mensajes.filter((m) => m.direction === "out").length === 1,
+    JSON.stringify(hiloRechazo.mensajes.map((m) => [m.direction, m.type, m.status]))
+  );
+
+  // Meta tarda más de 5 s ⇒ el texto sale solo dentro del límite.
+  await mediaMode("slow");
+  const lento = await preguntar("5214627026008", "¿tienen playera negra?", "foto.slow");
+  ok(
+    `Meta tarda con la imagen: el texto sale solo en ${lento.ms} ms (< coalescencia + 5 s + margen)`,
+    typeof lento.text === "string" &&
+      lento.text.includes("Playera negra (PLY-NEG)") &&
+      (await outboxDe("5214627026008"))[0]?.type === "text" &&
+      lento.ms < coalesce + 5000 + 2500,
+    JSON.stringify(lento)
+  );
+  await mediaMode("ok");
+  // El mock lento termina igual (como Meta): se le deja acabar para que no
+  // contamine a los siguientes leads.
+  await sleep(2500);
+
+  // Meta acepta y DESPUÉS reporta failed ⇒ el pie sale como texto, una vez.
+  const wamidFoto = negra[0]?.waMessageId;
+  const antesRespaldo = (await outboxDe("5214627026001")).length;
+  const fallo = await api("/api/dev/wa-mock/status", {
+    method: "POST",
+    body: JSON.stringify({
+      waMessageId: wamidFoto,
+      status: "failed",
+      errorCode: 131053,
+      errorMessage: "Media upload error",
+    }),
+  });
+  await sleep(1200);
+  const trasRespaldo = await outboxDe("5214627026001");
+  ok(
+    "failed tardío de la foto: el texto del pie sale como mensaje de texto",
+    fallo.res.ok &&
+      trasRespaldo.length === antesRespaldo + 1 &&
+      trasRespaldo.at(-1)?.type === "text" &&
+      textoDe(trasRespaldo.at(-1)) === negra[0]?.body?.image?.caption,
+    JSON.stringify({ status: fallo.res.status, tipos: trasRespaldo.map((o) => o.type) })
+  );
+  await api("/api/dev/wa-mock/status", {
+    method: "POST",
+    body: JSON.stringify({ waMessageId: wamidFoto, status: "failed", errorCode: 131053 }),
+  });
+  await sleep(800);
+  ok(
+    "un failed repetido no lo manda dos veces (estados monotónicos)",
+    (await outboxDe("5214627026001")).length === antesRespaldo + 1
+  );
+  const hiloTrasFallo = await hiloDe("Lead inventario us2.1");
+  ok(
+    "en el hilo, la foto queda failed con su motivo y el texto de respaldo va después",
+    hiloTrasFallo.mensajes.some((m) => m.type === "image" && m.status === "failed") &&
+      hiloTrasFallo.mensajes.at(-1)?.type === "text" &&
+      hiloTrasFallo.mensajes.at(-1)?.aiGenerated === true,
+    JSON.stringify(hiloTrasFallo.mensajes.map((m) => [m.direction, m.type, m.status]))
   );
 
   console.log("\n== 026: degradación cuando MS-Stock falla (US2, camino infeliz) ==");

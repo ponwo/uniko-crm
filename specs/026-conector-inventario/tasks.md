@@ -154,6 +154,42 @@ está probando la mitad que no corre en ninguna instancia por defecto.
 
 ---
 
+## Phase 7: Foto del producto (extensión 2026-09-13)
+
+**Purpose**: MS-Stock (feature 004) ya devuelve `image_url` en cada producto; cuando no
+es `null`, el motor manda al cliente la foto por URL con el texto como pie, sin que la
+foto pueda bloquear, retrasar ni duplicar la respuesta (FR-1118..FR-1121, SC-008).
+Contrato: `uniko-integration.md` §4 "Foto del producto". Sin variables nuevas, sin
+migración, sin cambio de prompt (la URL no llega al modelo).
+
+**Diseño (decisiones tomadas, no preguntas)**:
+- La foto viaja como **mensaje de imagen por link** con el texto como `caption` (un
+  solo mensaje); el mensaje se persiste `type: image`, `text: <pie>` (así el historial
+  del agente y el transcript del Laboratorio conservan el texto) y un `media_asset`
+  `kind: image` con `payload: { url }` y sin archivo local (no se descarga ni proxea).
+- El hilo del Inbox pinta la imagen desde `payload.url`; `/api/media/[assetId]` redirige
+  (302) a esa URL para "Ver completa".
+- Degradación en tres capas: (1) URL malformada ⇒ `null` en el adaptador; (2) el envío de
+  la imagen falla o supera **5 s** ⇒ se manda el texto solo y no se persiste ningún
+  mensaje fallido (el motivo va al log); (3) Meta acepta y luego reporta `failed` ⇒ al
+  aplicar ese estado se manda el pie como texto, una vez (estados monotónicos).
+- Canales sin `outboundMedia` (Instagram, Messenger) ⇒ texto solo. Pie > 1024 ⇒ texto
+  aparte y foto sin pie. Búsqueda con varios resultados ⇒ solo la foto del primero.
+
+- [X] T038 [P] Adaptador: `image_url` en `stockProductSchema` de `src/server/inventario/client.ts` (http/https ⇒ string; ausente, `null` o malformada ⇒ `null`, sin invalidar la respuesta); tests en `tests/unit/stock-client.test.ts` (sin el campo ⇒ `null`; con URL ⇒ tal cual; con basura ⇒ `null` y `ok: true`)
+- [X] T039 [P] `checkStockTurn` devuelve `imageUrl` (la del primer producto o `null`; nunca en el texto) en `src/server/inventario/agent.ts`; tests en `tests/unit/check-stock-turn.test.ts` (un producto con foto; varios ⇒ la del primero; primero sin foto ⇒ `null` aunque el segundo tenga; sin coincidencias ⇒ `null`; el texto no contiene la URL)
+- [X] T040 [P] `graphRequest` acepta `signal` (`src/lib/meta/client.ts`) y `callGraphSend` lo propaga; `sendImageLink()` en `src/server/inbox/send.ts` (pre-flight común, `outboundMedia`, mensaje `image` con `link`+`caption`, persiste asset `payload.url` + mensaje `type: image`/`text: caption`/`origin: ai`; nada se persiste si Graph rechaza); test de sandbox e ida a Graph en `tests/unit/media-send.test.ts`
+- [X] T041 Motor: `deliverReply(conversation, text, { imageUrl })` en `src/server/ai/pipeline.ts` — con foto y canal con imágenes: `sendImageLink` con `AbortSignal.timeout(5000)`; cualquier fallo ⇒ `sendText` + `console.error("[agente] foto: …")`; pie > 1024 ⇒ texto y luego foto sin pie; sandbox ⇒ `persistTestOutbound` con asset de URL; el `check_stock` pasa `turn.imageUrl`
+- [X] T042 Estado `failed` tardío: en `src/server/inbox/status.ts`, al aplicar `failed` a un mensaje `origin: ai`, `type: image` con `text`, enviar ese texto con `sendText` (try/catch: un fallo del respaldo nunca rompe el webhook); test `tests/unit/status-foto-respaldo.test.ts`
+- [X] T043 [P] Hilo: `MediaBlock` en `src/components/inbox/message-thread.tsx` usa `payload.url` como `src` para `image` sin archivo local; `src/app/api/media/[assetId]/route.ts` redirige 302 a `payload.url` (misma comprobación de tenant)
+- [X] T044 [P] Mocks: `stock-mock` con `image_url` en la forma pública (PLY-NEG con foto = `{origen}/icon-192.png`; el resto `null`); `wa-mock` con modo de imagen (`POST /api/dev/wa-mock/media-mode` → `ok | reject | slow`; `reject` ⇒ 400 código 100 en `type: image` con `link`; `slow` ⇒ 7 s) y reset con el outbox; test de forma en `tests/unit/mocks-404-incondicional.test.ts` si enumera rutas
+- [X] T045 Arnés: `inventarioChecks()` en `scripts/e2e-selftest.mjs` — `textoDe` entiende pies de imagen; casos: PLY-NEG ⇒ UN mensaje `image` con `link` = `image_url` del mock y `caption` = texto; gorra ⇒ solo texto; búsqueda "playera" ⇒ una sola imagen; `reject` ⇒ solo texto sin `failed` en `/api/conversations/:id/messages`; `slow` ⇒ el texto llega antes de 5 s + coalescencia; `failed` tardío vía `/api/dev/wa-mock/status` ⇒ texto de respaldo, una vez; guion `tests/e2e/us-inventario.md` §US2 con los casos 7–12
+- [X] T046 Gate (`pnpm typecheck && pnpm lint && pnpm build && pnpm test`) y `pnpm test:e2e` con `INVENTARIO=on` y con la bandera vacía (cero cambio); revisión en el navegador del hilo con la foto (escritorio y 375 px)
+- [X] T047 Docs: `docs/inventario-conector.md` (sección "Foto del producto"), `README.md` (una línea), `quickstart.md` §5 (verificación en vivo con `FOTO-TEST`)
+- [ ] T048 (**bloqueado por señal del dueño**: el merge a `main` es acción hacia afuera; PR #28 abierta con CI verde el 2026-09-13) Despliegue en la instancia de pruebas: merge `--ff-only` a `main` y push (deploy automático de `uniko-lanco`); `/api/health` 10/10; verificación en vivo: "FOTO-TEST" por WhatsApp real ⇒ texto + imagen; producto sin foto ⇒ solo texto; registrar evidencia en `quickstart.md`; memoria; **no** promover a `production`
+
+---
+
 ## Dependencies & Execution Order
 
 ### Phase Dependencies
@@ -164,6 +200,7 @@ está probando la mitad que no corre en ninguna instancia por defecto.
 - **US1 (Phase 4)**: depende de Phase 2 (mock `/portal/sso`) y de T001 (`jose`); independiente de US2
 - **US3 (Phase 5)**: depende de Phase 2 (adaptador `health`/`getProduct`); independiente de US1/US2
 - **Polish (Phase 6)**: T032–T033 en paralelo desde que exista código; T034 → T035 → T036 → T037
+- **Foto (Phase 7)**: T038, T039, T040, T043, T044 en paralelo; T041 tras T039+T040; T042 tras T040; T045 tras T041+T044; T046 → T047 → T048
 
 ### Within Each User Story
 

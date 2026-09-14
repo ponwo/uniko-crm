@@ -43,6 +43,18 @@ export const GET = withAuth(async (session, _req: Request, ctx: Params) => {
     return apiError(404, "no_binary", "Este adjunto no tiene archivo");
   }
 
+  // 026 — Imagen enviada por URL (foto del producto): no hay binario aquí ni
+  // se descarga; "Ver completa" va a la misma URL pública que recibió el
+  // cliente. Solo http(s): es lo único que el adaptador deja entrar.
+  const linked = (asset.payload as { url?: unknown } | null)?.url;
+  if (
+    asset.kind === "image" &&
+    typeof linked === "string" &&
+    (linked.startsWith("https://") || linked.startsWith("http://"))
+  ) {
+    return Response.redirect(linked, 302);
+  }
+
   if (asset.fetchStatus !== "available") {
     // On-demand: reintenta la descarga en el momento (pending o failed).
     asset = (await ensureAssetAvailable(session.organizationId, assetId)) ?? asset;

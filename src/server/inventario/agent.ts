@@ -17,6 +17,13 @@ export type StockTurn = {
   text: string;
   /** false ⇒ el conector falló; el turno sigue, sin inventario. */
   ok: boolean;
+  /**
+   * Foto del producto (contrato §4): la URL pública del PRIMER producto
+   * resuelto, o null. Va aparte del texto a propósito: la manda el motor como
+   * mensaje de imagen, nunca el modelo ni el texto (FR-1119, FR-1121). Con
+   * varios resultados, a lo sumo la del primero — nunca una ráfaga.
+   */
+  imageUrl: string | null;
 };
 
 export async function checkStockTurn(input: {
@@ -29,15 +36,23 @@ export async function checkStockTurn(input: {
     // Motivo tipado, sin la consulta completa ni la llave: basta para
     // diagnosticar en el log del servidor (FR-1112).
     console.error(`[agente] inventario: ${found.error} al consultar MS-Stock`);
-    return { ok: false, text: intro };
+    return { ok: false, text: intro, imageUrl: null };
   }
   const { products, truncated } = found.data;
   if (products.length === 0) {
-    return { ok: true, text: `No encontré productos para «${input.query.trim()}».` };
+    return {
+      ok: true,
+      text: `No encontré productos para «${input.query.trim()}».`,
+      imageUrl: null,
+    };
   }
   const lines = products.map(formatProduct);
   if (truncated) lines.push("Hay más coincidencias, ¿me dices cuál te interesa?");
-  return { ok: true, text: [intro, ...lines].filter(Boolean).join("\n") };
+  return {
+    ok: true,
+    text: [intro, ...lines].filter(Boolean).join("\n"),
+    imageUrl: products[0]?.image_url ?? null,
+  };
 }
 
 /** `Playera negra (PLY-NEG): 7 pieza — $199 MXN` · agotado · sin precio. */

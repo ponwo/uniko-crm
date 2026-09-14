@@ -7,7 +7,8 @@ import { getEnv, isAiConfigured } from "@/lib/env";
 import { chatJson, type ChatMessage } from "@/lib/ai";
 import { publish } from "@/server/events/bus";
 import { isWindowOpen } from "@/server/inbox/window";
-import { SendError, sendText } from "@/server/inbox/send";
+import { SendError, sendImageLink, sendText } from "@/server/inbox/send";
+import { capabilitiesFor } from "@/server/channels/capabilities";
 import {
   agentActionSchema,
   degradeAction,
@@ -225,7 +226,7 @@ export async function runAgentTurn(conversationId: string): Promise<void> {
     } else {
       const turn = await checkStockTurn({ query: action.query, intro: action.reply });
       if (turn.ok) {
-        await deliverReply(conversation, turn.text);
+        await deliverReply(conversation, turn.text, { imageUrl: turn.imageUrl });
         publish(organizationId, {
           type: "conversation.updated",
           data: { conversation: { id: conversationId } },
@@ -276,22 +277,42 @@ export async function runAgentTurn(conversationId: string): Promise<void> {
 
 type Conversation = typeof schema.conversation.$inferSelect;
 
-/** Entrega la respuesta: envío real o persistencia sandbox (is_test). */
+/** Límite de WhatsApp para el pie de una imagen. */
+const CAPTION_MAX = 1024;
+/** Cuánto se espera a Meta por la foto antes de mandar el texto solo. */
+const PHOTO_TIMEOUT_MS = 5_000;
+
+/**
+ * Entrega la respuesta: envío real o persistencia sandbox (is_test).
+ *
+ * 026 — Con `imageUrl` (foto del producto, contrato §4 de MS-Stock) el texto
+ * viaja como pie de UN mensaje de imagen por URL; si la foto no puede salir
+ * —canal sin imágenes, Meta la rechaza o no responde a tiempo— el texto sale
+ * solo (FR-1119, FR-1120). Un pie más largo de lo que WhatsApp admite va como
+ * texto aparte y la foto sin pie: nunca se recorta lo que el agente dijo.
+ */
 async function deliverReply(
   conversation: Conversation,
-  text: string
+  text: string,
+  opts: { imageUrl?: string | null } = {}
 ): Promise<void> {
+  const imageUrl = opts.imageUrl ?? null;
   if (conversation.isTest) {
-    await persistTestOutbound(conversation, text);
+    await persistTestOutbound(conversation, text, imageUrl);
     return;
   }
+  const photo =
+    imageUrl && capabilitiesFor(conversation.channel).outboundMedia ? imageUrl : null;
+  const asCaption = photo !== null && text.length <= CAPTION_MAX;
   try {
+    if (asCaption && (await sendPhoto(conversation, photo, text))) return;
     await sendText({
       conversationId: conversation.id,
       organizationId: conversation.organizationId,
       text,
       aiGenerated: true,
     });
+    if (photo && !asCaption) await sendPhoto(conversation, photo, undefined);
   } catch (err) {
     if (err instanceof SendError && err.code === "window_closed") {
       await applyHandoff(conversation.id, conversation.organizationId, "ventana");
@@ -301,22 +322,68 @@ async function deliverReply(
   }
 }
 
-/** Mensaje saliente del sandbox: se persiste, JAMÁS toca la API (FR-031). */
+/**
+ * true ⇒ la foto salió (con su pie, si lo llevaba). Cualquier fallo de la
+ * foto se registra y devuelve false para que el texto salga solo; la única
+ * excepción que sube es la ventana cerrada, que tampoco dejaría pasar el texto.
+ */
+async function sendPhoto(
+  conversation: Conversation,
+  link: string,
+  caption: string | undefined
+): Promise<boolean> {
+  try {
+    await sendImageLink({
+      conversationId: conversation.id,
+      organizationId: conversation.organizationId,
+      link,
+      caption,
+      aiGenerated: true,
+      signal: AbortSignal.timeout(PHOTO_TIMEOUT_MS),
+    });
+    return true;
+  } catch (err) {
+    if (err instanceof SendError && err.code === "window_closed") throw err;
+    const motivo = err instanceof Error ? err.message : String(err);
+    console.error(`[agente] foto: no se pudo enviar la imagen (${motivo}); sale solo el texto`);
+    return false;
+  }
+}
+
+/**
+ * Mensaje saliente del sandbox: se persiste, JAMÁS toca la API (FR-031). Con
+ * foto, se persiste como el envío real la dejaría (asset con la URL y el
+ * texto como pie), para que el Laboratorio enseñe lo mismo que vería el cliente.
+ */
 async function persistTestOutbound(
   conversation: Conversation,
-  text: string
+  text: string,
+  imageUrl: string | null = null
 ): Promise<void> {
   const db = getDb();
+  let mediaAssetId: string | null = null;
+  if (imageUrl) {
+    mediaAssetId = newId("mediaAsset");
+    await db.insert(schema.mediaAsset).values({
+      id: mediaAssetId,
+      organizationId: conversation.organizationId,
+      kind: "image",
+      caption: text || null,
+      payload: { url: imageUrl },
+      fetchStatus: "available",
+    });
+  }
   await db.insert(schema.message).values({
     id: newId("message"),
     organizationId: conversation.organizationId,
     conversationId: conversation.id,
     direction: "out",
-    type: "text",
+    type: mediaAssetId ? "image" : "text",
     text,
     status: "sent",
     aiGenerated: true,
     origin: "ai",
+    mediaAssetId,
   });
   await db
     .update(schema.conversation)

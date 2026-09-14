@@ -18,6 +18,22 @@ export const TIMEOUT_MS = 3_000;
 /** Cuántas coincidencias se le enseñan al cliente (el contrato admite hasta 25). */
 export const SEARCH_LIMIT = 5;
 
+/**
+ * Foto del producto (contrato §4, desde la feature 004 de MS-Stock): la URL
+ * pública de la foto principal o `null`. Se tolera que falte (un MS-Stock
+ * anterior a la 004) y que venga rota: una foto mal formada jamás cuesta el
+ * texto — se trata como "sin foto", nunca como respuesta inválida.
+ */
+function toImageUrl(value: unknown): string | null {
+  if (typeof value !== "string") return null;
+  try {
+    const url = new URL(value);
+    return url.protocol === "http:" || url.protocol === "https:" ? value : null;
+  } catch {
+    return null;
+  }
+}
+
 export const stockProductSchema = z.object({
   sku: z.string(),
   name: z.string(),
@@ -27,6 +43,8 @@ export const stockProductSchema = z.object({
   price: z.number().nullable(),
   currency: z.string(),
   available: z.boolean(),
+  /** Nombre del contrato tal cual (`image_url`); ver `toImageUrl`. */
+  image_url: z.unknown().transform(toImageUrl),
 });
 export type StockProduct = z.infer<typeof stockProductSchema>;
 
@@ -61,7 +79,7 @@ function baseUrl(): string {
 
 async function request<T>(
   path: string,
-  schema: z.ZodType<T>,
+  schema: z.ZodType<T, z.ZodTypeDef, unknown>,
   opts: { auth: boolean }
 ): Promise<StockResult<T>> {
   const controller = new AbortController();

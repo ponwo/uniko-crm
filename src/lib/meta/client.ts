@@ -42,6 +42,8 @@ export async function graphRequest<T>(
     method?: "GET" | "POST" | "DELETE";
     token: string;
     body?: unknown;
+    /** Para acotar la espera (p. ej. una foto que no debe retrasar el turno). */
+    signal?: AbortSignal;
   }
 ): Promise<T> {
   const env = getEnv();
@@ -57,6 +59,7 @@ export async function graphRequest<T>(
           : {}),
       },
       body: opts.body !== undefined ? JSON.stringify(opts.body) : undefined,
+      signal: opts.signal,
     });
   } catch (cause) {
     throw new MetaApiError("No se pudo contactar la API de Meta", {

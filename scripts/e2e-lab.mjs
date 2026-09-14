@@ -363,6 +363,49 @@ ok(
   `${outboxAntes} → ${outboxE3}`
 );
 
+// ── 026 (foto del producto): check_stock dentro del sandbox ─────────────
+//
+// Con el conector encendido, un escenario propio pregunta por el producto con
+// foto (PLY-NEG en el stock-mock). El turno consulta igual (es lectura), la
+// respuesta se persiste como imagen SIN tocar la API —el outbox del wa-mock
+// no crece— y el transcript conserva el texto porque viaja como pie.
+const inventarioOn = /^(on|1|true|si|sí|yes)$/i.test((process.env.INVENTARIO ?? "").trim());
+if (inventarioOn) {
+  console.log("\n== 026: check_stock con foto dentro del Laboratorio (sandbox) ==");
+  const alta = await api("/api/lab/scenarios", {
+    method: "POST",
+    data: {
+      escenarios: [
+        {
+          label: "Pregunta por la playera negra",
+          description: "Producto con foto en el inventario",
+          script: ["hola, buenas", "¿tienen playera negra?"],
+        },
+      ],
+    },
+  });
+  ok("el escenario que consulta inventario se guarda", alta.status === 201, `status ${alta.status}`);
+  const outboxAntesFoto = await outboxLen();
+  const inicio4 = await api("/api/lab/runs", { method: "POST" });
+  const reporte4 = await esperarCorrida(inicio4.json?.runId);
+  const caso = (reporte4?.cases ?? []).find((c) => c.personaLabel === "Pregunta por la playera negra");
+  const respuesta = (caso?.transcript ?? []).filter((t) => t.role === "agente").at(-1)?.text ?? "";
+  ok(
+    "el agente consultó el inventario y el transcript trae el texto (el pie de la foto)",
+    respuesta.includes("Playera negra (PLY-NEG): 7 pieza — $199 MXN"),
+    JSON.stringify(caso?.transcript ?? reporte4?.run)
+  );
+  ok("la URL de la foto no se cuela en el transcript", respuesta.length > 0 && !respuesta.includes("icon-192"));
+  const outboxTrasFoto = await outboxLen();
+  ok(
+    "y el sandbox sigue intacto: ninguna imagen salió por la API",
+    outboxTrasFoto === outboxAntesFoto,
+    `${outboxAntesFoto} → ${outboxTrasFoto}`
+  );
+} else {
+  console.log("\n  (conector de inventario apagado: el escenario con foto no aplica)");
+}
+
 await browser.close();
 
 console.log(`\n===== ${checks - failures}/${checks} checks OK, ${failures} fallos =====`);

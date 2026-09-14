@@ -12,6 +12,8 @@ const config = [
       "scripts/**",
       "next-env.d.ts",
       ".tmp-seed-demo.mjs",
+      // Worktrees locales de Claude Code (traen su propio .next): no son código de esta rama.
+      ".claude/worktrees/**",
     ],
   },
   ...compat.extends("next/core-web-vitals", "next/typescript"),

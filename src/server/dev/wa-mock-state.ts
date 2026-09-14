@@ -45,11 +45,19 @@ export type CapiMockEvent = {
   at: string;
 };
 
+/**
+ * 026 — Cómo responde el mock a un mensaje de imagen por link (foto del
+ * producto): `reject` ⇒ 400 como Meta ante un link inválido; `slow` ⇒ tarda
+ * más que el límite del motor (que debe mandar el texto solo).
+ */
+export type MediaMode = "ok" | "reject" | "slow";
+
 type WaMockState = {
   outbox: OutboxEntry[];
   templates: MockTemplate[];
   capiEvents: CapiMockEvent[];
   counter: number;
+  mediaMode: MediaMode;
 };
 
 const globalForMock = globalThis as unknown as { __waMockState?: WaMockState };
@@ -61,6 +69,7 @@ export function getWaMockState(): WaMockState {
       templates: [],
       capiEvents: [],
       counter: 0,
+      mediaMode: "ok",
     };
   }
   return globalForMock.__waMockState;
@@ -72,6 +81,7 @@ export function resetWaMockState(): void {
     templates: [],
     capiEvents: [],
     counter: 0,
+    mediaMode: "ok",
   };
 }
 
