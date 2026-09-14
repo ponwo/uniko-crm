@@ -27,6 +27,35 @@ opcionales ([ADR-001](adr-001-canales-opcionales.md), Principio II).
 - **Ajustes → Inventario**: a qué instancia apunta y "Probar conexión"
   (Conectado / Llave rechazada / Servicio no disponible).
 
+## Foto del producto
+
+Desde la feature 004 de MS-Stock cada producto trae `image_url`: la dirección
+**pública y permanente** de su foto principal (o `null` si no tiene, o si esa
+instancia no tiene fotos habilitadas). Cuando el producto que resolvió
+`check_stock` trae foto, el agente manda por WhatsApp **un** mensaje de imagen
+por URL con el texto del turno como pie (`caption`): el cliente ve la foto y,
+debajo, existencia y precio. Reglas:
+
+- **Uniko no descarga, reescala ni proxea la foto**: le pasa la URL a WhatsApp
+  (`image.link`) y la sirve quien la aloja (Cloudflare, no MS-Stock). En el hilo
+  del Inbox la imagen se pinta desde esa misma URL.
+- **La foto nunca bloquea ni retrasa la respuesta**: si WhatsApp rechaza la
+  imagen o no contesta en 5 s, sale solo el texto (y el motivo queda en el log como
+  `[agente] foto: …`); si la acepta y después la reporta `failed` (no pudo
+  descargarla), el texto del pie sale como mensaje de texto, una sola vez. El
+  cliente nunca ve un error.
+- **A lo sumo una foto por turno**: con varias coincidencias, la del primer
+  producto (o ninguna); nunca una ráfaga.
+- `image_url` **no llega al modelo** (sería ruido) ni se guarda fuera del mensaje
+  enviado: cambia cada vez que el negocio sube una foto nueva y se usa en el turno.
+- En Instagram y Messenger (sin imágenes salientes hoy) va solo el texto. Un pie
+  más largo de lo que WhatsApp admite (1024 caracteres) sale como texto aparte y la
+  foto sin pie.
+
+Con `image_url` en `null`, o con la bandera apagada, nada cambia. Subir,
+reemplazar o quitar fotos se hace en el portal de MS-Stock (o por su API), no
+desde Uniko.
+
 ## Qué pasa cuando MS-Stock falla
 
 El turno **degrada**: el agente contesta con su frase (o no contesta), la
@@ -57,7 +86,10 @@ MS-Stock, no el alias interno.
 
 El entorno de pruebas trae un MS-Stock de mentira (`/api/dev/stock-mock`, solo
 con `WA_MOCK_ENABLED=true` y fuera de producción) con un catálogo fijo y modos
-infelices (`down`, `unauthorized`, `slow`, `garbage`). En `.env`:
+infelices (`down`, `unauthorized`, `slow`, `garbage`); `PLY-NEG` y `TAZ-01`
+traen foto (un PNG de la propia app) y el resto no. Para el envío de la foto, el
+wa-mock tiene su propio modo (`POST /api/dev/wa-mock/media-mode` con `ok`,
+`reject` o `slow`). En `.env`:
 
 ```bash
 INVENTARIO=on

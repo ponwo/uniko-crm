@@ -148,9 +148,10 @@ afirmar**: existencia, unidad y precio reales, pegados por el sistema para que n
 pueda inventarlos; si MS-Stock no responde, contesta sin inventario y la
 conversación sigue. El botón **Inventario** abre el portal de MS-Stock ya
 autenticado (un pase de un solo uso: MS-Stock no tiene usuarios, la identidad es
-la de Uniko), y Ajustes → Inventario dice si la conexión funciona. Variables,
-mock de pruebas y contrato en
-[`docs/inventario-conector.md`](docs/inventario-conector.md).
+la de Uniko), y Ajustes → Inventario dice si la conexión funciona. Si el producto
+tiene foto en MS-Stock, el agente la manda con existencia y precio como pie —por su
+URL pública, sin que la foto pueda retrasar la respuesta. Variables, mock de pruebas
+y contrato en [`docs/inventario-conector.md`](docs/inventario-conector.md).
 
 ### 📄 Plantillas · 👥 Multi-usuario · 🔐 Self-hosted
 

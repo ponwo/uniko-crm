@@ -90,6 +90,10 @@ Uniko" → `http://localhost:3000`) y 3.4 con un producto real (`PLY-NEG`).
    al final de este archivo.
 3. **No** promover a `production` en esta feature (puerta de promoción: señal
    explícita del dueño).
+4. **Foto del producto (extensión 2026-09-13)**: en la instancia de pruebas, por
+   WhatsApp real, pedir "FOTO-TEST" (producto con foto en `stock.lanco.cloud`) ⇒
+   texto + imagen en el mismo turno; un producto sin foto ⇒ solo texto; con el envío
+   de la imagen fallando ⇒ solo texto y ningún error visible. Registrar abajo.
 
 ## Criterio de "Hecho"
 
