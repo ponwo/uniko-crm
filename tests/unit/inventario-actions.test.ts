@@ -19,6 +19,19 @@ describe("026 — la acción check_stock", () => {
     expect(schema.safeParse({ action: "check_stock", query: "x".repeat(101) }).success).toBe(false);
   });
 
+  it("tallas: size opcional de 1 a 20 caracteres (se recorta); vacía o larga ⇒ inválida", () => {
+    const schema = agentActionSchema({ agenda: false, inventario: true });
+    const parsed = schema.safeParse({ ...check, size: " G " });
+    expect(parsed.success && parsed.data.action === "check_stock" && parsed.data.size).toBe("G");
+    expect(schema.safeParse({ ...check, size: "" }).success).toBe(false);
+    expect(schema.safeParse({ ...check, size: "x".repeat(21) }).success).toBe(false);
+    // Degradar conserva la frase aunque venga talla.
+    expect(degradeAction({ action: "check_stock", query: "x", size: "G", reply: "Veo." })).toEqual({
+      action: "reply",
+      text: "Veo.",
+    });
+  });
+
   it("sin la bandera, la acción no existe en el esquema", () => {
     const schema = agentActionSchema({ agenda: false, inventario: false });
     expect(schema.safeParse(check).success).toBe(false);

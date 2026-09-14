@@ -56,6 +56,32 @@ Con `image_url` en `null`, o con la bandera apagada, nada cambia. Subir,
 reemplazar o quitar fotos se hace en el portal de MS-Stock (o por su API), no
 desde Uniko.
 
+## Tallas
+
+Desde la feature 005 de MS-Stock un producto puede ser un **modelo con tallas**
+("Playera roja" con CH, M, G, XG): cada talla tiene su propio SKU (`PLY-ROJ-G`) y
+su propia existencia; el modelo agrupa nombre, precio y foto. La respuesta trae
+`variants` (las tallas activas, en el orden del negocio, con su existencia) y, si lo
+que se consultó por SKU es una talla, `label` y `parent_sku`.
+
+Como siempre, **el modelo no redacta cifras**: solo separa el nombre base de la
+talla (`{"action":"check_stock","query":"playera roja","size":"G"}`) y el sistema
+redacta:
+
+- sin talla pedida: `Playera roja (PLY-ROJ) — $219 MXN. Tallas: CH 4, M agotada, G 7, XG 1`;
+- con talla pedida: `Playera roja (PLY-ROJ) talla G: 7 pieza — $219 MXN`; agotada:
+  `… talla M: agotada — $219 MXN. Con existencia: CH 4, G 7, XG 1`; una talla que el
+  modelo no tiene: `… no viene en talla XXG. Tallas: CH 4, M agotada, G 7, XG 1`;
+- SKU exacto de una talla: `Playera roja (PLY-ROJ-G) talla G: 7 pieza — $219 MXN`.
+
+Las etiquetas son las del negocio (`G`, `38`, `Única`); si el cliente escribe
+"grande", "mediana", "chica", "extra grande" o "extra chica" y ninguna etiqueta
+coincide literalmente, el motor las equipara a G, M, CH, XG y XCH. La foto de un
+modelo es una sola (la misma para todas sus tallas) y se envía a lo sumo una vez
+por turno. Un producto sin tallas (o un MS-Stock anterior a la 005) se responde
+exactamente igual que antes: `variants`, `label` y `parent_sku` ausentes se
+toleran.
+
 ## Qué pasa cuando MS-Stock falla
 
 El turno **degrada**: el agente contesta con su frase (o no contesta), la

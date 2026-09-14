@@ -29,7 +29,14 @@ describe("026 — el prompt y el inventario", () => {
       expect(p).not.toContain("check_stock");
       expect(p.toLowerCase()).not.toContain("inventario");
       expect(p.toLowerCase()).not.toContain("existencia");
+      expect(p.toLowerCase()).not.toContain("talla");
     }
+  });
+
+  it("encendida: la acción lleva size y la regla de separar nombre base y talla", () => {
+    const p = prompt(true);
+    expect(p).toContain('"size":"<talla que pidió el cliente');
+    expect(p).toMatch(/NO la pongas en query: ponla en size/);
   });
 
   it("encendida: describe check_stock y las reglas de no inventar", () => {

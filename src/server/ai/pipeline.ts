@@ -224,7 +224,11 @@ export async function runAgentTurn(conversationId: string): Promise<void> {
     if (!inventario) {
       action = degradeAction(action);
     } else {
-      const turn = await checkStockTurn({ query: action.query, intro: action.reply });
+      const turn = await checkStockTurn({
+        query: action.query,
+        size: action.size,
+        intro: action.reply,
+      });
       if (turn.ok) {
         await deliverReply(conversation, turn.text, { imageUrl: turn.imageUrl });
         publish(organizationId, {

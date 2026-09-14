@@ -61,6 +61,8 @@ const inventarioActions = [
   z.object({
     action: z.literal("check_stock"),
     query: z.string().min(2).max(100),
+    /** Talla que pidió el cliente (tallas, 2026-09-14); el sistema resuelve cuál es. */
+    size: z.string().trim().min(1).max(20).optional(),
     reply: z.string().optional(),
   }),
 ] as const;

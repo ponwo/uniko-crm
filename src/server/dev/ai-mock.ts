@@ -144,10 +144,18 @@ export function aiMockCompletion(messages: InMessage[]): string {
       /(?:tienen|tienes|hay|cu[aá]nto cuesta|precio de)\s+(.+?)\s*\??\s*$/i
     );
     if (m?.[1]) {
-      const query = m[1].replace(/^(?:el|la|los|las|un|una|unos|unas)\s+/i, "").trim();
+      let query = m[1].replace(/^(?:el|la|los|las|un|una|unos|unas)\s+/i, "").trim();
+      // Tallas (005): "… en G", "… talla G", "… en talla G" ⇒ query = nombre base, size = G.
+      const talla = query.match(/^(.+?)\s+(?:en\s+talla|talla|en)\s+([^\s]{1,20})$/i);
+      let size: string | undefined;
+      if (talla?.[1] && talla[2]) {
+        query = talla[1].trim();
+        size = talla[2];
+      }
       return JSON.stringify({
         action: "check_stock",
         query,
+        ...(size ? { size } : {}),
         reply: "Déjame revisar.",
       });
     }

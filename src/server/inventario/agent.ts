@@ -1,4 +1,4 @@
-import { lookup, type StockProduct } from "@/server/inventario/client";
+import { lookup, type StockProduct, type StockVariant } from "@/server/inventario/client";
 
 /**
  * 026 — Lo que el agente incluido puede hacer con el inventario: consultar.
@@ -10,6 +10,11 @@ import { lookup, type StockProduct } from "@/server/inventario/client";
  * consultar, y el sistema pega los datos reales. Si MS-Stock no responde, el
  * turno lo dice con `ok: false` y el pipeline degrada (FR-1112) — nunca se
  * afirma una existencia que no vino de la consulta.
+ *
+ * Tallas (extensión 2026-09-14, FR-1124): un modelo con tallas se responde en una
+ * línea con la existencia de cada talla; si el cliente pidió una talla (`size`),
+ * con la de esa talla. El modelo tampoco redacta esto: solo separa nombre base y
+ * talla.
  */
 
 export type StockTurn = {
@@ -21,16 +26,19 @@ export type StockTurn = {
    * Foto del producto (contrato §4): la URL pública del PRIMER producto
    * resuelto, o null. Va aparte del texto a propósito: la manda el motor como
    * mensaje de imagen, nunca el modelo ni el texto (FR-1119, FR-1121). Con
-   * varios resultados, a lo sumo la del primero — nunca una ráfaga.
+   * varios resultados, a lo sumo la del primero — nunca una ráfaga. La de un
+   * modelo es la misma en todas sus tallas: una sola vez (FR-1125).
    */
   imageUrl: string | null;
 };
 
 export async function checkStockTurn(input: {
   query: string;
+  size?: string;
   intro?: string;
 }): Promise<StockTurn> {
   const intro = input.intro?.trim() ?? "";
+  const size = input.size?.trim() ?? "";
   const found = await lookup(input.query);
   if (!found.ok) {
     // Motivo tipado, sin la consulta completa ni la llave: basta para
@@ -46,7 +54,7 @@ export async function checkStockTurn(input: {
       imageUrl: null,
     };
   }
-  const lines = products.map(formatProduct);
+  const lines = products.map((p) => formatProduct(p, size));
   if (truncated) lines.push("Hay más coincidencias, ¿me dices cuál te interesa?");
   return {
     ok: true,
@@ -55,11 +63,78 @@ export async function checkStockTurn(input: {
   };
 }
 
-/** `Playera negra (PLY-NEG): 7 pieza — $199 MXN` · agotado · sin precio. */
-export function formatProduct(p: StockProduct): string {
-  const existencia = p.stock > 0 ? `${formatQuantity(p.stock)} ${p.unit}` : "agotado";
+/**
+ * Una línea por producto, siempre redactada por el sistema:
+ * - simple: `Playera negra (PLY-NEG): 7 pieza — $199 MXN` · agotado · sin precio;
+ * - talla resuelta por SKU: `Playera roja (PLY-ROJ-G) talla G: 7 pieza — $219 MXN`;
+ * - modelo sin talla pedida: `Playera roja (PLY-ROJ) — $219 MXN. Tallas: CH 4, M agotada, G 7, XG 1`;
+ * - modelo con talla pedida: la existencia de esa talla; "agotada" más las que sí
+ *   hay; o "no viene en talla X" más las que tiene.
+ */
+export function formatProduct(p: StockProduct, size: string = ""): string {
   const precio = p.price === null ? "sin precio" : formatPrice(p.price, p.currency);
-  return `${p.name} (${p.sku}): ${existencia} — ${precio}`;
+  if (p.label !== null) {
+    return `${p.name} (${p.sku}) talla ${p.label}: ${existenciaDe(p.stock, p.unit)} — ${precio}`;
+  }
+  if (p.variants.length === 0) {
+    return `${p.name} (${p.sku}): ${existenciaDe(p.stock, p.unit)} — ${precio}`;
+  }
+  const head = `${p.name} (${p.sku})`;
+  if (!size) return `${head} — ${precio}. Tallas: ${listaTallas(p.variants)}`;
+  const talla = matchVariant(p.variants, size);
+  if (!talla) {
+    return `${head} no viene en talla ${size}. Tallas: ${listaTallas(p.variants)}`;
+  }
+  if (talla.stock <= 0) {
+    const otras = p.variants.filter((v) => v.stock > 0);
+    const resto = otras.length > 0 ? ` Con existencia: ${listaTallas(otras)}` : "";
+    return `${head} talla ${talla.label}: agotada — ${precio}.${resto}`;
+  }
+  return `${head} talla ${talla.label}: ${existenciaDe(talla.stock, p.unit)} — ${precio}`;
+}
+
+/** `CH 4, M agotada, G 7, XG 1` — en el orden del negocio, agotadas incluidas. */
+function listaTallas(variants: StockVariant[]): string {
+  return variants
+    .map((v) => `${v.label} ${v.stock > 0 ? formatQuantity(v.stock) : "agotada"}`)
+    .join(", ");
+}
+
+function existenciaDe(stock: number, unit: string): string {
+  return stock > 0 ? `${formatQuantity(stock)} ${unit}` : "agotado";
+}
+
+/**
+ * Equivalencias de respaldo cuando ninguna etiqueta coincide literalmente: las
+ * etiquetas son las del negocio; esto solo traduce cómo la gente escribe la talla.
+ */
+const EQUIVALENCIAS: Record<string, string[]> = {
+  xch: ["extra chica", "extrachica", "xs", "extra small"],
+  ch: ["chica", "s", "small"],
+  m: ["mediana", "medium", "med"],
+  g: ["grande", "l", "large"],
+  xg: ["extra grande", "extragrande", "xl", "extra large"],
+  xxg: ["xxl", "extra extra grande", "doble extra"],
+};
+
+export function matchVariant(variants: StockVariant[], size: string): StockVariant | null {
+  const wanted = normalize(size);
+  if (!wanted) return null;
+  const literal = variants.find((v) => normalize(v.label) === wanted);
+  if (literal) return literal;
+  const canon = Object.entries(EQUIVALENCIAS).find(([, words]) => words.includes(wanted))?.[0];
+  if (!canon) return null;
+  return variants.find((v) => normalize(v.label) === canon) ?? null;
+}
+
+/** Misma regla que MS-Stock: sin acentos, sin mayúsculas, espacios colapsados. */
+function normalize(text: string): string {
+  return text
+    .normalize("NFKD")
+    .replace(/[̀-ͯ]/g, "")
+    .toLowerCase()
+    .replace(/\s+/g, " ")
+    .trim();
 }
 
 function formatQuantity(n: number): string {

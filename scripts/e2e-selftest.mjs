@@ -1584,6 +1584,27 @@ async function inventarioChecks() {
     (await outboxDe("5214627026001")).some((o) => textoDe(o).startsWith("Déjame revisar.\n"))
   );
 
+  /* ---------- Tallas (contrato §4 "Forma exacta", FR-1122..FR-1126, SC-009) ---------- */
+  console.log("\n== 026: tallas en check_stock ==");
+  const tallas = [
+    ["5214627026011", "¿tienen playera roja?", "Playera roja (PLY-ROJ) — $219 MXN. Tallas: CH 4, M agotada, G 7, XG 1", "modelo sin talla pedida: una línea con cada talla en orden, agotadas incluidas"],
+    ["5214627026012", "¿tienen playera roja en G?", "Playera roja (PLY-ROJ) talla G: 7 pieza — $219 MXN", "talla pedida con existencia"],
+    ["5214627026013", "¿tienen playera roja en M?", "Playera roja (PLY-ROJ) talla M: agotada — $219 MXN. Con existencia: CH 4, G 7, XG 1", "talla pedida agotada: ofrece las que sí hay"],
+    ["5214627026014", "¿tienen playera roja en XXG?", "Playera roja (PLY-ROJ) no viene en talla XXG. Tallas: CH 4, M agotada, G 7, XG 1", "talla que el modelo no tiene"],
+    ["5214627026015", "¿cuánto cuesta la PLY-ROJ-G?", "Playera roja (PLY-ROJ-G) talla G: 7 pieza — $219 MXN", "SKU exacto de una talla"],
+  ];
+  let t = 0;
+  for (const [lead, pregunta, esperado, titulo] of tallas) {
+    const r = await preguntar(lead, pregunta, `tallas.${++t}`);
+    ok(`${titulo}`, typeof r.text === "string" && r.text.includes(esperado), JSON.stringify(r));
+  }
+  const rojaOut = await outboxDe("5214627026011");
+  ok(
+    "el modelo sin foto sale como texto; ninguna cifra la redactó el modelo (la frase precede a los datos)",
+    rojaOut.length === 1 && rojaOut[0].type === "text" && textoDe(rojaOut[0]).startsWith("Déjame revisar.\n"),
+    JSON.stringify(rojaOut.map((o) => [o.type, textoDe(o)]))
+  );
+
   /* ---------- Foto del producto (contrato §4, FR-1119..FR-1121) ---------- */
   console.log("\n== 026: foto del producto en check_stock ==");
   // El stock-mock arma image_url con el origen de la petición: la app misma.

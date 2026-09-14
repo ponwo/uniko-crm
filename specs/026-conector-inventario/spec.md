@@ -149,6 +149,29 @@ bandera y comprobar que el esquema de acciones del turno no incluye `check_stock
     envía a lo sumo la foto del **primer** producto (o ninguna), nunca una ráfaga de
     imágenes; y `image_url` jamás forma parte del prompt del modelo ni se guarda
     fuera del mensaje enviado.
+13. **(Tallas, 2026-09-14)** **Given** MS-Stock (feature 005) devuelve un **modelo con
+    tallas** ("Playera roja", `PLY-ROJ`, con `variants` CH 4, M 0, G 7, XG 1),
+    **When** el cliente pregunta "¿tienen playera roja?", **Then** el cliente recibe
+    **una** línea del modelo con su precio y la existencia de **cada talla en el
+    orden del negocio**, marcando las agotadas (`Playera roja (PLY-ROJ) — $219 MXN.
+    Tallas: CH 4, M agotada, G 7, XG 1`), sin que el modelo redacte ninguna cifra.
+14. **Given** el cliente pide una talla concreta ("¿tienen playera roja en G?"),
+    **When** el agente consulta, **Then** manda `query` = nombre base ("playera
+    roja") y `size` = "G", y el cliente recibe la existencia **de esa talla**
+    (`Playera roja (PLY-ROJ) talla G: 7 pieza — $219 MXN`); si la talla está en 0,
+    lo dice y ofrece las tallas con existencia (`talla M: agotada … Con existencia:
+    CH 4, G 7, XG 1`); si el modelo **no viene** en esa talla, lo dice y lista las
+    tallas que sí tiene.
+15. **Given** el cliente da el SKU exacto de una talla (`PLY-ROJ-G`), **When** el
+    agente consulta, **Then** recibe esa talla y responde con su etiqueta y
+    existencia (`Playera roja (PLY-ROJ-G) talla G: 7 pieza — $219 MXN`).
+16. **Given** un producto sin tallas (`variants` vacía o ausente, MS-Stock anterior a
+    la 005), **When** se responde, **Then** el texto es **exactamente** el de antes de
+    esta extensión; `variants`, `label` o `parent_sku` ausentes o malformados nunca
+    invalidan la respuesta.
+17. **Given** un modelo con tallas y foto, **When** se responde, **Then** la foto es
+    la del modelo y se envía **una sola vez** por turno (la misma para todas sus
+    tallas), con las reglas de los escenarios 9–12.
 
 ---
 
@@ -223,6 +246,17 @@ apagada, la sección no existe y su ruta responde como inexistente.
   texto; una sola vez por mensaje (los estados son monotónicos).
 - **Conversación de prueba del Laboratorio con foto**: se persiste el mensaje de
   imagen (URL + pie) sin tocar la API, como cualquier salida del sandbox.
+- **Talla escrita "a la mexicana"** ("grande", "mediana", "chica", "extra grande",
+  "extra chica"): el motor la equipara a la etiqueta del negocio (G, M, CH, XG, XCH)
+  solo cuando ninguna etiqueta coincide literalmente; cualquier otra etiqueta se
+  compara sin mayúsculas ni acentos (`38`, `Única`).
+- **Modelo con muchas tallas**: la línea lista todas las que MS-Stock devuelve (hasta
+  30, tope del contrato); WhatsApp lo muestra en varias líneas visuales, sin
+  recorte.
+- **`size` sin `variants`** (el cliente pidió talla de un producto simple): se
+  responde como producto simple; la talla pedida se ignora sin error.
+- **Modelo sin tallas activas** (`variants` vacía, `stock` 0): se responde como
+  producto agotado, como cualquier simple.
 
 ## Requirements *(mandatory)*
 
@@ -313,6 +347,29 @@ apagada, la sección no existe y su ruta responde como inexistente.
   negocio sube una foto nueva). En conversaciones de prueba el mensaje de imagen
   se persiste sin tocar la API.
 
+**Tallas** (extensión 2026-09-14; contrato §4 "Forma exacta" y "Prompt", MS-Stock 005)
+
+- **FR-1122**: El adaptador MUST aceptar `variants` (lista de `{sku, label, stock,
+  available}`), `label` y `parent_sku` en la forma del producto; ausentes, `null` o
+  malformados ⇒ lista vacía / `null`, sin invalidar la respuesta (compatibilidad con
+  un MS-Stock anterior a la 005).
+- **FR-1123**: `check_stock` MUST admitir un campo opcional `size` (1–20
+  caracteres) con la talla que pidió el cliente; el prompt MUST instruir al modelo a
+  poner en `query` el nombre base del producto (sin la talla) y la talla en `size`,
+  y a usar el SKU tal cual cuando el cliente lo da. Con la bandera apagada nada de
+  esto aparece en el esquema ni en el prompt.
+- **FR-1124**: El sistema (nunca el modelo) MUST redactar la respuesta de un modelo
+  con tallas: sin `size`, una línea con precio y la existencia de cada talla en el
+  orden recibido (agotadas incluidas, marcadas); con `size`, la existencia de esa
+  talla, o "agotada" más las tallas con existencia, o "no viene en talla X" más las
+  tallas que sí tiene; una talla resuelta por SKU exacto MUST mostrar su etiqueta.
+  Un producto sin tallas MUST verse exactamente como antes.
+- **FR-1125**: La foto de un modelo (`image_url`, la misma en sus tallas) MUST
+  enviarse a lo sumo una vez por turno, con las reglas FR-1119..FR-1121.
+- **FR-1126**: El stock-mock MUST incluir un modelo con tallas (y su consulta por SKU
+  de talla y por SKU del modelo) y el arnés E2E MUST cubrir los escenarios 13–16;
+  la CI los ejercita con la bandera encendida.
+
 **Estado del conector (Ajustes)**
 
 - **FR-1115**: Con la bandera encendida, Ajustes MUST mostrar una sección
@@ -339,8 +396,10 @@ apagada, la sección no existe y su ruta responde como inexistente.
 - **Pase SSO**: credencial de un solo uso que Uniko emite por clic (contrato de
   MS-Stock 003); Uniko no lo almacena.
 - **Consulta de existencias (`check_stock`)**: acción tipada del agente: consulta de
-  texto + frase opcional → lista de hasta 5 productos (SKU, nombre, existencia,
-  unidad, precio, moneda, disponible) o vacío → texto para el cliente.
+  texto + talla opcional + frase opcional → lista de hasta 5 productos (SKU, nombre,
+  existencia, unidad, precio, moneda, disponible, foto, y desde la 005 sus tallas
+  `variants` o su etiqueta `label`/`parent_sku` si es una talla) o vacío → texto para
+  el cliente.
 - **Estado del conector**: resultado instantáneo de "Probar conexión"; no se
   persiste.
 
@@ -374,6 +433,11 @@ apagada, la sección no existe y su ruta responde como inexistente.
   el texto llega solo dentro del mismo límite de tiempo de la degradación y sin
   mensaje fallido visible; en la instancia de pruebas, `FOTO-TEST` recibe texto +
   imagen por WhatsApp real.
+- **SC-009** (tallas): en el self-test, "¿tienen playera roja?" recibe una sola línea
+  con las cuatro tallas en orden y M marcada agotada; "en G" recibe la existencia de
+  G; "en XXG" recibe "no viene en talla XXG" con las tallas disponibles; los cinco
+  casos previos de US2 no cambian de texto; en la instancia de pruebas, una pregunta
+  por un modelo real de `stock.lanco.cloud` responde con sus tallas.
 
 ## Assumptions
 
@@ -396,6 +460,10 @@ apagada, la sección no existe y su ruta responde como inexistente.
 - **Instancia de pruebas**: `uniko-lanco` ya tiene `STOCK_BASE_URL`, `STOCK_API_KEY`
   y `STOCK_SSO_SECRET` cargadas (2026-09-12); `INVENTARIO=on` se pondrá al desplegar
   esta feature, a propósito.
+- **Tallas (2026-09-14)**: la respuesta con tallas la redacta el sistema (como el
+  resto de `check_stock`): el modelo solo separa nombre base y talla. Equivalencias
+  chica/mediana/grande/extra → CH/M/G/XCH/XG viven en el motor como respaldo; las
+  etiquetas son las del negocio. Sin variables ni migración nuevas.
 - **Fuera de alcance**: registrar movimientos (ventas, reservas) desde Uniko; mostrar
   inventario dentro de Uniko; configurar el conector desde la UI; restringir el botón
   por rol. Cada una sería una feature nueva (y las escrituras, también del lado
