@@ -23,8 +23,29 @@ const negra: StockProduct = {
   currency: "MXN",
   available: true,
   image_url: null,
+  variants: [],
+  label: null,
+  parent_sku: null,
 };
 const FOTO = "https://img.stock.example/products/1/ply-neg.jpg";
+/** Modelo con tallas (MS-Stock 005): existencia por talla, en el orden del negocio. */
+const roja: StockProduct = {
+  ...negra,
+  sku: "PLY-ROJ",
+  name: "Playera roja",
+  price: 219,
+  stock: 12,
+  variants: [
+    { sku: "PLY-ROJ-CH", label: "CH", stock: 4, available: true },
+    { sku: "PLY-ROJ-M", label: "M", stock: 0, available: false },
+    { sku: "PLY-ROJ-G", label: "G", stock: 7, available: true },
+    { sku: "PLY-ROJ-XG", label: "XG", stock: 1, available: true },
+  ],
+};
+
+function con(products: StockProduct[], truncated = false) {
+  lookup.mockResolvedValue({ ok: true, data: { products, truncated } });
+}
 
 afterEach(() => lookup.mockReset());
 
@@ -113,6 +134,74 @@ describe("026 — checkStockTurn", () => {
     });
     const turn = await checkStockTurn({ query: "playera" });
     expect(turn.imageUrl).toBeNull();
+  });
+
+  /* ---------- Tallas (extensión 2026-09-14, FR-1124) ---------- */
+
+  it("modelo sin talla pedida: una línea con precio y la existencia de cada talla en orden", async () => {
+    con([roja]);
+    const turn = await checkStockTurn({ query: "playera roja" });
+    expect(turn.text).toBe("Playera roja (PLY-ROJ) — $219 MXN. Tallas: CH 4, M agotada, G 7, XG 1");
+  });
+
+  it("talla pedida con existencia: solo esa talla", async () => {
+    con([roja]);
+    const turn = await checkStockTurn({ query: "playera roja", size: "g" });
+    expect(turn.text).toBe("Playera roja (PLY-ROJ) talla G: 7 pieza — $219 MXN");
+  });
+
+  it("talla pedida agotada: lo dice y ofrece las que sí hay", async () => {
+    con([roja]);
+    const turn = await checkStockTurn({ query: "playera roja", size: "M" });
+    expect(turn.text).toBe(
+      "Playera roja (PLY-ROJ) talla M: agotada — $219 MXN. Con existencia: CH 4, G 7, XG 1"
+    );
+  });
+
+  it("talla que el modelo no tiene: lo dice y lista sus tallas", async () => {
+    con([roja]);
+    const turn = await checkStockTurn({ query: "playera roja", size: "XXG" });
+    expect(turn.text).toBe(
+      "Playera roja (PLY-ROJ) no viene en talla XXG. Tallas: CH 4, M agotada, G 7, XG 1"
+    );
+  });
+
+  it("equivalencias solo de respaldo: «grande» ⇒ G, «extra grande» ⇒ XG, con acentos", async () => {
+    con([roja]);
+    expect((await checkStockTurn({ query: "playera roja", size: "grande" })).text).toContain(
+      "talla G: 7 pieza"
+    );
+    expect((await checkStockTurn({ query: "playera roja", size: "Extra Grande" })).text).toContain(
+      "talla XG: 1 pieza"
+    );
+    // Una etiqueta literal gana a la equivalencia: el negocio manda.
+    const literal = { ...roja, variants: [{ sku: "X-L", label: "L", stock: 2, available: true }] };
+    con([literal]);
+    expect((await checkStockTurn({ query: "x", size: "L" })).text).toContain("talla L: 2 pieza");
+  });
+
+  it("talla resuelta por SKU exacto: muestra su etiqueta y su existencia", async () => {
+    con([{ ...negra, sku: "PLY-ROJ-G", name: "Playera roja", price: 219, label: "G", parent_sku: "PLY-ROJ" }]);
+    const turn = await checkStockTurn({ query: "PLY-ROJ-G" });
+    expect(turn.text).toBe("Playera roja (PLY-ROJ-G) talla G: 7 pieza — $219 MXN");
+  });
+
+  it("producto simple con talla pedida: se ignora la talla; modelo sin tallas activas: agotado", async () => {
+    con([negra]);
+    expect((await checkStockTurn({ query: "playera negra", size: "G" })).text).toBe(
+      "Playera negra (PLY-NEG): 7 pieza — $199 MXN"
+    );
+    con([{ ...roja, variants: [], stock: 0, available: false }]);
+    expect((await checkStockTurn({ query: "playera roja" })).text).toBe(
+      "Playera roja (PLY-ROJ): agotado — $219 MXN"
+    );
+  });
+
+  it("la foto del modelo va una sola vez, aparte del texto, con las tallas en la línea", async () => {
+    con([{ ...roja, image_url: FOTO }]);
+    const turn = await checkStockTurn({ query: "playera roja", size: "G" });
+    expect(turn.imageUrl).toBe(FOTO);
+    expect(turn.text).not.toContain("http");
   });
 
   it("sin coincidencias: lo dice y sigue siendo un turno válido", async () => {

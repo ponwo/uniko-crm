@@ -190,6 +190,40 @@ migración, sin cambio de prompt (la URL no llega al modelo).
 
 ---
 
+## Phase 8: Tallas (extensión 2026-09-14)
+
+**Purpose**: MS-Stock (feature 005) devuelve modelos con tallas (`variants`, y
+`label`/`parent_sku` cuando la respuesta es una talla). El sistema redacta la línea
+por modelo con la existencia de cada talla y, si el cliente pidió una talla, la de esa
+talla (FR-1122..FR-1126, SC-009). Contrato: `uniko-integration.md` §4 "Forma exacta"
+y "Prompt". Sin variables ni migración; el prompt gana un campo `size` en
+`check_stock`.
+
+**Diseño (decisiones tomadas, no preguntas)**:
+- El modelo **no ve** las existencias (como siempre): pide `query` (nombre base) y,
+  opcionalmente, `size`; el motor busca la talla por etiqueta normalizada y, como
+  respaldo, por equivalencias (chica → CH, mediana → M, grande → G, extra grande → XG,
+  extra chica → XCH).
+- Formato: `Nombre (SKU) — $precio: Tallas: CH 4, M agotada, G 7, XG 1`; con talla
+  pedida: `Nombre (SKU) talla G: 7 pieza — $precio`; talla en 0: `… talla M: agotada
+  — $precio. Con existencia: CH 4, G 7, XG 1`; talla inexistente: `Nombre (SKU) no
+  viene en talla XXG. Tallas: CH 4, M agotada, G 7, XG 1`; talla por SKU exacto:
+  `Nombre (SKU-G) talla G: 7 pieza — $precio`. Un producto sin tallas: sin cambios.
+- La foto del modelo es una sola (`image_url` igual en sus tallas): reglas de la
+  Phase 7 sin cambios.
+
+- [X] T049 [P] Adaptador: `variants`, `label` y `parent_sku` en `stockProductSchema` de `src/server/inventario/client.ts` (tolerantes: ausentes, `null` o malformados ⇒ `[]`/`null`; cada talla exige `sku`, `label`, `stock`, `available`, las malformadas se descartan); tests en `tests/unit/stock-client.test.ts` (sin los campos ⇒ `[]`/`null` y `ok: true`; con tallas ⇒ tal cual y en orden; una talla rota ⇒ se descarta sin invalidar)
+- [X] T050 [P] Acción y prompt: `size: z.string().min(1).max(20).optional()` en `check_stock` (`src/server/ai/actions.ts`); en `src/server/ai/prompts.ts` la línea de la acción muestra `"query":"<nombre base del producto, sin la talla, o su SKU>","size":"<talla que pidió el cliente, si dijo alguna>"` y una regla: "Si el cliente menciona una talla, NO la pongas en query: ponla en size; el sistema responde con la existencia de esa talla"; tests en `tests/unit/inventario-actions.test.ts` (con y sin `size`; `size` vacía o > 20 ⇒ inválida) y `tests/unit/inventario-prompt.test.ts` (menciona `size` solo con la bandera)
+- [X] T051 `checkStockTurn({ query, size?, intro? })` en `src/server/inventario/agent.ts` (FR-1124): `formatProduct(p, size?)` con los cinco formatos del diseño; `matchVariant(variants, size)` normaliza sin mayúsculas ni acentos y aplica equivalencias solo si nada coincide literal; `imageUrl` sigue siendo la del primer producto; tests en `tests/unit/check-stock-turn.test.ts` (modelo sin `size`, con `size` existente/agotada/inexistente, talla por SKU, simple con `size` ignorada, modelo sin tallas activas ⇒ agotado, equivalencia "grande" ⇒ G, foto del modelo una vez)
+- [X] T052 Motor: `src/server/ai/pipeline.ts` pasa `size: action.size` a `checkStockTurn`
+- [X] T053 [P] Mocks: `src/server/dev/stock-mock-state.ts` gana un modelo `PLY-ROJ` "Playera roja" ($219, sin foto) con tallas CH 4, M 0, G 7, XG 1 (`variants` en `MockProduct`); `toPublic` emite `variants`/`label`/`parent_sku` (la talla como producto con los datos del modelo); `findActiveBySku` resuelve `PLY-ROJ-G`; `searchActive` coincide también por SKU de talla y devuelve el modelo una vez; `src/server/dev/ai-mock.ts` extrae la talla de "… en G", "… talla G", "… en talla G" ⇒ `size`; tests en `tests/unit/stock-mock.test.ts` y `tests/unit/ai-mock-inventario.test.ts`
+- [X] T054 Arnés: `inventarioChecks()` en `scripts/e2e-selftest.mjs` — casos "¿tienen playera roja?" ⇒ línea con `Tallas: CH 4, M agotada, G 7, XG 1`; "¿tienen playera roja en G?" ⇒ `talla G: 7 pieza`; "¿tienen playera roja en M?" ⇒ `talla M: agotada` y `Con existencia: CH 4, G 7, XG 1`; "¿tienen playera roja en XXG?" ⇒ `no viene en talla XXG`; "¿cuánto cuesta la PLY-ROJ-G?" ⇒ `(PLY-ROJ-G) talla G`; los cinco casos previos intactos; guion `tests/e2e/us-inventario.md` §US2 casos 13–17
+- [X] T055 Gate (`pnpm typecheck && pnpm lint && pnpm build && pnpm test`) y `pnpm test:e2e` con `INVENTARIO=on` sobre base limpia y con la bandera vacía (cero cambio)
+- [X] T056 [P] Docs: `docs/inventario-conector.md` (sección "Tallas"), `README.md` (una línea), `quickstart.md` §2 y resultados
+- [ ] T057 PR a `main` con CI verde (merge y deploy de `uniko-lanco` = señal del dueño); tras el deploy: `/api/health` 10/10 y en el Laboratorio o por WhatsApp una pregunta por un modelo real de `stock.lanco.cloud` responde con sus tallas; registrar en `quickstart.md`; memoria
+
+---
+
 ## Dependencies & Execution Order
 
 ### Phase Dependencies

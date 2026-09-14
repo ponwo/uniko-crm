@@ -69,6 +69,18 @@ El stock-mock devuelve `image_url` para `PLY-NEG` (`{origen}/icon-192.png`) y
     no lo manda de nuevo); en el hilo la foto queda `failed` con su motivo y
     el texto de respaldo después.
 
+13. **Tallas (2026-09-14)** "¿tienen playera roja?" → una sola línea del modelo
+    con precio y la existencia de cada talla en orden, agotadas marcadas:
+    `Playera roja (PLY-ROJ) — $219 MXN. Tallas: CH 4, M agotada, G 7, XG 1`.
+14. "¿tienen playera roja en G?" → el modelo manda `query` = "playera roja" y
+    `size` = "G"; el cliente recibe `Playera roja (PLY-ROJ) talla G: 7 pieza —
+    $219 MXN`.
+15. "¿tienen playera roja en M?" → `talla M: agotada … Con existencia: CH 4, G 7,
+    XG 1`; "… en XXG" → `no viene en talla XXG. Tallas: …`.
+16. "¿cuánto cuesta la PLY-ROJ-G?" → el SKU de la talla se consulta exacto:
+    `Playera roja (PLY-ROJ-G) talla G: 7 pieza — $219 MXN`.
+17. Los casos 1–5 responden exactamente igual que antes (productos sin tallas).
+
 ## US1 — Abrir el inventario desde Uniko sin llave
 
 1. Sin sesión, `GET /api/inventario/sso` → **401** y no emite pase.

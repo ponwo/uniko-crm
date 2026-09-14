@@ -51,6 +51,12 @@ el HTML de `/settings/inventario`. Con la bandera **apagada** (reiniciar la app 
 `INVENTARIO`): las dos rutas → `404`, "¿tienen playera negra?" → respuesta de eco
 normal (el ai-mock no propone `check_stock` porque el prompt no lo menciona).
 
+Tallas (extensión 2026-09-14): el stock-mock trae el modelo `PLY-ROJ` "Playera roja"
+con CH 4, M 0, G 7, XG 1; "¿tienen playera roja?" → `Playera roja (PLY-ROJ) — $219 MXN.
+Tallas: CH 4, M agotada, G 7, XG 1`; "… en G" → `talla G: 7 pieza`; "… en M" →
+`talla M: agotada … Con existencia: CH 4, G 7, XG 1`; "… en XXG" → `no viene en
+talla XXG`; "¿cuánto cuesta la PLY-ROJ-G?" → `(PLY-ROJ-G) talla G`.
+
 ## 3. Self-test manual en navegador (Playwright o a mano)
 
 1. Iniciar sesión; en la barra lateral aparece **Inventario** tras Pipeline (y Citas
@@ -187,3 +193,19 @@ instancia de pruebas §5.2 registrados aquí.
   texto. La consulta directa a `stock.lanco.cloud/v1/agent/products/FOTO-TEST` con la
   llave no se pudo hacer desde esta sesión (el modo automático bloquea usar la llave
   en `curl`); la forma de `image_url` la valida el adaptador en el turno.
+
+## Resultados de las tallas — 2026-09-14 (T049–T056, extensión)
+
+- Gate verde (`typecheck`, `lint`, `build`, 686 tests: 15 nuevos). `e2e-selftest.mjs`:
+  **153/153** con `INVENTARIO=on` (6 checks nuevos de tallas: modelo sin talla pedida,
+  talla con existencia, talla agotada con las que sí hay, talla inexistente, SKU
+  exacto de una talla, y "ninguna cifra la redactó el modelo") y **112/112** con la
+  bandera vacía. Bases desechables `uniko_dev_026t` / `uniko_dev_026toff2`.
+- Gotcha del entorno: en Windows `pkill` no mata `next dev`; un segundo `pnpm dev`
+  arranca en 3001 y el arnés le pega al viejo en 3000 (falsos rojos). Matar con
+  `taskkill //F //PID <pid> //T` (o `//IM node.exe`) antes de relanzar.
+- Los cinco casos previos de US2 y los de la foto no cambian de texto (el modelo
+  `PLY-ROJ` va al final del catálogo del mock para no mover el orden).
+- Pendiente (T057): merge a `main` = señal del dueño; tras el deploy de `uniko-lanco`,
+  preguntar por un modelo real de `stock.lanco.cloud` en el Laboratorio o por WhatsApp.
+

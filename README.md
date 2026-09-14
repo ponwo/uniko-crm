@@ -152,6 +152,8 @@ la de Uniko), y Ajustes → Inventario dice si la conexión funciona. Si el prod
 tiene foto en MS-Stock, el agente la manda con existencia y precio como pie —por su
 URL pública, sin que la foto pueda retrasar la respuesta. Variables, mock de pruebas
 y contrato en [`docs/inventario-conector.md`](docs/inventario-conector.md).
+Si el negocio vende por tallas, el agente responde con la existencia de cada
+talla (o de la que pidió el cliente) en una sola línea.
 
 ### 📄 Plantillas · 👥 Multi-usuario · 🔐 Self-hosted
 

@@ -27,12 +27,81 @@ const PRODUCT = {
   image_url: "https://img.stock.example/products/1/ply-neg.jpg",
 };
 
+/** Lo que el adaptador devuelve para esa forma: los campos de la 005 vacíos. */
+const PARSED = { ...PRODUCT, variants: [], label: null, parent_sku: null };
+
 function json(body: unknown, status = 200) {
   return new Response(JSON.stringify(body), {
     status,
     headers: { "content-type": "application/json" },
   });
 }
+
+describe("026 — adaptador de MS-Stock: tallas (extensión 2026-09-14, FR-1122)", () => {
+  beforeEach(() => {
+    vi.stubEnv("APP_BASE_URL", "http://localhost:3000");
+    vi.stubEnv("DATABASE_URL", "postgresql://t:t@localhost:5432/t");
+    vi.stubEnv("BETTER_AUTH_SECRET", "secret-de-test-suficiente");
+    vi.stubEnv("ENCRYPTION_KEY", Buffer.alloc(32, 3).toString("base64"));
+    vi.stubEnv("META_WEBHOOK_VERIFY_TOKEN", "verify-test");
+    vi.stubEnv("INVENTARIO", "on");
+    vi.stubEnv("STOCK_BASE_URL", "https://stock.example/");
+    vi.stubEnv("STOCK_API_KEY", KEY);
+    vi.stubEnv("STOCK_SSO_SECRET", "s".repeat(40));
+    vi.resetModules();
+  });
+
+  afterEach(() => {
+    vi.unstubAllEnvs();
+    vi.unstubAllGlobals();
+  });
+
+  it("un MS-Stock anterior a la 005 (sin los campos): variants [] y label/parent_sku null, ok", async () => {
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(json(PRODUCT)));
+    const r = await getProduct("PLY-NEG");
+    expect(r.ok).toBe(true);
+    if (r.ok) {
+      expect(r.data.variants).toEqual([]);
+      expect(r.data.label).toBeNull();
+      expect(r.data.parent_sku).toBeNull();
+    }
+  });
+
+  it("modelo con tallas: llegan tal cual y en orden; una talla rota se descarta sin invalidar", async () => {
+    const variants = [
+      { sku: "PLY-NEG-CH", label: "CH", stock: 4, available: true },
+      { sku: "PLY-NEG-M", label: "M", stock: 0, available: false },
+      { rota: true },
+      { sku: "PLY-NEG-G", label: "G", stock: 7, available: true },
+    ];
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue(json({ ...PRODUCT, variants, label: null, parent_sku: null }))
+    );
+    const r = await getProduct("PLY-NEG");
+    expect(r.ok).toBe(true);
+    if (r.ok) {
+      expect(r.data.variants.map((v) => v.label)).toEqual(["CH", "M", "G"]);
+      expect(r.data.label).toBeNull();
+    }
+  });
+
+  it("una talla como producto: label y parent_sku; basura en variants ⇒ []", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue(
+        json({ ...PRODUCT, sku: "PLY-NEG-G", variants: "nope", label: "G", parent_sku: "PLY-NEG" })
+      )
+    );
+    const r = await getProduct("PLY-NEG-G");
+    expect(r.ok).toBe(true);
+    if (r.ok) {
+      expect(r.data.variants).toEqual([]);
+      expect(r.data.label).toBe("G");
+      expect(r.data.parent_sku).toBe("PLY-NEG");
+    }
+  });
+});
 
 describe("026 — adaptador de MS-Stock", () => {
   beforeEach(() => {
@@ -58,7 +127,7 @@ describe("026 — adaptador de MS-Stock", () => {
     const fetchMock = vi.fn().mockResolvedValue(json(PRODUCT));
     vi.stubGlobal("fetch", fetchMock);
     const r = await getProduct("ply-neg");
-    expect(r).toEqual({ ok: true, data: PRODUCT });
+    expect(r).toEqual({ ok: true, data: PARSED });
     const [url, init] = fetchMock.mock.calls[0] as [string, RequestInit];
     expect(url).toBe("https://stock.example/v1/agent/products/PLY-NEG");
     expect(new Headers(init.headers).get("x-api-key")).toBe(KEY);
@@ -144,7 +213,7 @@ describe("026 — adaptador de MS-Stock", () => {
       .mockResolvedValue(json({ results: [PRODUCT], truncated: true }));
     vi.stubGlobal("fetch", fetchMock);
     const r = await searchProducts("playera negra");
-    expect(r).toEqual({ ok: true, data: { results: [PRODUCT], truncated: true } });
+    expect(r).toEqual({ ok: true, data: { results: [PARSED], truncated: true } });
     const [url] = fetchMock.mock.calls[0] as [string];
     expect(url).toBe("https://stock.example/v1/agent/search?q=playera+negra&limit=5");
   });
@@ -156,7 +225,7 @@ describe("026 — adaptador de MS-Stock", () => {
       .mockResolvedValueOnce(json({ results: [PRODUCT], truncated: false }));
     vi.stubGlobal("fetch", fetchMock);
     const r = await lookup("PLY-NEG");
-    expect(r).toEqual({ ok: true, data: { products: [PRODUCT], truncated: false } });
+    expect(r).toEqual({ ok: true, data: { products: [PARSED], truncated: false } });
     expect(fetchMock).toHaveBeenCalledTimes(2);
     expect((fetchMock.mock.calls[0] as [string])[0]).toContain("/v1/agent/products/PLY-NEG");
     expect((fetchMock.mock.calls[1] as [string])[0]).toContain("/v1/agent/search?q=PLY-NEG");
@@ -166,7 +235,7 @@ describe("026 — adaptador de MS-Stock", () => {
     const fetchMock = vi.fn().mockResolvedValueOnce(json(PRODUCT));
     vi.stubGlobal("fetch", fetchMock);
     const r = await lookup("PLY-NEG");
-    expect(r).toEqual({ ok: true, data: { products: [PRODUCT], truncated: false } });
+    expect(r).toEqual({ ok: true, data: { products: [PARSED], truncated: false } });
     expect(fetchMock).toHaveBeenCalledTimes(1);
   });
 

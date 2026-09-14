@@ -34,6 +34,33 @@ function toImageUrl(value: unknown): string | null {
   }
 }
 
+/**
+ * Talla de un modelo (contrato §4, desde la feature 005 de MS-Stock). Una talla
+ * malformada se descarta sin invalidar la respuesta; el resto se conserva en el
+ * orden en que llegó (el del negocio).
+ */
+export const stockVariantSchema = z.object({
+  sku: z.string(),
+  label: z.string(),
+  stock: z.number(),
+  available: z.boolean(),
+});
+export type StockVariant = z.infer<typeof stockVariantSchema>;
+
+function toVariants(value: unknown): StockVariant[] {
+  if (!Array.isArray(value)) return [];
+  const out: StockVariant[] = [];
+  for (const item of value) {
+    const parsed = stockVariantSchema.safeParse(item);
+    if (parsed.success) out.push(parsed.data);
+  }
+  return out;
+}
+
+function toOptionalText(value: unknown): string | null {
+  return typeof value === "string" && value.trim() !== "" ? value : null;
+}
+
 export const stockProductSchema = z.object({
   sku: z.string(),
   name: z.string(),
@@ -45,6 +72,15 @@ export const stockProductSchema = z.object({
   available: z.boolean(),
   /** Nombre del contrato tal cual (`image_url`); ver `toImageUrl`. */
   image_url: z.unknown().transform(toImageUrl),
+  /**
+   * Tallas (feature 005 de MS-Stock): las activas del modelo, en orden; `[]` en
+   * productos sin tallas, en tallas y ante un MS-Stock anterior a la 005.
+   */
+  variants: z.unknown().transform(toVariants),
+  /** Etiqueta de la talla cuando la respuesta ES una talla; si no, `null`. */
+  label: z.unknown().transform(toOptionalText),
+  /** SKU del modelo cuando la respuesta es una talla; si no, `null`. */
+  parent_sku: z.unknown().transform(toOptionalText),
 });
 export type StockProduct = z.infer<typeof stockProductSchema>;
 

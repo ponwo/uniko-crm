@@ -75,6 +75,10 @@ describe("026 — stock-mock", () => {
       // Foto (feature 004 de MS-Stock): URL absoluta y pública, servida por
       // esta misma app en el entorno de pruebas.
       image_url: "http://localhost:3000/icon-192.png",
+      // Tallas (feature 005): un producto simple las lleva vacías.
+      variants: [],
+      label: null,
+      parent_sku: null,
     });
     const inactive = await get("v1/agent/products/GOR-02", { key: KEY });
     expect(inactive.status).toBe(404);
@@ -88,18 +92,46 @@ describe("026 — stock-mock", () => {
     expect(body.results.map((p: { sku: string; image_url: string | null }) => [p.sku, p.image_url])).toEqual([
       ["PLY-NEG", "http://localhost:3000/icon-192.png"],
       ["PLY-BLA", null],
+      ["PLY-ROJ", null],
     ]);
   });
 
   it("búsqueda sin acentos ni mayúsculas, q corta → 422, limit acota y marca truncated", async () => {
     const r = await get("v1/agent/search", { key: KEY, query: "q=PLÁYERA" });
     const body = await r.json();
-    expect(body.results.map((p: { sku: string }) => p.sku)).toEqual(["PLY-NEG", "PLY-BLA"]);
+    expect(body.results.map((p: { sku: string }) => p.sku)).toEqual(["PLY-NEG", "PLY-BLA", "PLY-ROJ"]);
     expect(body.truncated).toBe(false);
     expect((await get("v1/agent/search", { key: KEY, query: "q=a" })).status).toBe(422);
     const limited = await (await get("v1/agent/search", { key: KEY, query: "q=gor&limit=1" })).json();
     expect(limited.results).toHaveLength(1);
     expect(limited.truncated).toBe(false); // GOR-02 es inactiva: solo hay una gorra
+  });
+
+  it("tallas (005): el modelo lleva variants en orden; el SKU de una talla devuelve la talla; buscar por SKU de talla devuelve el modelo", async () => {
+    const roja = await (await get("v1/agent/products/ply-roj", { key: KEY })).json();
+    expect(roja.stock).toBe(12);
+    expect(roja.label).toBeNull();
+    expect(roja.parent_sku).toBeNull();
+    expect(roja.variants).toEqual([
+      { sku: "PLY-ROJ-CH", label: "CH", stock: 4, available: true },
+      { sku: "PLY-ROJ-M", label: "M", stock: 0, available: false },
+      { sku: "PLY-ROJ-G", label: "G", stock: 7, available: true },
+      { sku: "PLY-ROJ-XG", label: "XG", stock: 1, available: true },
+    ]);
+    const g = await (await get("v1/agent/products/PLY-ROJ-G", { key: KEY })).json();
+    expect(g).toMatchObject({
+      sku: "PLY-ROJ-G",
+      name: "Playera roja",
+      price: 219,
+      stock: 7,
+      available: true,
+      variants: [],
+      label: "G",
+      parent_sku: "PLY-ROJ",
+    });
+    expect((await get("v1/agent/products/PLY-ROJ-XXG", { key: KEY })).status).toBe(404);
+    const found = await (await get("v1/agent/search", { key: KEY, query: "q=PLY-ROJ-G" })).json();
+    expect(found.results.map((p: { sku: string }) => p.sku)).toEqual(["PLY-ROJ"]);
   });
 
   it("modo down → 503 en /v1 y /health; unauthorized → 401 aunque la llave sea buena; garbage → no JSON", async () => {

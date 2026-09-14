@@ -2,6 +2,7 @@ import { jwtVerify } from "jose";
 import { mockGuard } from "@/lib/dev-guard";
 import {
   findActiveBySku,
+  findActiveVariantBySku,
   resetStockMock,
   searchActive,
   setStockMockMode,
@@ -94,9 +95,13 @@ export async function GET(req: Request, ctx: Ctx) {
 
     const m = route.match(/^v1\/agent\/products\/([^/]+)$/);
     if (m && m[1]) {
-      const product = findActiveBySku(decodeURIComponent(m[1]));
-      if (!product) return apiError(404, "NOT_FOUND", "Producto no encontrado.");
-      return Response.json(toPublic(product, url.origin));
+      const sku = decodeURIComponent(m[1]);
+      const product = findActiveBySku(sku);
+      if (product) return Response.json(toPublic(product, url.origin));
+      // 005: el SKU exacto de una talla devuelve la talla (con label y parent_sku).
+      const talla = findActiveVariantBySku(sku);
+      if (talla) return Response.json(toPublic(talla.model, url.origin, talla.label));
+      return apiError(404, "NOT_FOUND", "Producto no encontrado.");
     }
   }
 

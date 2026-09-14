@@ -52,13 +52,14 @@ export function buildAgentSystemPrompt(input: {
     : [];
   const inventarioLines = input.inventario
     ? [
-        '- {"action":"check_stock","query":"<lo que el cliente pidió: nombre, parte del nombre o SKU>","reply":"..."} — consultar existencia y precio reales en el inventario (reply es solo la frase de entrada; los datos los pega el sistema).',
+        '- {"action":"check_stock","query":"<nombre base del producto, sin la talla, o su SKU>","size":"<talla que pidió el cliente, si dijo alguna: G, M, 38…>","reply":"..."} — consultar existencia y precio reales en el inventario (reply es solo la frase de entrada; los datos, tallas incluidas, los pega el sistema).',
       ]
     : [];
   const inventarioRules = input.inventario
     ? [
         "- Antes de afirmar que hay existencia de algo o cuánto cuesta → check_stock. NUNCA inventes existencias ni precios: responde con lo que el sistema devuelva.",
         "- Si el cliente da un SKU (código de producto), úsalo tal cual como query.",
+        "- Si el cliente menciona una talla, NO la pongas en query: ponla en size (query = nombre base, p. ej. query «playera negra», size «G»). El sistema responde con la existencia de esa talla.",
       ]
     : [];
   const agendaRules = input.agenda

@@ -30,6 +30,18 @@ describe("026 — ai-mock y check_stock", () => {
     expect(run(CON, "Hola, ¿hay gorra?").query).toBe("gorra");
   });
 
+  it("tallas (005): '… en G', '… talla G' y '… en talla G' separan nombre base y talla", () => {
+    expect(run(CON, "¿tienen playera roja en G?")).toEqual({
+      action: "check_stock",
+      query: "playera roja",
+      size: "G",
+      reply: "Déjame revisar.",
+    });
+    expect(run(CON, "¿tienen playera roja talla M?")).toMatchObject({ query: "playera roja", size: "M" });
+    expect(run(CON, "¿hay playera roja en talla XXG?")).toMatchObject({ query: "playera roja", size: "XXG" });
+    expect(run(CON, "¿tienen playera negra?")).not.toHaveProperty("size");
+  });
+
   it("'cuánto cuesta la PLY-NEG' quita el artículo y deja el SKU", () => {
     expect(run(CON, "¿cuánto cuesta la PLY-NEG?").query).toBe("PLY-NEG");
     expect(run(CON, "precio de las tazas").query).toBe("tazas");
