@@ -101,5 +101,9 @@ rellenan con el primer sync.
 4. Logs del contenedor: solo el arranque (camino feliz, sin líneas
    `[templates]`).
 
-Pendiente para el dueño: esperar la aprobación de `test` (o borrarla en el
-Administrador de WhatsApp: el siguiente sync la marcará ausente, no la borrará).
+**Confirmado por el dueño (2026-09-15)**: «funciona perfectamente». Creó
+`seguimiento_a_cotizacion` desde Uniko y Meta **ya la aprobó** (la pantalla
+la muestra aprobada y enviable); creó `prueba_de_plantilla` **desde el
+Administrador de WhatsApp** y el CRM la trajo y la muestra en revisión. Es la
+evidencia de "uso real en la instancia de pruebas" que pide la puerta de
+promoción a `production`; la promoción sigue esperando su señal explícita.
