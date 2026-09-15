@@ -11,10 +11,29 @@ export class MetaApiError extends Error {
   code: number | null;
   type: string | null;
   details: unknown;
+  /**
+   * 027 — Lo que Meta dice DE VERDAD. `message` es el genérico ("(#100)
+   * Invalid parameter"); la causa viaja en `error_subcode`,
+   * `error_user_title`, `error_user_msg` y `error_data.details`, y sin
+   * conservarlos toda validación de plantilla llega igual de muda.
+   */
+  subcode: number | null;
+  userTitle: string | null;
+  userMsg: string | null;
+  detail: string | null;
 
   constructor(
     message: string,
-    opts: { status: number; code?: number | null; type?: string | null; details?: unknown }
+    opts: {
+      status: number;
+      code?: number | null;
+      type?: string | null;
+      details?: unknown;
+      subcode?: number | null;
+      userTitle?: string | null;
+      userMsg?: string | null;
+      detail?: string | null;
+    }
   ) {
     super(message);
     this.name = "MetaApiError";
@@ -22,6 +41,29 @@ export class MetaApiError extends Error {
     this.code = opts.code ?? null;
     this.type = opts.type ?? null;
     this.details = opts.details;
+    this.subcode = opts.subcode ?? null;
+    this.userTitle = opts.userTitle ?? null;
+    this.userMsg = opts.userMsg ?? null;
+    this.detail = opts.detail ?? null;
+  }
+
+  /**
+   * El texto más específico que Meta mandó, para mostrarlo tal cual cuando
+   * no hay traducción. `||` y no `??`: Meta a veces manda cadenas vacías.
+   */
+  get explanation(): string {
+    return (
+      this.userMsg?.trim() ||
+      this.detail?.trim() ||
+      this.userTitle?.trim() ||
+      this.message
+    );
+  }
+
+  /** `100/2388299` o `100`, para rastrearlo en la documentación de Meta. */
+  get codeLabel(): string | null {
+    if (this.code == null) return null;
+    return this.subcode != null ? `${this.code}/${this.subcode}` : String(this.code);
   }
 
   /**
@@ -62,10 +104,15 @@ export async function graphRequest<T>(
       signal: opts.signal,
     });
   } catch (cause) {
-    throw new MetaApiError("No se pudo contactar la API de Meta", {
-      status: 0,
-      details: cause,
-    });
+    // Un `signal` que venció se distingue del resto: "no respondió a tiempo"
+    // manda a reintentar; "no se pudo contactar" manda a revisar la red.
+    const vencido =
+      cause instanceof Error &&
+      (cause.name === "TimeoutError" || cause.name === "AbortError");
+    throw new MetaApiError(
+      vencido ? "Meta no respondió a tiempo" : "No se pudo contactar la API de Meta",
+      { status: 0, details: cause }
+    );
   }
 
   const text = await res.text();
@@ -77,16 +124,45 @@ export async function graphRequest<T>(
   }
 
   if (!res.ok) {
-    const err = (json as { error?: { message?: string; code?: number; type?: string } })
-      ?.error;
-    throw new MetaApiError(err?.message ?? `Meta respondió ${res.status}`, {
-      status: res.status,
-      code: err?.code ?? null,
-      type: err?.type ?? null,
-      details: json ?? text,
-    });
+    throw metaApiErrorFromResponse(res.status, json, text);
   }
   return json as T;
+}
+
+/** Forma del `error` de Graph. Todo opcional: Meta no siempre manda todo. */
+type GraphErrorBody = {
+  error?: {
+    message?: string;
+    code?: number;
+    type?: string;
+    error_subcode?: number;
+    error_user_title?: string;
+    error_user_msg?: string;
+    error_data?: { details?: string; messaging_product?: string };
+  };
+};
+
+/**
+ * Construye el error a partir del cuerpo de Graph conservando TODO lo que
+ * explica la causa. Exportado para que los demás clientes que hablan con
+ * Graph fuera de `graphRequest` (media, Instagram) construyan el mismo error.
+ */
+export function metaApiErrorFromResponse(
+  status: number,
+  json: unknown,
+  rawText?: string
+): MetaApiError {
+  const err = (json as GraphErrorBody | null)?.error;
+  return new MetaApiError(err?.message ?? `Meta respondió ${status}`, {
+    status,
+    code: err?.code ?? null,
+    type: err?.type ?? null,
+    details: json ?? rawText,
+    subcode: err?.error_subcode ?? null,
+    userTitle: err?.error_user_title ?? null,
+    userMsg: err?.error_user_msg ?? null,
+    detail: err?.error_data?.details ?? null,
+  });
 }
 
 /**

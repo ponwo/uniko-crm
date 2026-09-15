@@ -4,16 +4,9 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { Send } from "lucide-react";
 import type { TemplateDto } from "@/lib/types";
+import { countVariables, esEnviable } from "@/lib/templates";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-
-/** Cuenta {{1}}..{{n}} igual que el servidor, para pedir sus valores. */
-function countVariables(body: string): number {
-  const found = new Set(
-    Array.from(body.matchAll(/\{\{\s*(\d+)\s*\}\}/g)).map((m) => m[1])
-  );
-  return found.size;
-}
 
 /**
  * Abrir conversación con quien nunca ha escrito.
@@ -40,7 +33,9 @@ export function StartConversation({
       const res = await fetch("/api/templates").catch(() => null);
       if (!res?.ok) return setTemplates([]);
       const data = (await res.json()) as { templates: TemplateDto[] };
-      const aprobadas = data.templates.filter((t) => t.status === "approved");
+      // 027 — La MISMA regla que el servidor: aprobada, presente en Meta,
+      // APPROVED ahora mismo y rellenable por el CRM.
+      const aprobadas = data.templates.filter(esEnviable);
       setTemplates(aprobadas);
       setTemplateId(aprobadas[0]?.id ?? "");
     })();

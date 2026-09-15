@@ -1,12 +1,22 @@
 import { and, eq } from "drizzle-orm";
 import {
+  analizarComponentes,
+  bloqueoDeMeta,
   countVariables,
+  normalizeBody,
   renderBody,
   validateBodyVariables,
+  type TemplateComponent,
 } from "@/lib/templates";
 import { getDb, schema } from "@/lib/db";
 import { newId } from "@/lib/db/ids";
 import { graphRequest, MetaApiError, normalizeRecipient } from "@/lib/meta/client";
+import {
+  describeTemplateError,
+  esFaltaDePermiso,
+  esNombreDuplicado,
+  esWabaDesconocido,
+} from "@/lib/meta/template-errors";
 import { scoped } from "@/lib/db/tenant";
 import { publish } from "@/server/events/bus";
 import {
@@ -25,6 +35,7 @@ export class TemplateError extends Error {
     | "reconnect_required"
     | "invalid"
     | "not_found"
+    | "already_exists"
     | "meta_error"
     | "meta_unavailable";
 
@@ -40,6 +51,7 @@ const TEMPLATE_ERROR_STATUS: Record<TemplateError["code"], number> = {
   reconnect_required: 409,
   invalid: 422,
   not_found: 404,
+  already_exists: 409,
   meta_error: 422,
   meta_unavailable: 503,
 };
@@ -60,16 +72,79 @@ export function serializeTemplate(t: TemplateRow) {
     category: t.category,
     body: t.body,
     status: t.status,
+    metaStatus: t.metaStatus,
     rejectionReason: t.rejectionReason,
+    missingSince: t.missingSince ? t.missingSince.toISOString() : null,
+    components: t.components ?? null,
   };
 }
 
-/** Crea la plantilla y la manda a aprobación de Meta (FR-050). */
+/**
+ * El estado de Meta tal cual, solo normalizado a mayúsculas.
+ *
+ * No filtra por una lista de estados conocidos A PROPÓSITO: lo que Meta invente
+ * mañana tiene que poder GUARDARSE —para poder nombrarlo en pantalla— y a la
+ * vez bloquear el envío, cosa que `esEnviable` consigue exigiendo el APPROVED
+ * literal en vez de excluir estados malos uno a uno.
+ */
+function normalizaMetaStatus(status: string | undefined | null): string | null {
+  const s = (status ?? "").trim().toUpperCase();
+  return s.length > 0 ? s : null;
+}
+
+/**
+ * Traducción al ciclo de aprobación del CRM. Devuelve null para lo que no es
+ * un paso de ese ciclo (PAUSED, DISABLED…): eso vive en `meta_status`.
+ */
+function mapMetaStatus(
+  status: string | undefined | null
+): TemplateRow["status"] | null {
+  const s = (status ?? "").trim().toUpperCase();
+  if (s === "APPROVED") return "approved";
+  if (s === "REJECTED") return "rejected";
+  if (
+    s === "PENDING" ||
+    s === "IN_REVIEW" ||
+    s === "IN_APPEAL" ||
+    s === "PENDING_DELETION"
+  ) {
+    return "pending";
+  }
+  return null;
+}
+
+/**
+ * Meta manda `rejected_reason: "NONE"` en las que NO están rechazadas, y el
+ * motivo real solo tiene sentido cuando el estado es REJECTED. Guardar "NONE"
+ * pintaría "Razón del rechazo: NONE" en una plantilla aprobada.
+ */
+function motivoDeRechazo(
+  status: TemplateRow["status"] | null,
+  reason: string | null | undefined
+): string | null {
+  if (status !== "rejected") return null;
+  const r = (reason ?? "").trim();
+  return r && r.toUpperCase() !== "NONE" ? r : null;
+}
+
+/**
+ * Tope de espera por llamada de administración de plantillas. Sin él, una
+ * llamada colgada a Graph se convierte en un 5xx del proxy (HTML) que la
+ * pantalla solo puede mostrar como "No se pudo crear la plantilla": con él,
+ * es un 503 con causa ("Meta no respondió a tiempo") y la base no se toca.
+ */
+const ESPERA_MAXIMA_MS = 30_000;
+
+/** Crea la plantilla y la manda a aprobación de Meta (FR-050, FR-1208..FR-1211). */
 export async function createTemplate(
   organizationId: string,
   input: { name: string; language: string; category: string; body: string }
 ): Promise<TemplateRow> {
-  const variableError = validateBodyVariables(input.body);
+  // `{{ 1 }}` → `{{1}}` antes de validar, de mandar y de guardar: Meta solo
+  // reconoce la forma pegada, y el cuerpo guardado debe ser el aprobado.
+  const body = normalizeBody(input.body);
+  if (!body) throw new TemplateError("invalid", "El cuerpo no puede estar vacío");
+  const variableError = validateBodyVariables(body);
   if (variableError) throw new TemplateError("invalid", variableError);
 
   const creds = await getCredentialsByOrg(organizationId);
@@ -87,48 +162,75 @@ export async function createTemplate(
   if (!name) throw new TemplateError("invalid", "Nombre de plantilla inválido");
 
   // Meta pide un ejemplo por variable: si faltan, rechaza la plantilla.
-  const variableCount = countVariables(input.body);
+  const variableCount = countVariables(body);
   const examples = Array.from(
     { length: variableCount },
     (_, i) => `ejemplo ${i + 1}`
   );
-  let waTemplateId: string | null = null;
+  const components: TemplateComponent[] = [
+    {
+      type: "BODY",
+      text: body,
+      ...(variableCount > 0 ? { example: { body_text: [examples] } } : {}),
+    },
+  ];
+
+  let respuesta: { id?: string; status?: string; category?: string };
   try {
-    const res = await graphRequest<{ id?: string; status?: string }>(
-      `${creds.wabaId}/message_templates`,
-      {
-        method: "POST",
-        token: creds.token,
-        body: {
-          name,
-          language: input.language,
-          category: input.category,
-          components: [
-            {
-              type: "BODY",
-              text: input.body,
-              ...(variableCount > 0
-                ? { example: { body_text: [examples] } }
-                : {}),
-            },
-          ],
-        },
-      }
-    );
-    waTemplateId = res.id ?? null;
+    respuesta = await graphRequest(`${creds.wabaId}/message_templates`, {
+      method: "POST",
+      token: creds.token,
+      signal: AbortSignal.timeout(ESPERA_MAXIMA_MS),
+      body: {
+        name,
+        language: input.language,
+        category: input.category,
+        // Sin esto, una UTILITY que Meta clasifica como MARKETING se RECHAZA
+        // días después (TAG_CONTENT_MISMATCH). Con esto Meta le pone la
+        // categoría que sus reglas dictan y la responde aquí mismo; se guarda
+        // la suya, que es la que cobra.
+        allow_category_change: true,
+        components,
+      },
+    });
   } catch (err) {
-    if (err instanceof MetaApiError) {
-      if (err.isAuthError) {
-        await markReconnectRequired(organizationId);
-        throw new TemplateError("reconnect_required", "El token expiró: reconecta el número");
-      }
-      if (err.status === 0 || err.status >= 500) {
-        throw new TemplateError("meta_unavailable", "Meta no está disponible ahora");
-      }
-      throw new TemplateError("meta_error", err.message);
+    if (!(err instanceof MetaApiError)) throw err;
+    if (err.isAuthError) {
+      await markReconnectRequired(organizationId);
+      throw new TemplateError("reconnect_required", "El token expiró: reconecta el número");
     }
-    throw err;
+    if (err.status === 0 || err.status >= 500) {
+      throw new TemplateError(
+        "meta_unavailable",
+        err.status === 0 ? `${err.message}: vuelve a intentarlo en un momento` : "Meta no está disponible ahora"
+      );
+    }
+    // Sin token ni secretos: código, subcódigo y lo que Meta dijo. Es lo que
+    // permite diagnosticar desde los logs de la instancia sin pedirle al
+    // dueño que copie la pantalla.
+    console.error(
+      `[templates] Meta rechazó la creación de «${name}» (${err.codeLabel ?? "sin código"}): ${err.explanation}`
+    );
+    if (esNombreDuplicado(err)) {
+      // Ya existía en Meta —creada allá, o por un intento anterior que no
+      // llegó a guardarse aquí—. Se importa tal como está y se explica: un
+      // 422 "ya existe" a secas manda al dueño a inventar otro nombre para
+      // algo que ya tenía.
+      const importada = await importarSiExiste(organizationId, name, input.language);
+      throw new TemplateError(
+        "already_exists",
+        importada
+          ? `Ya existe en tu cuenta de Meta una plantilla «${name}» en ${input.language}: la importé tal como está allá y ya aparece en la lista. Si quieres otro texto, ponle otro nombre.`
+          : `Ya existe en tu cuenta de Meta una plantilla «${name}» en ${input.language}. Pulsa Sincronizar para traerla, o ponle otro nombre.`
+      );
+    }
+    throw new TemplateError("meta_error", describeTemplateError(err));
   }
+
+  const status = mapMetaStatus(respuesta.status) ?? "pending";
+  const metaStatus = normalizaMetaStatus(respuesta.status) ?? "PENDING";
+  const category = (respuesta.category ?? input.category).toUpperCase();
+  const waTemplateId = respuesta.id ?? null;
 
   const db = getDb();
   const inserted = await db
@@ -138,10 +240,14 @@ export async function createTemplate(
       organizationId,
       name,
       language: input.language,
-      category: input.category,
-      body: input.body,
-      status: "pending",
+      category,
+      body,
+      status,
+      metaStatus,
+      rejectionReason: null,
       waTemplateId,
+      missingSince: null,
+      components,
     })
     .onConflictDoUpdate({
       target: [
@@ -150,11 +256,14 @@ export async function createTemplate(
         schema.template.language,
       ],
       set: {
-        category: input.category,
-        body: input.body,
-        status: "pending",
+        category,
+        body,
+        status,
+        metaStatus,
         rejectionReason: null,
         waTemplateId,
+        missingSince: null,
+        components,
         updatedAt: new Date(),
       },
     })
@@ -162,45 +271,212 @@ export async function createTemplate(
   return inserted[0]!;
 }
 
-function mapMetaStatus(
-  status: string | undefined
-): TemplateRow["status"] | null {
-  const s = (status ?? "").toUpperCase();
-  if (s === "APPROVED") return "approved";
-  if (s === "REJECTED") return "rejected";
-  if (s === "PENDING" || s === "IN_APPEAL" || s === "PENDING_DELETION") {
-    return "pending";
+/** Tras un "already exists": sincroniza y dice si la plantilla quedó local. */
+async function importarSiExiste(
+  organizationId: string,
+  name: string,
+  language: string
+): Promise<boolean> {
+  try {
+    await syncTemplates(organizationId);
+  } catch (err) {
+    console.warn("[templates] no se pudo importar la duplicada:", err);
+    return false;
   }
-  return null;
+  const db = getDb();
+  const rows = await db
+    .select({ id: schema.template.id })
+    .from(schema.template)
+    .where(
+      scoped(
+        schema.template.organizationId,
+        organizationId,
+        eq(schema.template.name, name),
+        eq(schema.template.language, language)
+      )
+    )
+    .limit(1);
+  return rows.length > 0;
+}
+
+/* ============================================================
+ * Sincronización: espejo en tres direcciones (FR-1201..FR-1206)
+ * ============================================================ */
+
+/** Una plantilla tal como la devuelve `GET {waba}/message_templates`. */
+type PlantillaRemota = {
+  id?: string;
+  name?: string;
+  language?: string;
+  status?: string;
+  category?: string;
+  rejected_reason?: string;
+  components?: TemplateComponent[];
+};
+
+type PaginaDePlantillas = {
+  data?: PlantillaRemota[];
+  paging?: { cursors?: { after?: string }; next?: string };
+};
+
+/**
+ * Campos pedidos explícitamente. Se enumeran en vez de aceptar el default
+ * porque el default de Graph cambia entre versiones sin avisar (y no trae
+ * `rejected_reason`), y porque un campo mal escrito debe reventar la petición
+ * entera (400/código 100) en vez de llegar vacío y hacernos creer que la
+ * plantilla no tiene cuerpo.
+ */
+const CAMPOS_PLANTILLA =
+  "id,name,language,status,category,components,rejected_reason";
+
+/**
+ * Tope de páginas. No es un límite de producto: es el seguro contra un cursor
+ * que no avanza. Si se alcanza, la lista está INCOMPLETA y eso se reporta como
+ * fallo — nunca como una sincronización correcta.
+ */
+const MAX_PAGINAS = 200;
+
+/**
+ * Igualdad de componentes SIN depender del orden de las llaves: Postgres
+ * reordena las de un `jsonb` al guardarlo, así que comparar el JSON tal cual
+ * marcaba "cambió" en cada sync y la idempotencia se rompía sin que nada
+ * hubiera cambiado.
+ */
+function canon(value: unknown): string {
+  return JSON.stringify(ordenar(value));
+}
+
+function ordenar(value: unknown): unknown {
+  if (Array.isArray(value)) return value.map(ordenar);
+  if (value && typeof value === "object") {
+    const obj = value as Record<string, unknown>;
+    return Object.fromEntries(
+      Object.keys(obj)
+        .sort()
+        .map((k) => [k, ordenar(obj[k])])
+    );
+  }
+  return value;
+}
+
+/** El cuerpo vive en el componente BODY; el resto se conserva en `components`. */
+function cuerpoDe(remota: PlantillaRemota): string {
+  const body = remota.components?.find(
+    (c) => (c.type ?? "").toUpperCase() === "BODY"
+  );
+  return body?.text ?? "";
 }
 
 /**
- * Sincroniza estados desde Graph (`GET {waba}/message_templates`). Cubre el
- * modo agencia: los webhooks de plantillas NO siguen el override de callback,
- * así que el pull es la vía universal (DV-VC-04/DV-VC-15).
+ * Recorre TODAS las páginas de `GET {waba}/message_templates`.
+ *
+ * Graph sirve 25 por página y señala continuación con `paging.next`. Quien lea
+ * solo `data` se lleva las primeras 25 y cree que son todas: sin error y sin
+ * aviso. Aquí se sigue el CURSOR (`paging.cursors.after`), no la URL absoluta
+ * de `paging.next`, por dos razones: `graphRequest` sigue siendo la única
+ * frontera de salida hacia Meta (Principio II), y no se navega a una URL que
+ * viene en la respuesta de un tercero.
+ *
+ * A propósito no se pide `limit`: con el tamaño de página por defecto el código
+ * ejercita la paginación de verdad en cuanto hay más de 25 plantillas.
  */
-export async function syncTemplates(organizationId: string): Promise<number> {
+async function traerTodasLasPlantillas(
+  wabaId: string,
+  token: string
+): Promise<PlantillaRemota[]> {
+  const todas: PlantillaRemota[] = [];
+  let after: string | undefined;
+
+  for (let pagina = 0; pagina < MAX_PAGINAS; pagina++) {
+    const query = new URLSearchParams({ fields: CAMPOS_PLANTILLA });
+    if (after) query.set("after", after);
+    const res = await graphRequest<PaginaDePlantillas>(
+      `${wabaId}/message_templates?${query.toString()}`,
+      { token, signal: AbortSignal.timeout(ESPERA_MAXIMA_MS) }
+    );
+    todas.push(...(res.data ?? []));
+
+    if (!res.paging?.next) return todas;
+
+    const siguiente = res.paging.cursors?.after;
+    if (!siguiente || siguiente === after) {
+      // Meta dice que hay más pero no da con qué pedirlo. Devolver lo que
+      // llevamos sería presentar una lista parcial como si fuera completa.
+      throw new TemplateError(
+        "meta_unavailable",
+        "Meta devolvió la lista de plantillas a medias. Vuelve a intentarlo en un momento."
+      );
+    }
+    after = siguiente;
+  }
+
+  throw new TemplateError(
+    "meta_unavailable",
+    "La lista de plantillas de Meta no terminó de paginar. Vuelve a intentarlo en un momento."
+  );
+}
+
+/** Lo que cambió en una pasada de sincronización. */
+export type ResumenDeSync = {
+  /** Filas existentes cuyo estado, categoría, motivo o componentes cambiaron. */
+  updated: number;
+  /** Plantillas que estaban en Meta y no en la base: ahora sí están. */
+  imported: number;
+  /** Filas locales que Meta ya no lista: marcadas ausentes, nunca borradas. */
+  missing: number;
+};
+
+/**
+ * Sincroniza plantillas desde Graph. Cubre el modo agencia: los webhooks de
+ * plantillas NO siguen el override de callback, así que el pull es la vía
+ * universal (DV-VC-04/DV-VC-15).
+ *
+ * Meta es la AUTORIDAD sobre qué plantillas existen y en qué estado, así que
+ * esto es un espejo en tres direcciones, no solo un actualizador de estados:
+ * importa lo que falta, actualiza lo que cambió y marca lo que desapareció.
+ */
+export async function syncTemplates(
+  organizationId: string
+): Promise<ResumenDeSync> {
   const creds = await getCredentialsByOrg(organizationId);
   if (!creds) {
     throw new TemplateError("not_connected", "Conecta tu número de WhatsApp primero");
   }
 
-  let data: {
-    data?: { id?: string; name?: string; language?: string; status?: string; category?: string; quality_score?: unknown; rejected_reason?: string }[];
-  };
+  let remotas: PlantillaRemota[];
   try {
-    data = await graphRequest(`${creds.wabaId}/message_templates`, {
-      token: creds.token,
-    });
+    remotas = await traerTodasLasPlantillas(creds.wabaId, creds.token);
   } catch (err) {
-    if (err instanceof MetaApiError) {
-      if (err.isAuthError) {
-        await markReconnectRequired(organizationId);
-        throw new TemplateError("reconnect_required", "El token expiró: reconecta el número");
-      }
-      throw new TemplateError("meta_unavailable", "No se pudo consultar Meta");
+    if (err instanceof TemplateError) throw err;
+    if (!(err instanceof MetaApiError)) throw err;
+    if (err.isAuthError) {
+      await markReconnectRequired(organizationId);
+      throw new TemplateError("reconnect_required", "El token expiró: reconecta el número");
     }
-    throw err;
+    if (err.status === 0 || err.status >= 500) {
+      throw new TemplateError(
+        "meta_unavailable",
+        err.status === 0
+          ? `${err.message}: lo que ves es la última copia local`
+          : "Meta no está disponible ahora: lo que ves es la última copia local"
+      );
+    }
+    console.error(
+      `[templates] Graph rechazó la lista de plantillas (${err.codeLabel ?? "sin código"}): ${err.explanation}`
+    );
+    if (esFaltaDePermiso(err) || esWabaDesconocido(err)) {
+      // Fallo de la CONEXIÓN guardada, no de Meta: no lo arregla reintentar.
+      throw new TemplateError("meta_error", describeTemplateError(err));
+    }
+    if (err.status === 400 && err.code === 100) {
+      // Fallo NUESTRO: pedimos un campo que el nodo no tiene. Se distingue
+      // del resto porque no lo arregla ni reintentar ni reconectar.
+      throw new TemplateError(
+        "meta_unavailable",
+        `No se pudo leer la lista de plantillas de Meta: la app pidió algo que Graph no reconoce (${err.explanation}). Es un problema del CRM, no de tu cuenta.`
+      );
+    }
+    throw new TemplateError("meta_unavailable", describeTemplateError(err));
   }
 
   const db = getDb();
@@ -209,33 +485,157 @@ export async function syncTemplates(organizationId: string): Promise<number> {
     .from(schema.template)
     .where(scoped(schema.template.organizationId, organizationId));
 
+  /* ---------- Emparejamiento en DOS pasadas ----------
+   *
+   * Un `find` con `||` devuelve la primera coincidencia sin comprobar
+   * unicidad, así que una fila ya reclamada por su `waTemplateId` podía
+   * volver a casar por nombre+idioma con OTRA remota y acabar sobrescrita.
+   * Primero se agotan las coincidencias por id —la llave fuerte, la que
+   * asigna Meta— y solo después se empareja por nombre+idioma sobre lo que
+   * quedó libre.
+   */
+  const sinReclamar = new Set(local.map((t) => t.id));
+  const emparejadas: { remota: PlantillaRemota; fila: TemplateRow }[] = [];
+
+  const porWaId = new Map<string, TemplateRow>();
+  for (const t of local) if (t.waTemplateId) porWaId.set(t.waTemplateId, t);
+
+  const huerfanas: PlantillaRemota[] = [];
+  for (const remota of remotas) {
+    const fila = remota.id ? porWaId.get(remota.id) : undefined;
+    if (fila && sinReclamar.has(fila.id)) {
+      sinReclamar.delete(fila.id);
+      emparejadas.push({ remota, fila });
+    } else {
+      huerfanas.push(remota);
+    }
+  }
+
+  const porNombre = new Map<string, TemplateRow>();
+  for (const t of local) {
+    if (sinReclamar.has(t.id)) porNombre.set(`${t.name}|${t.language}`, t);
+  }
+
+  const aImportar: PlantillaRemota[] = [];
+  for (const remota of huerfanas) {
+    const fila = porNombre.get(`${remota.name}|${remota.language}`);
+    if (fila && sinReclamar.has(fila.id)) {
+      sinReclamar.delete(fila.id);
+      emparejadas.push({ remota, fila });
+    } else {
+      aImportar.push(remota);
+    }
+  }
+
   let updated = 0;
-  for (const remote of data.data ?? []) {
-    const status = mapMetaStatus(remote.status);
-    if (!status) continue;
-    const match = local.find(
-      (t) =>
-        (remote.id && t.waTemplateId === remote.id) ||
-        (t.name === remote.name && t.language === remote.language)
-    );
-    if (!match) continue;
+  for (const { remota, fila } of emparejadas) {
+    // Un estado que no sabemos traducir no toca el ENUM local —preferimos
+    // dejarlo como está a inventarle una etiqueta— pero SÍ se guarda crudo en
+    // `metaStatus`, que es lo que manda sobre el envío.
+    const status = mapMetaStatus(remota.status);
+    if (!status) {
+      console.warn(
+        `[templates] estado de Meta no traducible a insignia: "${remota.status}" ` +
+          `en ${remota.name} — se guarda crudo y bloquea el envío`
+      );
+    }
+    const metaStatus = normalizaMetaStatus(remota.status);
     // Meta reclasifica la categoría al aprobar (una UTILITY puede volverse
     // MARKETING, lo que cambia el costo por conversación): es autoridad.
-    const category = remote.category ?? match.category;
-    if (match.status === status && match.category === category) continue;
+    const category = remota.category?.toUpperCase() ?? fila.category;
+    const nuevoStatus = status ?? fila.status;
+    const rejectionReason = motivoDeRechazo(nuevoStatus, remota.rejected_reason);
+    const waTemplateId = remota.id ?? fila.waTemplateId ?? null;
+    // El cuerpo lo escribe Meta también: una editada en el Administrador de
+    // WhatsApp debe verse aquí con el texto que de verdad se manda.
+    const body = cuerpoDe(remota) || fila.body;
+    const components = remota.components ?? fila.components ?? null;
+
+    const igual =
+      fila.status === nuevoStatus &&
+      fila.metaStatus === metaStatus &&
+      fila.category === category &&
+      fila.rejectionReason === rejectionReason &&
+      fila.waTemplateId === waTemplateId &&
+      fila.body === body &&
+      canon(fila.components ?? null) === canon(components) &&
+      fila.missingSince === null;
+    if (igual) continue;
+
     await db
       .update(schema.template)
       .set({
-        status,
+        status: nuevoStatus,
+        metaStatus,
         category,
-        rejectionReason: remote.rejected_reason ?? null,
-        waTemplateId: match.waTemplateId ?? remote.id ?? null,
+        rejectionReason,
+        waTemplateId,
+        body,
+        components,
+        // Reapareció en Meta: deja de estar ausente.
+        missingSince: null,
         updatedAt: new Date(),
       })
-      .where(eq(schema.template.id, match.id));
+      .where(eq(schema.template.id, fila.id));
     updated += 1;
   }
-  return updated;
+
+  let imported = 0;
+  for (const remota of aImportar) {
+    // Sin nombre o idioma no hay llave con la que guardarla.
+    if (!remota.name || !remota.language) {
+      console.warn("[templates] remota sin nombre o idioma, no se importa:", remota.id);
+      continue;
+    }
+    // De una plantilla que vemos por primera vez solo afirmamos lo que Meta
+    // afirma: si su estado no se reconoce, entra como pendiente (no
+    // enviable), nunca como aprobada.
+    const status = mapMetaStatus(remota.status) ?? ("pending" as const);
+    const values = {
+      organizationId,
+      name: remota.name,
+      language: remota.language,
+      category: remota.category?.toUpperCase() ?? "UTILITY",
+      body: cuerpoDe(remota),
+      status,
+      metaStatus: normalizaMetaStatus(remota.status),
+      rejectionReason: motivoDeRechazo(status, remota.rejected_reason),
+      waTemplateId: remota.id ?? null,
+      missingSince: null,
+      components: remota.components ?? null,
+    };
+    // `onConflictDoUpdate` sobre la MISMA llave única que usa createTemplate:
+    // re-sincronizar no puede duplicar ni reventar (Principio IV).
+    await db
+      .insert(schema.template)
+      .values({ id: newId("template"), ...values })
+      .onConflictDoUpdate({
+        target: [
+          schema.template.organizationId,
+          schema.template.name,
+          schema.template.language,
+        ],
+        set: { ...values, updatedAt: new Date() },
+      });
+    imported += 1;
+  }
+
+  let missing = 0;
+  for (const fila of local) {
+    if (!sinReclamar.has(fila.id)) continue;
+    // Un borrador nunca llegó a Meta: que no esté allí no es una ausencia.
+    if (fila.status === "draft") continue;
+    if (fila.missingSince) continue;
+    // NO se borra: los mensajes ya enviados la referencian y el historial de la
+    // conversación no puede quedarse sin el texto que se mandó.
+    await db
+      .update(schema.template)
+      .set({ missingSince: new Date(), updatedAt: new Date() })
+      .where(eq(schema.template.id, fila.id));
+    missing += 1;
+  }
+
+  return { updated, imported, missing };
 }
 
 /** Evento webhook `message_template_status_update` (modo directo, FR-050). */
@@ -248,16 +648,24 @@ export async function applyTemplateStatusEvent(
   if (!creds) return;
 
   const status = mapMetaStatus(value.event);
+  const metaStatus = normalizaMetaStatus(value.event);
   const name = value.message_template_name;
   const language = value.message_template_language;
-  if (!status || !name || !language) return;
+  // Sin nombre o idioma no hay a qué fila aplicarlo. El ESTADO, en cambio, ya
+  // no puede faltar para seguir: un evento PAUSED salía por aquí y no tocaba
+  // nada, así que la plantilla se quedaba `approved` y enviable. Importa
+  // porque el webhook llega en segundos mientras que el sync espera a que
+  // alguien lo pulse.
+  if (!metaStatus || !name || !language) return;
 
   const db = getDb();
   await db
     .update(schema.template)
     .set({
-      status,
-      rejectionReason: status === "rejected" ? (value.reason ?? null) : null,
+      // El enum solo se mueve si el estado es traducible; `metaStatus` siempre.
+      ...(status ? { status } : {}),
+      metaStatus,
+      ...(status ? { rejectionReason: motivoDeRechazo(status, value.reason) } : {}),
       updatedAt: new Date(),
     })
     .where(
@@ -294,6 +702,26 @@ export async function sendTemplate(input: {
   if (template.status !== "approved") {
     throw new TemplateError("invalid", "Solo se pueden enviar plantillas aprobadas");
   }
+  if (template.missingSince) {
+    // Meta ya no la lista: intentarlo devolvería un error suyo sin explicación
+    // útil. Se dice aquí, con la causa y la salida.
+    throw new TemplateError(
+      "invalid",
+      "Esta plantilla ya no existe en tu cuenta de Meta. Vuelve a crearla en el Administrador de WhatsApp o desde Plantillas."
+    );
+  }
+  // El estado CRUDO de Meta manda sobre el envío. Es la última barrera y la
+  // que cuenta: la UI ya no la ofrece, pero esta ruta también la alcanzan el
+  // bot API y cualquier cliente que mande el id a mano.
+  const bloqueo = bloqueoDeMeta(template);
+  if (bloqueo) {
+    throw new TemplateError("invalid", `${bloqueo.etiqueta}. ${bloqueo.explicacion}`);
+  }
+  // Una importada con encabezado multimedia, botones dinámicos o variables
+  // con nombre: Meta exigiría parámetros que este CRM no rellena (132000).
+  const requisito = analizarComponentes(template.components, template.body).requisito;
+  if (requisito) throw new TemplateError("invalid", requisito);
+
   // Meta exige EXACTAMENTE un parámetro por variable del cuerpo: si sobran o
   // falta alguno responde 132000 (plantilla y parámetros no coinciden).
   const variableCount = countVariables(template.body);

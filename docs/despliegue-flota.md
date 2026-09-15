@@ -24,8 +24,14 @@ rama (ver "Cómo se suelta un cambio").
 | Postgres | `mdculd8ymchlpqapypxolr86` | `opmzwkjlw7vnfpnq2oydohyo` | `l3rfxifjouusbob12omrrnve` |
 | Volumen | `vsze669ddpoxrguka4evjrqa` | `wfkz7pkxiiksqwg3ohqtysyx` | `gcxnxpg7cg9yds5fpq9imz5y` |
 
-Los tres subdominios resuelven a `212.28.185.186`, la misma IP que el resto de
-las apps del servidor.
+Los dos subdominios de clientes resuelven directo a `212.28.185.186`, la misma
+IP que el resto de las apps del servidor. **`uniko.lanco.cloud` va por el proxy
+de Cloudflare** (comprobado el 2026-09-15: `server: cloudflare`, IPs
+`104.21.*`/`172.67.*`). Eso importa al diagnosticar: si el origen tarda más de
+100 s, Cloudflare responde un 524 en HTML —no el JSON de error de la API— y la
+pantalla solo puede decir "respuesta inesperada del servidor (HTTP 524)"; y
+durante el relevo de un despliegue el 502 también llega como página de
+Cloudflare.
 
 ## Cómo queda configurada cada app
 

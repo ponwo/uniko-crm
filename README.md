@@ -157,8 +157,10 @@ talla (o de la que pidió el cliente) en una sola línea.
 
 ### 📄 Plantillas · 👥 Multi-usuario · 🔐 Self-hosted
 
-Plantillas con varias variables `{{1}}…{{n}}` y aprobación de Meta
-sincronizada; cuentas de equipo creadas por el propietario (el registro público
+Plantillas con varias variables `{{1}}…{{n}}`, con Meta como autoridad: el
+CRM importa las que crees en el Administrador de WhatsApp, refleja pausas,
+deshabilitaciones y borrados, y al crear te dice la causa exacta de un rechazo
+de Meta; cuentas de equipo creadas por el propietario (el registro público
 se cierra tras la primera organización); token de WhatsApp cifrado en reposo
 (AES-256-GCM),
 webhook autenticado en dos capas y cero dependencias de runtime más allá de
@@ -283,8 +285,11 @@ del cliente se conecta con el **override de callback por WABA**:
 > ℹ️ **Limitación conocida de Meta**: los eventos de estado de PLANTILLAS
 > (`message_template_status_update`) no siguen el override de callback — van a
 > la app dueña. Por eso Uniko también **sincroniza plantillas por la API de
-> Graph** (botón "Sincronizar" en Configuración → Plantillas), así el modo
-> agencia ve las aprobaciones igual.
+> Graph** (al abrir Configuración → Plantillas y con el botón "Sincronizar"),
+> así el modo agencia ve las aprobaciones igual. Ese sync es un espejo: trae
+> las plantillas creadas fuera del CRM, pagina la lista completa, marca las que
+> Meta dejó de listar (sin borrarlas: el historial las referencia) y guarda el
+> estado literal de Meta, que es el que manda sobre el envío.
 
 ## Canales opcionales: Instagram y Messenger
 
