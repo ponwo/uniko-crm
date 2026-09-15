@@ -109,7 +109,9 @@ export function TemplatesClient() {
         return;
       }
 
-      const data = (await res.json()) as {
+      // Un 200 sin JSON (proxy raro) no debe reventar el efecto: se pinta
+      // "Todo al día" con lo que haya y la lista se vuelve a pedir igual.
+      const data = (await res.json().catch(() => ({}))) as {
         updated?: number;
         imported?: number;
         missing?: number;

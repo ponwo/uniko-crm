@@ -207,6 +207,15 @@ describe("bloqueoDeMeta (027)", () => {
       /Sincronizar/
     );
   });
+
+  it("una PAUSED importada como pending también se dice: la insignia no puede decir 'Pendiente'", () => {
+    expect(bloqueoDeMeta({ status: "pending", metaStatus: "PAUSED" })?.etiqueta).toBe(
+      "Pausada por Meta"
+    );
+    // Pendiente de verdad (Meta lo confirma) o sin noticias: sin bloqueo.
+    expect(bloqueoDeMeta({ status: "pending", metaStatus: "IN_REVIEW" })).toBeNull();
+    expect(bloqueoDeMeta({ status: "pending", metaStatus: null })).toBeNull();
+  });
 });
 
 describe("analizarComponentes (027) — lo que el CRM no sabe rellenar", () => {

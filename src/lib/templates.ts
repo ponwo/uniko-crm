@@ -119,6 +119,19 @@ export function esEnviable(t: {
 }
 
 /**
+ * Los estados de Meta que SON pasos del ciclo de aprobación (los que
+ * `status` traduce). Todo lo demás es un bloqueo con nombre propio.
+ */
+const ESTADOS_DEL_CICLO = new Set([
+  "APPROVED",
+  "REJECTED",
+  "PENDING",
+  "IN_REVIEW",
+  "IN_APPEAL",
+  "PENDING_DELETION",
+]);
+
+/**
  * Por qué NO se puede enviar y qué hacer al respecto.
  *
  * Bloquear el envío sin decir nada deja al operador con una plantilla que
@@ -135,10 +148,19 @@ export function bloqueoDeMeta(t: {
   status: string;
   metaStatus: string | null;
 }): { etiqueta: string; explicacion: string } | null {
-  // Solo se habla del bloqueo de Meta cuando el ciclo de aprobación ya se
-  // completó: en un borrador o una rechazada, `metaStatus` no es la noticia.
-  if (t.status !== "approved") return null;
-  if (t.metaStatus === "APPROVED") return null;
+  // En un borrador o una rechazada, `metaStatus` no es la noticia: la
+  // insignia del ciclo ya dice lo que hay que saber.
+  if (t.status === "draft" || t.status === "rejected") return null;
+  // Un estado del propio ciclo (APPROVED, PENDING, IN_REVIEW…) tampoco es un
+  // bloqueo: lo pinta la insignia. Lo que sí lo es —PAUSED, DISABLED, LIMIT_
+  // EXCEEDED, DELETED, ARCHIVED, o lo que Meta invente— se dice aunque la fila
+  // esté `pending`: una PAUSED importada entra como pendiente (el CRM no la
+  // vio aprobarse) y sin esto llevaría la insignia "Pendiente de Meta", que es
+  // otra mentira.
+  if (t.metaStatus !== null && ESTADOS_DEL_CICLO.has(t.metaStatus)) return null;
+  // Sin noticias de Meta: solo preocupa en una aprobada, que es la que se
+  // ofrecería para enviar; una pendiente sin noticias sigue siendo pendiente.
+  if (t.metaStatus === null && t.status !== "approved") return null;
 
   switch (t.metaStatus) {
     case "PAUSED":
