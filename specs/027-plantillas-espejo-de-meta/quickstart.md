@@ -23,7 +23,7 @@ node --env-file=.env scripts/e2e-templates-sync.mjs
 node --env-file=.env scripts/e2e-templates-multivar.mjs
 ```
 
-Registro 2026-09-15: **80/80** y **21/21**, TODO VERDE. Los escenarios están
+Registro 2026-09-15: **80/80** y **21/21**, TODO VERDE; `e2e-selftest.mjs` contra base limpia (`uniko_dev_027`): **153/153**. Los escenarios están
 numerados en [`tests/e2e/us6-templates.md`](../../tests/e2e/us6-templates.md)
 (15–25). Comprobación de UI en `/settings/templates` con el Browser pane: aviso
 rojo en vivo al escribir `Hola {{1}}` con el botón deshabilitado; filas con
