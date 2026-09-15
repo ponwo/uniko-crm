@@ -1,7 +1,7 @@
 import { z } from "zod";
 import { mockGuard } from "@/lib/dev-guard";
 import { apiError, parseBody } from "@/lib/api";
-import { getWaMockState } from "@/server/dev/wa-mock-state";
+import { templatesOf } from "@/server/dev/wa-mock-state";
 import {
   buildTemplateStatusPayload,
   deliverToWebhook,
@@ -13,7 +13,15 @@ const bodySchema = z.object({
   wabaId: z.string().min(1),
   name: z.string().min(1),
   language: z.string().min(1),
-  event: z.enum(["APPROVED", "REJECTED"]),
+  /**
+   * Texto libre en MAYÚSCULAS, no una lista cerrada (027): Meta manda también
+   * PAUSED, DISABLED, LIMIT_EXCEEDED… y el arnés tiene que poder producir
+   * cualquiera —incluido uno desconocido— para comprobar que bloquea.
+   */
+  event: z
+    .string()
+    .min(1)
+    .transform((s) => s.trim().toUpperCase()),
   reason: z.string().optional(),
   /** Meta reclasifica al aprobar (UTILITY → MARKETING). Solo lado "Meta". */
   category: z.string().optional(),
@@ -34,13 +42,13 @@ export async function POST(req: Request) {
   if (!body.ok) return body.response;
 
   // Mantener coherente el estado del "panel de Meta" simulado (para el sync).
-  const state = getWaMockState();
-  const tpl = state.templates.find(
+  const tpl = templatesOf(body.data.wabaId).find(
     (t) => t.name === body.data.name && t.language === body.data.language
   );
   if (tpl) {
     tpl.status = body.data.event;
     if (body.data.category) tpl.category = body.data.category;
+    if (body.data.event === "REJECTED") tpl.rejectedReason = body.data.reason;
   }
 
   if (body.data.notify === false) {

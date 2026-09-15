@@ -1,8 +1,11 @@
 import { mockGuard } from "@/lib/dev-guard";
 import {
+  allMockTemplates,
   getWaMockState,
   nextN,
   nextOutboundWamid,
+  nextTemplateId,
+  templatesOf,
   type MockTemplate,
 } from "@/server/dev/wa-mock-state";
 
@@ -57,6 +60,147 @@ function normalizePath(path: string[]): string[] {
   return path[0] && /^v\d+/.test(path[0]) ? path.slice(1) : path;
 }
 
+/* ---------- 027 — Fidelidad del mock: plantillas ----------
+ *
+ * Un mock que responde lo que nos conviene no prueba nada, MIENTE. Tres cosas
+ * que la Graph API real hace y un mock permisivo se salta:
+ *
+ * 1. Valida el `fields=` y rechaza la petición ENTERA (400/100) si pide un
+ *    campo que el nodo no tiene: los campos buenos se pierden con el malo.
+ * 2. Pagina por cursor, 25 por página. Quien lea solo `data` se lleva las
+ *    primeras 25 y cree que son todas, sin error y sin aviso.
+ * 3. Valida de forma SÍNCRONA al crear, y responde siempre "(#100) Invalid
+ *    parameter" en `message` con la causa en `error_subcode` y
+ *    `error_user_msg`. Si el mock no lo replica, el CRM nunca ejercita la
+ *    traducción de esos errores.
+ */
+
+/** Campos documentados del edge message_templates (v26.0). */
+const CAMPOS_PLANTILLA = new Set([
+  "id", "name", "status", "category", "language", "components",
+  "rejected_reason", "quality_score", "previous_category",
+  "correct_category", "sub_category", "message_send_ttl_seconds",
+  "parameter_format", "library_template_name", "cta_url_link_tracking_opted_out",
+]);
+
+/** Réplica del rechazo real de Graph ante un campo que el nodo no tiene. */
+function campoInexistente(req: Request, conocidos: Set<string>, nodo: string): Response | null {
+  const fields = new URL(req.url).searchParams.get("fields");
+  if (!fields) return null;
+  const malo = fields
+    .split(",")
+    .map((f) => f.trim().split("(")[0]!.trim())
+    .filter(Boolean)
+    .find((f) => !conocidos.has(f));
+  if (!malo) return null;
+  return Response.json(
+    {
+      error: {
+        message: `(#100) Tried accessing nonexisting field (${malo}) on node type (${nodo})`,
+        type: "OAuthException",
+        code: 100,
+        fbtrace_id: "mock",
+      },
+    },
+    { status: 400 }
+  );
+}
+
+/**
+ * Los cursores de Meta son OPACOS (base64 de su estado interno). Aquí también
+ * lo son a propósito: si el mock devolviera el índice en claro, alguien
+ * acabaría calculándolo en vez de seguir el cursor, y contra Meta real eso no
+ * funciona.
+ */
+const PAGINA_POR_DEFECTO = 25;
+
+function codificarCursor(indice: number): string {
+  return Buffer.from(`mock:${indice}`).toString("base64url");
+}
+
+function decodificarCursor(cursor: string | null): number {
+  if (!cursor) return 0;
+  const crudo = Buffer.from(cursor, "base64url").toString("utf8");
+  const n = Number(crudo.startsWith("mock:") ? crudo.slice(5) : NaN);
+  return Number.isInteger(n) && n >= 0 ? n : 0;
+}
+
+/**
+ * Envuelve una colección como lo hace Graph: `data` con la página, y `paging`
+ * con los cursores. `next` SOLO aparece si queda algo detrás — es la señal que
+ * distingue "esto es todo" de "hay más y tienes que ir por ello".
+ */
+function paginar<T>(req: Request, todos: T[]): { data: T[]; paging: unknown } {
+  const url = new URL(req.url);
+  const pedido = Number(url.searchParams.get("limit"));
+  const limite =
+    Number.isInteger(pedido) && pedido > 0 ? Math.min(pedido, 100) : PAGINA_POR_DEFECTO;
+  const desde = decodificarCursor(url.searchParams.get("after"));
+  const pagina = todos.slice(desde, desde + limite);
+  const hasta = desde + pagina.length;
+  const hayMas = hasta < todos.length;
+
+  const siguiente = new URL(url);
+  siguiente.searchParams.set("limit", String(limite));
+  siguiente.searchParams.set("after", codificarCursor(hasta));
+
+  return {
+    data: pagina,
+    paging: {
+      cursors: {
+        before: codificarCursor(desde),
+        after: codificarCursor(hasta),
+      },
+      ...(hayMas ? { next: siguiente.toString() } : {}),
+    },
+  };
+}
+
+/**
+ * Meta caído, con la forma real del incidente 2026-08-03: un 5xx que además
+ * viene etiquetado `OAuthException` (código 2, "service temporarily
+ * unavailable"). Lo produce un WABA cuyo id termina en `-caido`, para que el
+ * arnés pueda comprobar que el CRM no lo confunde con un token vencido ni lo
+ * disfraza de "Todo al día".
+ */
+function metaCaido(wabaId: string): Response | null {
+  if (!wabaId.endsWith("-caido")) return null;
+  return Response.json(
+    {
+      error: {
+        message: "Service temporarily unavailable",
+        type: "OAuthException",
+        code: 2,
+        is_transient: true,
+        fbtrace_id: "mock",
+      },
+    },
+    { status: 503 }
+  );
+}
+
+/**
+ * Error de validación de plantilla con la forma REAL de Meta: `message`
+ * genérico, causa en `error_subcode`/`error_user_title`/`error_user_msg`.
+ */
+function rechazoDePlantilla(subcode: number, title: string, msg: string): Response {
+  return Response.json(
+    {
+      error: {
+        message: "(#100) Invalid parameter",
+        type: "OAuthException",
+        code: 100,
+        error_subcode: subcode,
+        is_transient: false,
+        error_user_title: title,
+        error_user_msg: msg,
+        fbtrace_id: "mock",
+      },
+    },
+    { status: 400 }
+  );
+}
+
 export async function GET(req: Request, ctx: Params) {
   const guard = mockGuard();
   if (guard) return guard;
@@ -64,19 +208,26 @@ export async function GET(req: Request, ctx: Params) {
   const token = bearerToken(req);
   if (token.endsWith("-invalid")) return invalidTokenResponse();
 
-  // GET {wabaId}/message_templates → lista para el sync
+  // GET {wabaId}/message_templates → lista para el sync.
+  // Filtrada por el WABA de la ruta y paginada como Graph: son las dos cosas
+  // que un mock permisivo se salta y producción no perdona.
   if (path.length === 2 && path[1] === "message_templates") {
-    const state = getWaMockState();
-    return Response.json({
-      data: state.templates.map((t) => ({
-        id: t.id,
-        name: t.name,
-        language: t.language,
-        category: t.category,
-        status: t.status,
-        components: t.components ?? [{ type: "BODY", text: t.body }],
-      })),
-    });
+    const caido = metaCaido(path[0]!);
+    if (caido) return caido;
+    const malo = campoInexistente(req, CAMPOS_PLANTILLA, "WhatsAppBusinessAccount");
+    if (malo) return malo;
+    const todas = templatesOf(path[0]!).map((t) => ({
+      id: t.id,
+      name: t.name,
+      language: t.language,
+      category: t.category,
+      status: t.status,
+      components: t.components ?? [{ type: "BODY", text: t.body }],
+      // Como Meta: "NONE" en las que no están rechazadas.
+      rejected_reason:
+        t.status === "REJECTED" ? (t.rejectedReason ?? "INVALID_FORMAT") : "NONE",
+    }));
+    return Response.json(paginar(req, todas));
   }
 
   // GET {mediaId} (ids "media...") → metadata de adjunto (media proxy del bot)
@@ -224,7 +375,7 @@ export async function POST(req: Request, ctx: Params) {
             components?: { type?: string; parameters?: unknown[] }[];
           }
         | undefined;
-      const known = state.templates.find((t) => t.name === tplSend?.name);
+      const known = allMockTemplates().find((t) => t.name === tplSend?.name);
       if (known) {
         const expected = [...known.body.matchAll(/\{\{\s*(\d+)\s*\}\}/g)].reduce(
           (max, m) => Math.max(max, Number(m[1])),
@@ -290,9 +441,12 @@ export async function POST(req: Request, ctx: Params) {
     });
   }
 
-  // POST {wabaId}/message_templates → alta de plantilla (queda PENDING)
+  // POST {wabaId}/message_templates → alta de plantilla (queda PENDING).
+  // Replica las validaciones SÍNCRONAS de Meta, con su forma de error real.
   if (path.length === 2 && path[1] === "message_templates") {
-    const state = getWaMockState();
+    const caido = metaCaido(path[0]!);
+    if (caido) return caido;
+    const bolsa = templatesOf(path[0]!);
     const components = (body.components ?? []) as {
       type?: string;
       text?: string;
@@ -301,11 +455,12 @@ export async function POST(req: Request, ctx: Params) {
     const bodyComponent = components.find(
       (c) => (c.type ?? "").toUpperCase() === "BODY"
     );
+    const texto = bodyComponent?.text ?? "";
+    // Meta solo reconoce `{{n}}` pegado: `{{ n }}` es texto para ella.
+    const variables = [...texto.matchAll(/\{\{(\d+)\}\}/g)];
     // Meta valida que haya un ejemplo por cada {{n}} del cuerpo: sin esto el
     // mock aceptaría plantillas que producción rechaza (error 100).
-    const highestVar = [
-      ...(bodyComponent?.text ?? "").matchAll(/\{\{\s*(\d+)\s*\}\}/g),
-    ].reduce((max, m) => Math.max(max, Number(m[1])), 0);
+    const highestVar = variables.reduce((max, m) => Math.max(max, Number(m[1])), 0);
     const examples = bodyComponent?.example?.body_text?.[0] ?? [];
     if (highestVar !== examples.length) {
       return Response.json(
@@ -320,16 +475,57 @@ export async function POST(req: Request, ctx: Params) {
         { status: 400 }
       );
     }
+    // 2388299 — variable al inicio, al final o dos pegadas.
+    if (
+      /^\{\{\d+\}\}/.test(texto.trim()) ||
+      /\{\{\d+\}\}$/.test(texto.trim()) ||
+      /\{\{\d+\}\}\s*\{\{\d+\}\}/.test(texto)
+    ) {
+      return rechazoDePlantilla(
+        2388299,
+        "Variables cannot be at the start or end of the template",
+        "The body text cannot start or end with a variable, and variables cannot be adjacent to each other."
+      );
+    }
+    // Rechazo forzado para probar la TRADUCCIÓN de un subcódigo que el CRM no
+    // valida localmente (la proporción variables/texto no es pública).
+    if (texto.includes("[meta-rechaza]")) {
+      return rechazoDePlantilla(
+        2388293,
+        "Template content contains too many variable parameters",
+        "This template contains too many variable parameters relative to the message length. You need to decrease the number of variable parameters or increase the message length."
+      );
+    }
+    // Nombre repetido dentro del mismo idioma: Meta lo rechaza, no lo pisa.
+    const name = String(body.name ?? "");
+    const language = String(body.language ?? "es_MX");
+    if (bolsa.some((t) => t.name === name && t.language === language)) {
+      return Response.json(
+        {
+          error: {
+            message: "(#100) Invalid parameter",
+            type: "OAuthException",
+            code: 100,
+            is_transient: false,
+            error_user_title: "Message Template Name Already Exists",
+            error_user_msg:
+              "Message template with the same name and language already exists.",
+            fbtrace_id: "mock",
+          },
+        },
+        { status: 400 }
+      );
+    }
     const tpl: MockTemplate = {
-      id: `tplmock_${nextN()}`,
-      name: String(body.name ?? ""),
-      language: String(body.language ?? "es_MX"),
+      id: nextTemplateId("tplmock"),
+      name,
+      language,
       category: String(body.category ?? "UTILITY"),
       status: "PENDING",
-      body: bodyComponent?.text ?? "",
+      body: texto,
       components,
     };
-    state.templates.push(tpl);
+    bolsa.push(tpl);
     return Response.json({ id: tpl.id, status: "PENDING", category: tpl.category });
   }
 

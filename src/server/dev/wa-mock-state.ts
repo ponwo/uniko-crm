@@ -23,8 +23,17 @@ export type MockTemplate = {
   name: string;
   language: string;
   category: string;
-  status: "PENDING" | "APPROVED" | "REJECTED";
+  /**
+   * Estado tal como lo devuelve Meta. Texto libre, NO una unión cerrada
+   * (027): Meta responde también PAUSED, DISABLED, LIMIT_EXCEEDED, DELETED,
+   * ARCHIVED e IN_REVIEW, y puede añadir otros sin avisar. Un mock más
+   * estricto que la API real es una prueba que no puede fallar — y el agujero
+   * existió precisamente porque nada podía producir esos estados.
+   */
+  status: string;
   body: string;
+  /** Motivo con el que se simuló el rechazo (Meta: `rejected_reason`). */
+  rejectedReason?: string;
   /** Componentes tal cual los mandó el CRM: Meta valida aquí los `example`. */
   components?: unknown[];
 };
@@ -54,7 +63,14 @@ export type MediaMode = "ok" | "reject" | "slow";
 
 type WaMockState = {
   outbox: OutboxEntry[];
-  templates: MockTemplate[];
+  /**
+   * 027 — Plantillas POR WABA, no un array global. En Meta una plantilla
+   * pertenece a una cuenta concreta y `GET {waba}/message_templates` jamás
+   * devuelve las de otra; con una sola bolsa compartida, el sync de un arnés
+   * importaría lo que sembró otro y los conteos dejarían de significar lo
+   * que dicen.
+   */
+  templates: Record<string, MockTemplate[]>;
   capiEvents: CapiMockEvent[];
   counter: number;
   mediaMode: MediaMode;
@@ -66,7 +82,7 @@ export function getWaMockState(): WaMockState {
   if (!globalForMock.__waMockState) {
     globalForMock.__waMockState = {
       outbox: [],
-      templates: [],
+      templates: {},
       capiEvents: [],
       counter: 0,
       mediaMode: "ok",
@@ -78,11 +94,30 @@ export function getWaMockState(): WaMockState {
 export function resetWaMockState(): void {
   globalForMock.__waMockState = {
     outbox: [],
-    templates: [],
+    templates: {},
     capiEvents: [],
     counter: 0,
     mediaMode: "ok",
   };
+}
+
+/**
+ * Bolsa de plantillas de UN WABA, creándola si es la primera. Todo acceso a
+ * plantillas del mock pasa por aquí: es lo que impide volver a escribir una
+ * lista global sin darse cuenta.
+ */
+export function templatesOf(wabaId: string): MockTemplate[] {
+  const state = getWaMockState();
+  const bolsa = state.templates[wabaId];
+  if (bolsa) return bolsa;
+  const nueva: MockTemplate[] = [];
+  state.templates[wabaId] = nueva;
+  return nueva;
+}
+
+/** Todas las plantillas del mock, de todos los WABA (para buscar por nombre). */
+export function allMockTemplates(): MockTemplate[] {
+  return Object.values(getWaMockState().templates).flat();
 }
 
 export function nextN(): number {
@@ -99,4 +134,18 @@ const boot = Math.random().toString(36).slice(2, 8);
 
 export function nextOutboundWamid(): string {
   return `wamid.mock.out.${boot}.${nextN()}`;
+}
+
+/**
+ * 027 — Ids de plantilla. Llevan el sello de arranque Y una secuencia que
+ * vive FUERA del estado: los ids de Meta son únicos para siempre y jamás se
+ * reciclan, así que vaciar el panel simulado (`DELETE outbox` llama a
+ * `resetWaMockState`) no puede devolver el contador a cero. Cuando lo hacía,
+ * la plantilla recién creada nacía con un id que ya tenía una fila de una
+ * corrida anterior, y el sync —que casa primero por `waTemplateId`—
+ * actualizaba la fila equivocada.
+ */
+let secuenciaDePlantillas = 0;
+export function nextTemplateId(prefijo: "tplmock" | "tplseed"): string {
+  return `${prefijo}_${boot}_${++secuenciaDePlantillas}`;
 }

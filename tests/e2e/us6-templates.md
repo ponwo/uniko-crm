@@ -66,3 +66,51 @@ modo agencia no es el de esta instancia: sin pull, la plantilla se queda
     132000 de Meta si el número de parámetros no cuadra.
 14. Compatibilidad: el payload viejo `{ templateId, variable }` (una variable)
     sigue enviando — lo usa el cron de recordatorios de sesión.
+
+## 027 — Meta es la autoridad: espejo en tres direcciones y errores con causa (2026-09-15)
+
+> Automatizado en `scripts/e2e-templates-sync.mjs` (80 checks, incluye los 13
+> del modo agencia) — entra en `pnpm test:e2e`. Spec:
+> [`specs/027-plantillas-espejo-de-meta/spec.md`](../../specs/027-plantillas-espejo-de-meta/spec.md).
+> Reproduce lo reportado el 2026-09-14: crear "marcaba error" sin causa y las
+> plantillas creadas en el Administrador de WhatsApp nunca aparecían.
+
+15. **Ya tenía plantillas.** Sembrar en el mock (`POST /api/dev/wa-mock/seed-templates`)
+    tres plantillas sin pasar por el CRM: una APPROVED de solo cuerpo, una
+    PAUSED y una APPROVED con encabezado IMAGE. `POST /api/templates/sync`.
+    ✅ `imported: 3`. La de solo cuerpo es enviable y se envía (200). La pausada
+    entra `pending` con `metaStatus: PAUSED` y no se ofrece. La de encabezado
+    conserva sus `components`; enviarla responde 422 diciendo que el encabezado
+    es una imagen que el CRM no adjunta y que la salida es el Administrador de
+    WhatsApp o una versión solo de texto.
+16. **Paginación.** 30 plantillas en Meta ⇒ las 30 aprobadas y enviables tras el
+    sync, no 25.
+17. **Desaparece de Meta.** Vaciar el panel simulado y sincronizar.
+    ✅ `missing ≥ 30`; la fila sigue, con `missingSince`, deja de ser enviable
+    (422 "ya no existe en tu cuenta de Meta") y, si reaparece, la marca se limpia.
+18. **Crear con la variable al final / al inicio / dos pegadas.**
+    ✅ La pantalla lo avisa en rojo y deshabilita el botón; por API, 422 con la
+    regla (`TERMINE`, `EMPIECE`, `pegadas`).
+19. **`{{ 1 }}` con espacios.** ✅ Se acepta, se guarda como `{{1}}` y Meta recibe
+    `{{1}}` con un ejemplo por variable.
+20. **Rechazo síncrono de Meta** (el mock lo fuerza con `[meta-rechaza]` ⇒
+    subcódigo 2388293). ✅ 422 con la frase traducida y `(Meta 100/2388293)`;
+    sin fila local.
+21. **Nombre que ya existe en Meta.** ✅ 409 `already_exists`; la plantilla queda
+    importada tal como está allá y el mensaje lo dice.
+22. **Estados que no son APPROVED.** Sembrar APPROVED, sincronizar, cambiar a
+    PAUSED y sincronizar. ✅ `metaStatus: PAUSED`, `status` sigue `approved`, no
+    enviable; el envío por API responde 422 diciendo "pausada" y qué hacer.
+    Un estado inventado se guarda literal y bloquea. `IN_REVIEW` ⇒ `pending`.
+23. **Webhook PAUSED** (`template-status` con `notify: true`). ✅ Bloquea en
+    segundos sin esperar al sync. **Webhook REJECTED** con `reason`. ✅ Queda
+    rechazada con su motivo, y el sync no lo borra.
+24. **Meta caído** (WABA terminado en `-caido` ⇒ 503 del mock). ✅ El sync
+    responde 503 `meta_unavailable`, crear responde 503 sin tocar la base, y la
+    lista local sigue respondiendo; la pantalla dice que lo que ve es local.
+25. **UI** (`/settings/templates`, Playwright/Browser). ✅ Resumen del sync
+    («3 importada(s) de Meta · 1 actualizada(s)»), el error del sync visible
+    aunque sea automático, insignias «Pausada por Meta» / «Ya no está en Meta»
+    con su explicación, «Encabezado: imagen · Pie de página · 1 botón» en las
+    importadas, y el aviso rojo en vivo al escribir un cuerpo que Meta
+    rechazaría.

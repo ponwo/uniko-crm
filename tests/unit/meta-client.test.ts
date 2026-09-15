@@ -1,5 +1,10 @@
 import { describe, expect, it } from "vitest";
-import { MetaApiError, normalizeMx, normalizeRecipient } from "@/lib/meta/client";
+import {
+  MetaApiError,
+  metaApiErrorFromResponse,
+  normalizeMx,
+  normalizeRecipient,
+} from "@/lib/meta/client";
 
 describe("normalizeRecipient", () => {
   it("México móvil legado: 521 + 10 dígitos → 52 + 10 dígitos", () => {
@@ -76,5 +81,36 @@ describe("MetaApiError.isAuthError", () => {
     expect(
       new MetaApiError("x", { status: 500, code: 190 }).isAuthError
     ).toBe(false);
+  });
+});
+
+describe("metaApiErrorFromResponse (027) — conserva la causa, no solo el genérico", () => {
+  it("lee subcódigo, título, mensaje de usuario y error_data.details", () => {
+    const err = metaApiErrorFromResponse(400, {
+      error: {
+        message: "(#100) Invalid parameter",
+        type: "OAuthException",
+        code: 100,
+        error_subcode: 2388299,
+        error_user_title: "Variables cannot be at the start or end of the template",
+        error_user_msg: "Please rewrite the body.",
+        error_data: { messaging_product: "whatsapp", details: "Body text ends with a variable" },
+      },
+    });
+    expect(err.code).toBe(100);
+    expect(err.subcode).toBe(2388299);
+    expect(err.userTitle).toMatch(/start or end/);
+    expect(err.userMsg).toBe("Please rewrite the body.");
+    expect(err.detail).toBe("Body text ends with a variable");
+    expect(err.codeLabel).toBe("100/2388299");
+    expect(err.explanation).toBe("Please rewrite the body.");
+  });
+
+  it("sin cuerpo JSON: el estado HTTP y el texto crudo", () => {
+    const err = metaApiErrorFromResponse(502, null, "<html>Bad gateway</html>");
+    expect(err.message).toBe("Meta respondió 502");
+    expect(err.details).toBe("<html>Bad gateway</html>");
+    expect(err.codeLabel).toBeNull();
+    expect(err.explanation).toBe("Meta respondió 502");
   });
 });

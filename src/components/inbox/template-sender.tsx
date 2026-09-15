@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import type { TemplateDto } from "@/lib/types";
-import { countVariables } from "@/lib/templates";
+import { countVariables, esEnviable } from "@/lib/templates";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -31,7 +31,7 @@ export function TemplateSender({
       .then((d: { templates?: TemplateDto[] }) => {
         if (!cancelled) {
           setTemplates(
-            (d.templates ?? []).filter((t) => t.status === "approved")
+            (d.templates ?? []).filter(esEnviable)
           );
         }
       })

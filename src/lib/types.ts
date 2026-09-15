@@ -1,6 +1,7 @@
 /** DTOs que viajan por la API interna (lado cliente). */
 
 import type { Channel } from "@/lib/channels";
+import type { TemplateComponent } from "@/lib/templates";
 
 export type ConversationDto = {
   id: string;
@@ -61,8 +62,21 @@ export type TemplateDto = {
   language: string;
   category: string;
   body: string;
+  /** Ciclo de aprobación de este CRM. Es lo que la insignia pinta. */
   status: "draft" | "pending" | "approved" | "rejected";
+  /**
+   * 027 — Estado LITERAL de Meta, sin traducir, y autoridad sobre el envío.
+   * Viaja al cliente porque la pantalla y el selector deciden con él
+   * (`esEnviable` es la MISMA función en las dos orillas). No es un secreto:
+   * es lo que Meta ya le dice al dueño en su Administrador de WhatsApp.
+   * null = todavía sin noticias de Meta, que también bloquea.
+   */
+  metaStatus: string | null;
   rejectionReason: string | null;
+  /** 027 — ISO del momento en que Meta dejó de listarla; null = sigue en Meta. */
+  missingSince: string | null;
+  /** 027 — Componentes crudos de Meta (null en las creadas aquí sin sync). */
+  components: TemplateComponent[] | null;
 };
 
 export type StageDto = {

@@ -248,7 +248,8 @@ export function buildTemplateStatusPayload(input: {
   wabaId: string;
   name: string;
   language: string;
-  event: "APPROVED" | "REJECTED";
+  /** Estado literal de Meta (027): APPROVED, REJECTED, PAUSED… */
+  event: string;
   reason?: string;
   templateId?: string;
 }) {

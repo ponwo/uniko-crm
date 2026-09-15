@@ -19,6 +19,7 @@ import {
   X,
 } from "lucide-react";
 import type { ConversationDto, TemplateDto } from "@/lib/types";
+import { esEnviable } from "@/lib/templates";
 import { cn } from "@/lib/utils";
 import { formatBytes, formatRemaining } from "./helpers";
 import { TemplateSender } from "./template-sender";
@@ -112,7 +113,7 @@ export function Composer({
       .then((r) => (r.ok ? r.json() : { templates: [] }))
       .then((d: { templates?: TemplateDto[] }) => {
         if (!cancelled)
-          setTemplates((d.templates ?? []).filter((t) => t.status === "approved"));
+          setTemplates((d.templates ?? []).filter(esEnviable));
       })
       .catch(() => {});
     return () => {

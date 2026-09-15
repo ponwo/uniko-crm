@@ -8,14 +8,18 @@ import {
 export const dynamic = "force-dynamic";
 
 /**
- * Sincroniza estados de plantillas por Graph API (pull). Vía universal para
- * el modo agencia: los webhooks de plantillas no siguen el override de
- * callback (limitación de Meta documentada en el README).
+ * Sincroniza plantillas por Graph API (pull). Vía universal para el modo
+ * agencia: los webhooks de plantillas no siguen el override de callback
+ * (limitación de Meta documentada en el README).
+ *
+ * 027 — Espejo en tres direcciones: `updated` se mantiene en la raíz por
+ * compatibilidad con lo que ya consumía la pantalla; `imported` y `missing`
+ * son las dos direcciones nuevas.
  */
 export const POST = withAuth(async (session) => {
   try {
-    const updated = await syncTemplates(session.organizationId);
-    return Response.json({ ok: true, updated });
+    const resumen = await syncTemplates(session.organizationId);
+    return Response.json({ ok: true, ...resumen });
   } catch (err) {
     if (err instanceof TemplateError) {
       return apiError(templateErrorStatus(err), err.code, err.message);

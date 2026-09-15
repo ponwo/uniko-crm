@@ -10,6 +10,7 @@ import {
   uniqueIndex,
 } from "drizzle-orm/pg-core";
 import { sql } from "drizzle-orm";
+import type { TemplateComponent } from "@/lib/templates";
 
 /* ============================================================
  * Auth (Better Auth + plugin organization)
@@ -622,6 +623,7 @@ export const template = pgTable(
     language: text("language").notNull(),
     category: text("category").notNull(),
     body: text("body").notNull(),
+    /** Ciclo de aprobación de este CRM: lo que la insignia pinta. */
     status: text("status", {
       enum: ["draft", "pending", "approved", "rejected"],
     })
@@ -629,6 +631,21 @@ export const template = pgTable(
       .default("draft"),
     rejectionReason: text("rejection_reason"),
     waTemplateId: text("wa_template_id"),
+    /**
+     * 027 — Estado LITERAL de Meta, sin traducir, y autoridad sobre el envío.
+     * Texto libre a propósito: PAUSED, DISABLED, LIMIT_EXCEEDED, IN_REVIEW… o
+     * lo que Meta invente mañana, que debe poder nombrarse y a la vez
+     * bloquear. NULL = todavía sin noticias de Meta, que también bloquea.
+     */
+    metaStatus: text("meta_status"),
+    /** 027 — Cuándo Meta dejó de listarla. NULL = sigue en Meta. Nunca se borra. */
+    missingSince: timestamp("missing_since"),
+    /**
+     * 027 — `components` tal como los devuelve Graph (header, body, footer,
+     * buttons). El CRM solo rellena el cuerpo posicional; lo demás se guarda
+     * para poder decir qué tiene la plantilla y por qué no la envía.
+     */
+    components: jsonb("components").$type<TemplateComponent[]>(),
     createdAt: timestamp("created_at").notNull().defaultNow(),
     updatedAt: timestamp("updated_at").notNull().defaultNow(),
   },

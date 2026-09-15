@@ -1,0 +1,64 @@
+# Quickstart — 027 Plantillas: verificación
+
+**Spec**: [spec.md](spec.md) · **Plan**: [plan.md](plan.md) · **Tareas**: [tasks.md](tasks.md)
+
+## 1. Gate técnico
+
+```bash
+pnpm typecheck && pnpm lint && pnpm build && pnpm test
+```
+
+Registro 2026-09-15 (rama `027-plantillas-espejo-de-meta`, máquina de
+desarrollo, Node 22): typecheck ✓ · lint ✓ · test **721/721** (83 archivos;
+57 nuevos entre `templates.test.ts`, `template-errors.test.ts` y
+`meta-client.test.ts`) · build ✓.
+
+## 2. Arnés de comportamiento (mocks)
+
+Con `pnpm dev` vivo, `WA_MOCK_ENABLED=true` y `META_GRAPH_BASE_URL` apuntando
+al wa-mock:
+
+```bash
+node --env-file=.env scripts/e2e-templates-sync.mjs
+node --env-file=.env scripts/e2e-templates-multivar.mjs
+```
+
+Registro 2026-09-15: **80/80** y **21/21**, TODO VERDE. Los escenarios están
+numerados en [`tests/e2e/us6-templates.md`](../../tests/e2e/us6-templates.md)
+(15–25). Comprobación de UI en `/settings/templates` con el Browser pane: aviso
+rojo en vivo al escribir `Hola {{1}}` con el botón deshabilitado; filas con
+«Ya no está en Meta» / «Antes de desaparecer, Meta la tenía así (PAUSED)…».
+
+## 3. Ensayo del Principio X (toca `drizzle/`)
+
+Procedimiento: el de
+[`specs/020-notificaciones-push/quickstart.md`](../020-notificaciones-push/quickstart.md)
+(parte 1), con base `uniko_ensayo_027_<fecha>` y el respaldo diario de LanCo
+descargado del panel de Coolify.
+
+Qué mirar además de que aplique:
+
+```sql
+select status, meta_status, count(*) from template group by 1, 2;
+```
+
+Toda fila `approved` debe salir con `meta_status = 'APPROVED'` (el backfill);
+las demás con `NULL`. `missing_since` y `components` en `NULL` en todas: se
+rellenan con el primer sync.
+
+**Registro**: pendiente — requiere el volcado de LanCo descargado del panel
+(sin API ni SSH desde esta máquina; ver el quickstart de la 020).
+
+## 4. En vivo (uniko-lanco, tras merge a `main`)
+
+1. `/api/health` 10/10 tras el relevo del contenedor.
+2. `/settings/templates`: el sync automático debe **importar** lo que haya en el
+   WABA de LanCo (antes: "Todo al día" con la lista vacía). Anotar el resumen.
+3. Crear una plantilla real desde la pantalla. Si Meta la rechaza, el mensaje
+   debe traer la causa y el código, no "No se pudo crear la plantilla"; si la
+   acepta, queda `pending` con la categoría que Meta respondió, y aparece en el
+   Administrador de WhatsApp.
+4. Logs del contenedor: si hubo rechazo, una línea
+   `[templates] Meta rechazó la creación de «…» (100/…): …` sin token.
+
+**Registro**: pendiente.
