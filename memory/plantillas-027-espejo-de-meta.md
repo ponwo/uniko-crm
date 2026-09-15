@@ -1,6 +1,6 @@
 ---
 name: plantillas-027-espejo-de-meta
-description: "027 (plantillas): en main (8df60b5, PR #30) y verificada en uniko-lanco el 2026-09-15 — el sync importó hello_world y crear respondió 201 tras >8 s de Meta; el error del dueño era el fallback no-JSON; uniko.lanco.cloud SÍ va por Cloudflare; pendiente promover a production"
+description: "027 (plantillas): promovida a production en 0a5c0bd el 2026-09-15 (flota 3/3) — el sync importa las creadas en Meta y crear devuelve la causa; el error del dueño era el fallback no-JSON; Meta tarda >8 s en crear; uniko.lanco.cloud SÍ va por Cloudflare"
 metadata:
   type: project
 ---
@@ -14,7 +14,7 @@ anteriores nunca llegaron a Meta) y la creación de `test` respondió 201 —
 viejo. El dueño lo confirmó el mismo día («funciona perfectamente»:
 `seguimiento_a_cotizacion` creada desde Uniko y aprobada por Meta;
 `prueba_de_plantilla` creada en el Administrador de WhatsApp e importada en
-revisión). Pendiente: promoción a `production` por señal del dueño (runbook).
+revisión). Promovida a `production` en `0a5c0bd` el mismo día por señal del dueño (push `main:production` ff, flota 3/3 con migraciones aplicadas).
 
 Hallazgos que NO están en el código:
 

@@ -106,4 +106,14 @@ rellenan con el primer sync.
 la muestra aprobada y enviable); creó `prueba_de_plantilla` **desde el
 Administrador de WhatsApp** y el CRM la trajo y la muestra en revisión. Es la
 evidencia de "uso real en la instancia de pruebas" que pide la puerta de
-promoción a `production`; la promoción sigue esperando su señal explícita.
+promoción a `production`.
+
+## 5. Promoción a `production` (2026-09-15)
+
+Señal explícita del dueño («adelante haz la promoción a producción»).
+`promote-gate.sh`: LanCo corría `0a5c0bd` == `main`, CI verde en la matriz
+para ese commit, 11 commits en `production..main`, `::DRIZZLE:: SI` con el
+ensayo del §3 como registro. Push `main:production` en fast-forward
+(`8d91b78..0a5c0bd`); `verify-fleet.sh 0a5c0bd` → **3/3** (LanCo, I Love The
+Universe, NuriaAndrea), los dos clientes 10/10 sanos tras el relevo y con
+`[migrate] migraciones aplicadas` en su log de arranque.
