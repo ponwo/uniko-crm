@@ -1,14 +1,16 @@
 ---
 name: foto-producto-026-pr28-pendiente
-description: "Extensión de la 026 (foto del producto en check_stock, image_url de MS-Stock 004) — PR #28 mergeada y desplegada en uniko-lanco el 2026-09-14; falta solo la evidencia de FOTO-TEST por WhatsApp real (T048)"
+description: "Extensión de la 026 (foto del producto en check_stock, image_url de MS-Stock 004) — PR #28 en main y en uniko-lanco desde el 2026-09-14, T048 cerrada con la verificación del dueño por WhatsApp real; no promovida a production; decisiones de diseño fuera del contrato"
 metadata:
   type: project
 ---
 
 Estado 2026-09-14: PR #28 **mergeada a `main`** (`2fa5714`) y **desplegada en
-`uniko-lanco`** (Coolify, deployment `dgjadmxf86mwxsvdl0tycaji`, 01:27 UTC). Lo que
-sigue sin constar es la verificación en vivo de T048 (por WhatsApp real "FOTO-TEST" ⇒
-texto + imagen; producto sin foto ⇒ solo texto) y su registro en `quickstart.md`.
+`uniko-lanco`** (Coolify, deployment `dgjadmxf86mwxsvdl0tycaji`, 01:27 UTC); después
+entró la PR #29 (tallas, `3c38120`), que es lo que corre. **T048 cerrada**: el dueño
+preguntó por la playera negra por WhatsApp real y confirmó "todo en orden"; el log
+del contenedor no tiene líneas `[agente] inventario:` ni `[agente] foto:` (el camino
+feliz no escribe; la degradación sí). Registrado en `quickstart.md`.
 
 Decisiones de diseño que no están en el contrato y conviene no reabrir:
 - UN mensaje de imagen por link con el texto como pie; el mensaje se persiste
@@ -18,8 +20,9 @@ Decisiones de diseño que no están en el contrato y conviene no reabrir:
 - El stock-mock arma `image_url` con el origen de la petición (`/icon-192.png`);
   el wa-mock tiene `media-mode` (`ok | reject | slow`).
 
-**Why:** sin esta nota otra sesión podría rehacer el merge/deploy o dudar de si ya
-está en la instancia de pruebas.
-**How to apply:** si el dueño confirma la foto por WhatsApp, marcar T048 y anotar la
-evidencia; no promover a `production` sin su señal. Ver
+**Why:** tres sesiones tocaron esto (implementación, deploy, cierre); sin la nota,
+otra podría rehacer la verificación o dudar de si ya está en la instancia de pruebas.
+**How to apply:** al tocar la foto, leer primero estas decisiones y el contrato; para
+diagnosticar en vivo, buscar `[agente] foto:` en el log del contenedor (solo aparece
+al degradar). No promover a `production` sin señal del dueño. Ver
 [[conector-inventario-consume-el-contrato-de-ms-stock]] y [[tallas-026-pr29]].

@@ -187,12 +187,26 @@ instancia de pruebas §5.2 registrados aquí.
   caso `failed` tardío, la foto con "No se entregó. Media upload error (Meta 131053)"
   y el texto de respaldo después.
 - CI de la PR #28 verde en `default` y `completo`.
-- **Pendiente (señal del dueño)**: merge a `main` ⇒ deploy de `uniko-lanco`;
-  `/api/health` 10/10; por WhatsApp real "FOTO-TEST" ⇒ texto + imagen (la foto la
-  sirve la URL pública de `stock.lanco.cloud`/Cloudflare); producto sin foto ⇒ solo
-  texto. La consulta directa a `stock.lanco.cloud/v1/agent/products/FOTO-TEST` con la
-  llave no se pudo hacer desde esta sesión (el modo automático bloquea usar la llave
+- La consulta directa a `stock.lanco.cloud/v1/agent/products/FOTO-TEST` con la
+  llave no se pudo hacer desde la sesión (el modo automático bloquea usar la llave
   en `curl`); la forma de `image_url` la valida el adaptador en el turno.
+
+## Resultados del despliegue de la foto en la instancia de pruebas — 2026-09-14 (T048)
+
+- El dueño hizo el merge de la PR #28 (`2fa5714`) y el deploy de `uniko-lanco`;
+  `GET /api/health` → `{"ok":true,"commit":"2fa5714"}` **10/10** seguidos. Después
+  entró también la PR #29 (tallas, `3c38120`), que es el commit que corre ahora
+  (`/api/health` lo confirma; el contenedor arrancó con `[migrate] migraciones
+  aplicadas` y `Ready` el 2026-09-14 13:47 UTC).
+- **Verificación humana (2026-09-14, el dueño)**: por WhatsApp real preguntó por la
+  playera negra y confirmó que "se recibió todo en orden": el turno con
+  `check_stock` salió completo por la API real de Meta contra el inventario real
+  de `stock.lanco.cloud`.
+- Evidencia del lado servidor: el log del contenedor **no** tiene ninguna línea
+  `[agente] inventario:` ni `[agente] foto:` — el camino feliz no escribe nada; si
+  MS-Stock hubiera fallado o Meta hubiera rechazado o retrasado la imagen, el motivo
+  habría quedado ahí (como se vio en local con el wa-mock en `reject`/`slow`).
+- No se promueve a `production` (puerta de promoción: señal explícita del dueño).
 
 ## Resultados de las tallas — 2026-09-14 (T049–T056, extensión)
 
