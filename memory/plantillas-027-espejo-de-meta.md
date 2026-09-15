@@ -5,11 +5,16 @@ metadata:
   type: project
 ---
 
-Estado 2026-09-15: rama `027-plantillas-espejo-de-meta`, gate verde (721
-tests, build), arnés `e2e-templates-sync.mjs` 80/80 y `multivar` 21/21.
-Pendientes: ensayo del Principio X (migración `0015`: 3 columnas nullable +
-backfill de `meta_status`) con el volcado de LanCo del panel de Coolify, y la
-verificación en vivo en uniko-lanco.
+Estado 2026-09-15: PR #30 mergeado en `main` (`8df60b5`) tras CI verde,
+ensayo del Principio X con el respaldo diario de LanCo (0015 en 1,1 s) y
+revisión de código. Verificada en uniko-lanco desde el navegador del dueño: el
+sync importó `hello_world` (lo único que había en el WABA: los intentos
+anteriores nunca llegaron a Meta) y la creación de `test` respondió 201 —
+**Meta tardó entre 8 y 38 s**, lo que explica el síntoma original con el código
+viejo. El dueño lo confirmó el mismo día («funciona perfectamente»:
+`seguimiento_a_cotizacion` creada desde Uniko y aprobada por Meta;
+`prueba_de_plantilla` creada en el Administrador de WhatsApp e importada en
+revisión). Pendiente: promoción a `production` por señal del dueño (runbook).
 
 Hallazgos que NO están en el código:
 
