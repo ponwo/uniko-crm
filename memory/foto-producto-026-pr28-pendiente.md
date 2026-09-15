@@ -8,9 +8,10 @@ metadata:
 Estado 2026-09-14: PR #28 **mergeada a `main`** (`2fa5714`) y **desplegada en
 `uniko-lanco`** (Coolify, deployment `dgjadmxf86mwxsvdl0tycaji`, 01:27 UTC); después
 entró la PR #29 (tallas, `3c38120`), que es lo que corre. **T048 cerrada**: el dueño
-preguntó por la playera negra por WhatsApp real y confirmó "todo en orden"; el log
-del contenedor no tiene líneas `[agente] inventario:` ni `[agente] foto:` (el camino
-feliz no escribe; la degradación sí). Registrado en `quickstart.md`.
+pidió "FOTO-TEST" por WhatsApp real y **llegó la foto** (texto + imagen en el mismo
+turno); el log del contenedor no tiene líneas `[agente] inventario:` ni
+`[agente] foto:` (el camino feliz no escribe; la degradación sí). Registrado en
+`quickstart.md`.
 
 Decisiones de diseño que no están en el contrato y conviene no reabrir:
 - UN mensaje de imagen por link con el texto como pie; el mensaje se persiste

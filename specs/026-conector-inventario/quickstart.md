@@ -199,9 +199,10 @@ instancia de pruebas §5.2 registrados aquí.
   (`/api/health` lo confirma; el contenedor arrancó con `[migrate] migraciones
   aplicadas` y `Ready` el 2026-09-14 13:47 UTC).
 - **Verificación humana (2026-09-14, el dueño)**: por WhatsApp real preguntó por la
-  playera negra y confirmó que "se recibió todo en orden": el turno con
-  `check_stock` salió completo por la API real de Meta contra el inventario real
-  de `stock.lanco.cloud`.
+  playera negra y confirmó que "se recibió todo en orden"; después pidió
+  **`FOTO-TEST`** (el producto con foto en `stock.lanco.cloud`) y **llegó la foto**:
+  texto + imagen en el mismo turno, por la API real de Meta, con la imagen servida
+  desde la URL pública de MS-Stock (SC-008 en vivo).
 - Evidencia del lado servidor: el log del contenedor **no** tiene ninguna línea
   `[agente] inventario:` ni `[agente] foto:` — el camino feliz no escribe nada; si
   MS-Stock hubiera fallado o Meta hubiera rechazado o retrasado la imagen, el motivo
