@@ -78,4 +78,28 @@ rellenan con el primer sync.
 4. Logs del contenedor: si hubo rechazo, una línea
    `[templates] Meta rechazó la creación de «…» (100/…): …` sin token.
 
-**Registro**: pendiente.
+**Registro 2026-09-15** (hecho, desde la sesión del dueño en su navegador):
+
+1. PR [#30](https://github.com/ponwo/uniko-crm/pull/30) mergeado en `8df60b5`;
+   deploy automático de uniko-lanco (`fn6dgsae2skekyeletef7i4n`), migraciones
+   aplicadas al arrancar, `/api/health` con `commit: 8df60b5` **10/10**.
+2. `/settings/templates`: el sync automático reportó **«1 importada(s) de
+   Meta»**: `hello_world` (en_US · UTILITY, aprobada, «Encabezado: texto · Pie
+   de página», lista para enviar). Antes: lista vacía y "Todo al día". Es la
+   única plantilla que había en el WABA: los intentos anteriores del dueño
+   **nunca llegaron a Meta**, lo que confirma que el fallo era del tramo
+   CRM→Meta/transporte y no una validación de Meta.
+3. Creación real desde la pantalla: `test` (es_MX, UTILITY, «Hola {{1}}, esta
+   es tu confirmación de cita para el {{2}} a las {{3}}. Saludos»). Meta tardó
+   **entre 8 y 38 s** en responder (la petición seguía `pending` a los 8 s);
+   respondió **201**, la fila quedó «Pendiente de Meta» y un Sincronizar
+   posterior dijo «Todo al día» (las dos presentes en Meta). Ese tiempo de
+   respuesta explica el síntoma original: con el código viejo, cualquier
+   corte del proxy/CDN durante esa espera llegaba como HTML y la pantalla
+   solo podía decir «No se pudo crear la plantilla»; ahora hay tope de 30 s
+   con causa y el código HTTP se muestra.
+4. Logs del contenedor: solo el arranque (camino feliz, sin líneas
+   `[templates]`).
+
+Pendiente para el dueño: esperar la aprobación de `test` (o borrarla en el
+Administrador de WhatsApp: el siguiente sync la marcará ausente, no la borrará).

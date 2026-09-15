@@ -1,6 +1,6 @@
 ---
 name: plantillas-027-espejo-de-meta
-description: "027 (plantillas): el error del dueño era el fallback genérico de la pantalla (respuesta no-JSON), NO un mensaje de Meta; uniko.lanco.cloud SÍ está detrás de Cloudflare (contra lo que dice el runbook); la creación local valida lo que Meta rechaza síncronamente; el sync importa/pagina/marca; PR pendiente de ensayo X y verificación en vivo"
+description: "027 (plantillas): en main (8df60b5, PR #30) y verificada en uniko-lanco el 2026-09-15 — el sync importó hello_world y crear respondió 201 tras >8 s de Meta; el error del dueño era el fallback no-JSON; uniko.lanco.cloud SÍ va por Cloudflare; pendiente promover a production"
 metadata:
   type: project
 ---

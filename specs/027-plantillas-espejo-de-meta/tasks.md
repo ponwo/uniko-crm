@@ -61,6 +61,6 @@ Orden de dependencias. `[P]` = puede ir en paralelo con las vecinas.
 - [x] T021 Ensayo del Principio X contra un respaldo real restaurado
       (registrar en quickstart).
 - [x] T022 Docs: `tests/e2e/us6-templates.md`, `specs/README.md`, memoria.
-- [ ] T023 En vivo (tras merge a `main` → uniko-lanco): sync importa lo que
+- [x] T023 En vivo (tras merge a `main` → uniko-lanco): sync importa lo que
       hay en el WABA de LanCo; crear una plantilla real desde la pantalla y
       leer la respuesta de Meta con causa. Registrar en quickstart.
