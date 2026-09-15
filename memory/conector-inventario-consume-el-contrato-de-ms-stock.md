@@ -13,8 +13,10 @@ es el único módulo que conoce HTTP de MS-Stock.
 Estado 2026-09-12: en `main` (`e143555`) y desplegado en `uniko-lanco` con
 `INVENTARIO=on` + `STOCK_BASE_URL`/`STOCK_API_KEY`/`STOCK_SSO_SECRET` (runtime, en
 Coolify; copiadas de la app `ms-stock`). Ninguna otra instancia lo tiene encendido.
-No promovido a `production`. El dueño verificó el flujo real en la instancia de
-pruebas el 2026-09-12 (existencia y precio; agotado con precio).
+El dueño verificó el flujo real en la instancia de pruebas el 2026-09-12
+(existencia y precio; agotado con precio). **Promovida a `production` el 2026-09-14
+en `8d91b78`** (con la foto y las tallas); las instancias de clientes siguen con
+`INVENTARIO` apagada (sin bandera ni `STOCK_*` en su Coolify).
 
 **Why:** dos repos, un contrato: quien lo cambie sin avisar rompe el otro lado en
 silencio. Y la bandera viva solo en pruebas evita que una instancia de cliente

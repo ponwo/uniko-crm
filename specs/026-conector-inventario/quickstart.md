@@ -224,3 +224,22 @@ instancia de pruebas §5.2 registrados aquí.
 - Pendiente (T057): merge a `main` = señal del dueño; tras el deploy de `uniko-lanco`,
   preguntar por un modelo real de `stock.lanco.cloud` en el Laboratorio o por WhatsApp.
 
+
+## Promoción a `production` — 2026-09-14 (22:12 hora local; 2026-09-15 04:12 UTC)
+
+- Señal explícita del dueño ("aplica la promoción pero deja apagado INVENTARIO").
+  Puerta (`promote-gate.sh`): CI verde para `8d91b78` en `default` y `completo`;
+  LanCo corriendo `8d91b78` 10/10; 18 commits (toda la 026); no toca `drizzle/`.
+  Declaradas por el dueño en la misma conversación: uso real por WhatsApp
+  ("playera negra" y "FOTO-TEST" con foto). Self-test IX contra LanCo desplegada:
+  `e2e-mocks-404.mjs --base=https://uniko.lanco.cloud` **22/22** (la ruta nueva
+  `wa-mock/media-mode` también en 404). Plan de reversión: redesplegar `88c9bc1`
+  (sin migración ni variable nueva; en clientes la bandera apagada no produce datos).
+- `git checkout production && git merge --ff-only main && git push`:
+  `88c9bc1..8d91b78`. Coolify redesplegó `uniko-iltu` y `uniko-nuriaandrea`
+  (~5 min de relevo cada una); `verify-fleet.sh` **3/3** en `8d91b78` y 10/10 en
+  cada instancia.
+- `INVENTARIO` **apagada en los clientes** (verificado en Coolify: ninguna de las dos
+  apps tiene `INVENTARIO` ni `STOCK_*`): sin sesión `/api/inventario/*` → 401 (igual
+  que toda ruta autenticada) y con sesión → 404, como la agenda; `/api/dev/*` → 404.
+  Solo `uniko-lanco` tiene el conector encendido.

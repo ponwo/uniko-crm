@@ -1,6 +1,6 @@
 ---
 name: foto-producto-026-pr28-pendiente
-description: "Extensión de la 026 (foto del producto en check_stock, image_url de MS-Stock 004) — PR #28 en main y en uniko-lanco desde el 2026-09-14, T048 cerrada con la verificación del dueño por WhatsApp real; no promovida a production; decisiones de diseño fuera del contrato"
+description: "Extensión de la 026 (foto del producto en check_stock, image_url de MS-Stock 004) — verificada por el dueño por WhatsApp real y PROMOVIDA a production en 8d91b78 el 2026-09-14 (flota 3/3, INVENTARIO apagada en clientes); decisiones de diseño fuera del contrato"
 metadata:
   type: project
 ---
@@ -11,7 +11,10 @@ entró la PR #29 (tallas, `3c38120`), que es lo que corre. **T048 cerrada**: el 
 pidió "FOTO-TEST" por WhatsApp real y **llegó la foto** (texto + imagen en el mismo
 turno); el log del contenedor no tiene líneas `[agente] inventario:` ni
 `[agente] foto:` (el camino feliz no escribe; la degradación sí). Registrado en
-`quickstart.md`.
+`quickstart.md`. **Promovida a `production` el 2026-09-14** (`8d91b78`, toda la 026 con
+foto y tallas; `verify-fleet.sh` 3/3, 10/10 por instancia); `INVENTARIO` sigue
+apagada en `uniko-iltu` y `uniko-nuriaandrea` (ni la bandera ni `STOCK_*` existen
+en su Coolify) — para ellos no cambió nada.
 
 Decisiones de diseño que no están en el contrato y conviene no reabrir:
 - UN mensaje de imagen por link con el texto como pie; el mensaje se persiste
@@ -25,5 +28,6 @@ Decisiones de diseño que no están en el contrato y conviene no reabrir:
 otra podría rehacer la verificación o dudar de si ya está en la instancia de pruebas.
 **How to apply:** al tocar la foto, leer primero estas decisiones y el contrato; para
 diagnosticar en vivo, buscar `[agente] foto:` en el log del contenedor (solo aparece
-al degradar). No promover a `production` sin señal del dueño. Ver
+al degradar). Ya está en `production`; encender `INVENTARIO` en un cliente exige antes cargar
+sus tres `STOCK_*` (si falta una, `/api/health` da 503). Ver
 [[conector-inventario-consume-el-contrato-de-ms-stock]] y [[tallas-026-pr29]].
