@@ -46,8 +46,25 @@ Toda fila `approved` debe salir con `meta_status = 'APPROVED'` (el backfill);
 las demás con `NULL`. `missing_since` y `components` en `NULL` en todas: se
 rellenan con el primer sync.
 
-**Registro**: pendiente — requiere el volcado de LanCo descargado del panel
-(sin API ni SSH desde esta máquina; ver el quickstart de la 020).
+**Registro 2026-09-15** (hecho, con autorización del dueño):
+
+- Volcado: el diario de LanCo de las 03:00 UTC (`pg-dump-uniko-1789441205.dmp`,
+  147.510 B), descargado del panel de Coolify (pestaña Backups → Executions →
+  icono de descarga; la ruta `/download/backup/<uuid>` directa responde
+  «Failed to download backup» aunque haya sesión).
+- Restaurado en `uniko_ensayo_027_20260915` (Postgres 16 local, base
+  desechable) en 974 ms: **46 conversaciones, 339 mensajes, 0 plantillas**, 15
+  migraciones previas.
+- `scripts/migrate.mjs` (el mismo runner del contenedor) aplicó la 0015 en
+  **1.100 ms**: 16 migraciones, las tres columnas creadas y nullable, los
+  conteos intactos.
+- Como LanCo no tiene plantillas, el backfill se ejercitó a mano sobre la copia:
+  una fila `approved` insertada → `meta_status = 'APPROVED'`; una `pending` →
+  `NULL`; segunda pasada del `UPDATE` → 0 filas (re-ejecutable).
+- La app (build de producción, `pnpm start -p 3100`) arrancó contra la copia y
+  `/api/health` respondió `{"ok":true}`.
+- Tirado todo al terminar: `dropdb`, el volcado, y de paso el volcado del
+  2026-09-08 que seguía en Descargas.
 
 ## 4. En vivo (uniko-lanco, tras merge a `main`)
 
