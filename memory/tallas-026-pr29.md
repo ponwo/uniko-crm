@@ -25,7 +25,9 @@ Gotcha de la máquina (Windows): `pkill -f "next dev"` NO mata el servidor; un
 segundo `pnpm dev` arranca en 3001 y el arnés le pega al viejo en 3000 → 40 falsos
 rojos. Matar con `taskkill //F //PID <pid> //T` (o `//IM node.exe`) antes de relanzar.
 
-Pendiente (T057): merge a `main` (señal del dueño) → deploy automático de
+Actualización 2026-09-16: la PR #29 se mergeó y desplegó; la T057 se cierra con la verificación en vivo de la 028 (ver [[respuesta-por-talla-028-pr31]]), que ya tiene los 4 modelos reales en `stock.lanco.cloud`.
+
+Pendiente original (T057): merge a `main` (señal del dueño) → deploy automático de
 `uniko-lanco` → `/api/health` 10/10 → en el Laboratorio o por WhatsApp una pregunta
 por un modelo con tallas de `stock.lanco.cloud` (hoy no hay ninguno activo: los de
 prueba `PLY-QS*` quedaron desactivados; crear uno desde el portal de MS-Stock) →
