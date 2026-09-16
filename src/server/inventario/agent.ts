@@ -4,7 +4,7 @@ import { lookup, type StockProduct, type StockVariant } from "@/server/inventari
  * 026 — Lo que el agente incluido puede hacer con el inventario: consultar.
  *
  * Vive aquí y no en el pipeline para que el pipeline no aprenda de inventarios:
- * el turno pide "consulta esto" y recibe el texto que hay que mandar (FR-1111).
+ * el turno pide "consulta esto" y recibe lo que hay que mandar (FR-1111).
  *
  * Regla que atraviesa todo: el modelo NO redacta existencias ni precios. Pide
  * consultar, y el sistema pega los datos reales. Si MS-Stock no responde, el
@@ -15,22 +15,37 @@ import { lookup, type StockProduct, type StockVariant } from "@/server/inventari
  * línea con la existencia de cada talla; si el cliente pidió una talla (`size`),
  * con la de esa talla. El modelo tampoco redacta esto: solo separa nombre base y
  * talla.
+ *
+ * 028 — El turno ya no es "un texto y a lo sumo una foto" sino una LISTA de
+ * mensajes en orden (`messages`), cada uno con su texto y, si el producto la
+ * tiene, su foto (FR-1301..FR-1308). Con un solo producto resuelto la lista tiene
+ * un elemento con el texto de siempre (FR-1302): nada de la 026 cambia ahí.
  */
 
-export type StockTurn = {
-  /** Lo que hay que enviarle al cliente (vacío si no hay ni datos ni frase). */
+/** Un mensaje que hay que mandar, en orden. Texto (o pie, si hay foto) y foto por URL. */
+export type StockMessage = {
   text: string;
-  /** false ⇒ el conector falló; el turno sigue, sin inventario. */
-  ok: boolean;
   /**
-   * Foto del producto (contrato §4): la URL pública del PRIMER producto
-   * resuelto, o null. Va aparte del texto a propósito: la manda el motor como
-   * mensaje de imagen, nunca el modelo ni el texto (FR-1119, FR-1121). Con
-   * varios resultados, a lo sumo la del primero — nunca una ráfaga. La de un
-   * modelo es la misma en todas sus tallas: una sola vez (FR-1125).
+   * Foto del producto de esta línea (contrato §4), o null ⇒ texto. Va aparte del
+   * texto a propósito: la manda el motor como mensaje de imagen, nunca el modelo
+   * ni el texto (FR-1121).
    */
   imageUrl: string | null;
 };
+
+export type StockTurn = {
+  /** false ⇒ el conector falló; el turno sigue, sin inventario (FR-1112). */
+  ok: boolean;
+  /** Lo que hay que enviarle al cliente, en orden (vacío si no hay ni datos ni frase). */
+  messages: StockMessage[];
+};
+
+/** Productos mostrados a lo sumo por turno (FR-1308). */
+export const SHOW_LIMIT = 5;
+/** Imágenes a lo sumo por turno (FR-1305): tope explícito, no una prohibición. */
+export const MAX_PHOTOS = 5;
+
+const HAY_MAS = "Hay más coincidencias, ¿me dices cuál te interesa?";
 
 export async function checkStockTurn(input: {
   query: string;
@@ -44,23 +59,84 @@ export async function checkStockTurn(input: {
     // Motivo tipado, sin la consulta completa ni la llave: basta para
     // diagnosticar en el log del servidor (FR-1112).
     console.error(`[agente] inventario: ${found.error} al consultar MS-Stock`);
-    return { ok: false, text: intro, imageUrl: null };
+    return { ok: false, messages: intro ? [{ text: intro, imageUrl: null }] : [] };
   }
   const { products, truncated } = found.data;
   if (products.length === 0) {
     return {
       ok: true,
-      text: `No encontré productos para «${input.query.trim()}».`,
-      imageUrl: null,
+      messages: [{ text: `No encontré productos para «${input.query.trim()}».`, imageUrl: null }],
     };
   }
-  const lines = products.map((p) => formatProduct(p, size));
-  if (truncated) lines.push("Hay más coincidencias, ¿me dices cuál te interesa?");
-  return {
-    ok: true,
-    text: [intro, ...lines].filter(Boolean).join("\n"),
-    imageUrl: products[0]?.image_url ?? null,
-  };
+  // Un solo producto resuelto: la redacción de la 026, tal cual (FR-1302, FR-1304).
+  const only = products.length === 1 ? products[0] : undefined;
+  if (only) {
+    const messages = [{ text: formatProduct(only, size), imageUrl: only.image_url }];
+    if (truncated) messages.push({ text: HAY_MAS, imageUrl: null });
+    return { ok: true, messages: withIntro(intro, messages) };
+  }
+  // Varios: solo lo que tiene existencia (en la talla pedida, si la hubo), uno por
+  // mensaje con su foto; los demás no se mencionan (FR-1301, FR-1303, FR-1307).
+  const { shown, more } = selectProducts(products, size);
+  if (shown.length === 0) {
+    const query = input.query.trim();
+    const text = size
+      ? `Por ahora no tengo ${query} en talla ${size}.`
+      : `Por ahora no tengo ${query} con existencia.`;
+    return { ok: true, messages: withIntro(intro, [{ text, imageUrl: null }]) };
+  }
+  const messages = withPhotos(shown.map((p) => ({ product: p, text: lineaDe(p, size) })));
+  if (more || truncated) messages.push({ text: HAY_MAS, imageUrl: null });
+  return { ok: true, messages: withIntro(intro, messages) };
+}
+
+/**
+ * Con dos o más productos resueltos, los que tienen existencia: en la talla pedida
+ * (etiqueta literal o equivalencia) si la hubo; un producto sin tallas cuenta si tiene
+ * existencia (es de talla única); sin talla pedida, `stock > 0`. A lo sumo
+ * `SHOW_LIMIT`; `more` avisa que quedaron fuera (FR-1301, FR-1307, FR-1308).
+ */
+export function selectProducts(
+  products: StockProduct[],
+  size: string
+): { shown: StockProduct[]; more: boolean } {
+  const conExistencia = products.filter((p) => {
+    if (p.variants.length === 0) return p.stock > 0;
+    if (!size) return p.stock > 0;
+    return (matchVariant(p.variants, size)?.stock ?? 0) > 0;
+  });
+  return { shown: conExistencia.slice(0, SHOW_LIMIT), more: conExistencia.length > SHOW_LIMIT };
+}
+
+/** La línea de un producto dentro de un conjunto: nunca "agotada" ni "no viene" (eso es para uno solo). */
+function lineaDe(p: StockProduct, size: string): string {
+  if (p.variants.length === 0 || !size) return formatProduct(p);
+  const talla = matchVariant(p.variants, size);
+  if (!talla) return formatProduct(p);
+  const precio = p.price === null ? "sin precio" : formatPrice(p.price, p.currency);
+  return `${p.name} (${p.sku}) talla ${talla.label}: ${existenciaDe(talla.stock, p.unit)} — ${precio}`;
+}
+
+/**
+ * Una foto por producto mostrado que la tenga, nunca la misma dos veces en el turno
+ * ni más de `MAX_PHOTOS` (FR-1305). Sin foto (o fuera del tope), texto en su lugar.
+ */
+function withPhotos(items: { product: StockProduct; text: string }[]): StockMessage[] {
+  const usadas = new Set<string>();
+  return items.map(({ product, text }) => {
+    const url = product.image_url;
+    if (!url || usadas.has(url) || usadas.size >= MAX_PHOTOS) return { text, imageUrl: null };
+    usadas.add(url);
+    return { text, imageUrl: url };
+  });
+}
+
+/** La frase de entrada del modelo va al frente del primer mensaje; nunca sola (FR-1305). */
+function withIntro(intro: string, messages: StockMessage[]): StockMessage[] {
+  if (!intro) return messages;
+  const [first, ...rest] = messages;
+  if (!first) return [{ text: intro, imageUrl: null }];
+  return [{ ...first, text: `${intro}\n${first.text}` }, ...rest];
 }
 
 /**

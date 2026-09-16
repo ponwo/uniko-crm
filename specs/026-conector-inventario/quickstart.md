@@ -168,7 +168,8 @@ instancia de pruebas §5.2 registrados aquí.
   agente confirmó existencia y precio de "Playera negra" y, de "Playera blanca",
   solo el precio con la marca de **agotado** (existencia 0 en `stock.lanco.cloud`).
   Es el comportamiento especificado en FR-1111 (`Playera blanca (PLY-BLA): agotado —
-  $199 MXN`): el precio es un dato del producto, no de la existencia. Con esto la
+  $199 MXN`): el precio es un dato del producto, no de la existencia. (028: con dos o
+  más productos resueltos, los agotados ya no se mencionan; con uno, sigue igual.) Con esto la
   026 está **Hecha** de punta a punta en la instancia de pruebas.
 
 ## Resultados de la foto del producto — 2026-09-13 (T038–T047, extensión)

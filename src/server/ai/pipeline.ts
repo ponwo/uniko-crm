@@ -21,7 +21,7 @@ import { buildAgentSystemPrompt } from "@/server/ai/prompts";
 import { agendaEnabled } from "@/server/agenda/flag";
 import { bookSlot, offerSlots } from "@/server/agenda/agent";
 import { inventarioEnabled } from "@/server/inventario/flag";
-import { checkStockTurn } from "@/server/inventario/agent";
+import { checkStockTurn, type StockMessage } from "@/server/inventario/agent";
 
 /**
  * Turno del agente (FR-021..FR-025).
@@ -230,7 +230,7 @@ export async function runAgentTurn(conversationId: string): Promise<void> {
         intro: action.reply,
       });
       if (turn.ok) {
-        await deliverReply(conversation, turn.text, { imageUrl: turn.imageUrl });
+        await deliverReplies(conversation, turn.messages);
         publish(organizationId, {
           type: "conversation.updated",
           data: { conversation: { id: conversationId } },
@@ -292,24 +292,25 @@ const PHOTO_TIMEOUT_MS = 5_000;
  * 026 — Con `imageUrl` (foto del producto, contrato §4 de MS-Stock) el texto
  * viaja como pie de UN mensaje de imagen por URL; si la foto no puede salir
  * —canal sin imágenes, Meta la rechaza o no responde a tiempo— el texto sale
- * solo (FR-1119, FR-1120). Un pie más largo de lo que WhatsApp admite va como
+ * solo (FR-1119 —la parte "una sola imagen" derogada por FR-1305 de la 028—,
+ * FR-1120). Un pie más largo de lo que WhatsApp admite va como
  * texto aparte y la foto sin pie: nunca se recorta lo que el agente dijo.
  */
 async function deliverReply(
   conversation: Conversation,
   text: string,
   opts: { imageUrl?: string | null } = {}
-): Promise<void> {
+): Promise<boolean> {
   const imageUrl = opts.imageUrl ?? null;
   if (conversation.isTest) {
     await persistTestOutbound(conversation, text, imageUrl);
-    return;
+    return true;
   }
   const photo =
     imageUrl && capabilitiesFor(conversation.channel).outboundMedia ? imageUrl : null;
   const asCaption = photo !== null && text.length <= CAPTION_MAX;
   try {
-    if (asCaption && (await sendPhoto(conversation, photo, text))) return;
+    if (asCaption && (await sendPhoto(conversation, photo, text))) return true;
     await sendText({
       conversationId: conversation.id,
       organizationId: conversation.organizationId,
@@ -317,12 +318,40 @@ async function deliverReply(
       aiGenerated: true,
     });
     if (photo && !asCaption) await sendPhoto(conversation, photo, undefined);
+    return true;
   } catch (err) {
     if (err instanceof SendError && err.code === "window_closed") {
       await applyHandoff(conversation.id, conversation.organizationId, "ventana");
-      return;
+      return false;
     }
     throw err;
+  }
+}
+
+/**
+ * 028 — Entrega un turno de varios mensajes (uno por producto mostrado, FR-1305):
+ * en serie y en orden, cada uno con la regla de la 026 (`deliverReply`: pie si
+ * cabe, texto + foto si no, texto solo si la foto falla o tarda). Si ningún
+ * mensaje tiene foto enviable —todas `null`, o el canal no manda imágenes y no es
+ * conversación de prueba— todo el turno sale como UN solo texto, exactamente como
+ * antes de la 028 (FR-1306). La ventana cerrada (ya escalada por `deliverReply`)
+ * detiene la serie: los siguientes tampoco saldrían. Exportada solo para su test.
+ */
+export async function deliverReplies(
+  conversation: Conversation,
+  messages: StockMessage[]
+): Promise<void> {
+  const pending = messages.filter((m) => m.text);
+  if (pending.length === 0) return;
+  const canSendPhotos =
+    conversation.isTest || capabilitiesFor(conversation.channel).outboundMedia;
+  if (!canSendPhotos || !pending.some((m) => m.imageUrl)) {
+    await deliverReply(conversation, pending.map((m) => m.text).join("\n"));
+    return;
+  }
+  for (const m of pending) {
+    const delivered = await deliverReply(conversation, m.text, { imageUrl: m.imageUrl });
+    if (!delivered) return;
   }
 }
 

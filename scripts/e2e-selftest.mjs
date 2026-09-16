@@ -1605,7 +1605,159 @@ async function inventarioChecks() {
     JSON.stringify(rojaOut.map((o) => [o.type, textoDe(o)]))
   );
 
-  /* ---------- Foto del producto (contrato §4, FR-1119..FR-1121) ---------- */
+  /* ---------- 028: respuesta por talla y fotos por producto (FR-1301..FR-1309) ---------- */
+  console.log("\n== 028: respuesta por talla y fotos por producto ==");
+  /**
+   * Un turno de la 028 puede ser VARIOS mensajes: se espera al primero y luego a que
+   * el outbox del lead deje de crecer (1.5 s sin novedad), y se devuelven todos.
+   */
+  async function preguntarVarios(lead, texto, n, esperados = 0) {
+    const antes = (await outboxDe(lead)).length;
+    const t0 = Date.now();
+    await api("/api/dev/wa-mock/inbound", {
+      method: "POST",
+      body: JSON.stringify({
+        phoneNumberId: PN,
+        from: lead,
+        name: `Lead inventario ${n}`,
+        text: texto,
+        waMessageId: `wamid.e2e.028.${n}`,
+      }),
+    });
+    const hasta = Date.now() + ventana;
+    let vistos = antes;
+    let quieto = 0;
+    while (Date.now() < hasta) {
+      const ahora = (await outboxDe(lead)).length;
+      if (ahora > vistos) {
+        vistos = ahora;
+        quieto = Date.now();
+      }
+      // Con `esperados`, se espera a que lleguen todos (una foto lenta tarda 5 s en
+      // degradar a texto); sin él, a 1.5 s sin novedad tras el primero.
+      if (esperados > 0 ? vistos - antes >= esperados : vistos > antes && Date.now() - quieto > 1500) {
+        break;
+      }
+      await sleep(300);
+    }
+    const todos = await outboxDe(lead);
+    return { salientes: todos.slice(antes), ms: Date.now() - t0 };
+  }
+  const resumen = (salientes) => salientes.map((o) => [o.type, textoDe(o), o.body?.image?.link ?? null]);
+  const ORIGEN = new URL(STOCK).origin;
+  const fotoDe = (path) => `${ORIGEN}${path}`;
+
+  // US1.1 — talla pedida, varios modelos, en plural: solo los con existencia en G.
+  const enG = await preguntarVarios("5214627028001", "¿tienen playeras en G?", "us1.G", 3);
+  ok(
+    "«playeras en G» (plural): tres salientes en orden — negra (imagen, talla única), roja (texto, sin foto), gris (imagen)",
+    resumen(enG.salientes).length === 3 &&
+      enG.salientes[0].type === "image" &&
+      enG.salientes[0].body?.image?.link === fotoDe("/icon-192.png") &&
+      textoDe(enG.salientes[0]) === "Déjame revisar.\nPlayera negra (PLY-NEG): 7 pieza — $199 MXN" &&
+      enG.salientes[1].type === "text" &&
+      textoDe(enG.salientes[1]) === "Playera roja (PLY-ROJ) talla G: 7 pieza — $219 MXN" &&
+      enG.salientes[2].type === "image" &&
+      enG.salientes[2].body?.image?.link === fotoDe("/icon-512.png?m=grs") &&
+      textoDe(enG.salientes[2]) === "Playera gris (PLA-GRS) talla G: 3 pieza — $250 MXN",
+    JSON.stringify(resumen(enG.salientes))
+  );
+  ok(
+    "ningún saliente menciona agotados, «no viene» ni otras tallas; la URL de la foto no va en ningún texto",
+    enG.salientes.every((o) => !/agotad|no viene|Tallas:|icon-/.test(textoDe(o))),
+    JSON.stringify(resumen(enG.salientes))
+  );
+
+  // US1.2 — en M: roja y gris agotadas en M, azul y amarilla sin M ⇒ solo negra y verde.
+  const enM = await preguntarVarios("5214627028002", "¿tienen playeras en M?", "us1.M", 2);
+  ok(
+    "«playeras en M»: negra (imagen) y verde (imagen, talla M: 10 pieza); las demás no se mencionan",
+    resumen(enM.salientes).map((r) => r[0]).join(",") === "image,image" &&
+      textoDe(enM.salientes[1]) === "Playera verde (PLA-VRD) talla M: 10 pieza — $200 MXN" &&
+      enM.salientes[1].body?.image?.link === fotoDe("/icon-192.png?m=vrd") &&
+      !enM.salientes.some((o) => /roja|gris|azul|amarilla/i.test(textoDe(o))),
+    JSON.stringify(resumen(enM.salientes))
+  );
+
+  // US1.3 — equivalencia con varios: «extra chica» ⇒ XCH (solo la azul la trae).
+  const enXCH = await preguntarVarios("5214627028003", "¿tienen playeras en extra chica?", "us1.XCH", 2);
+  ok(
+    "«playeras en extra chica» ⇒ XCH: negra (imagen) y azul (imagen, talla XCH: 1 pieza — $800 MXN)",
+    resumen(enXCH.salientes).map((r) => r[0]).join(",") === "image,image" &&
+      textoDe(enXCH.salientes[1]) === "Playera azul (PLA-AZL) talla XCH: 1 pieza — $800 MXN",
+    JSON.stringify(resumen(enXCH.salientes))
+  );
+
+  // US1.4 — ninguno con existencia en la talla: una frase, sin fotos, con la consulta tal cual.
+  const en40 = await preguntarVarios("5214627028004", "¿tienen pantalones en 40?", "us1.40");
+  ok(
+    "«pantalones en 40»: un solo texto «Por ahora no tengo pantalones en talla 40.» (y el plural encontró los pantalones)",
+    resumen(en40.salientes).length === 1 &&
+      en40.salientes[0].type === "text" &&
+      textoDe(en40.salientes[0]) === "Déjame revisar.\nPor ahora no tengo pantalones en talla 40.",
+    JSON.stringify(resumen(en40.salientes))
+  );
+
+  // US1.5 — talla numérica con existencia en los dos: uno con foto, otro sin.
+  const en32 = await preguntarVarios("5214627028005", "¿tienen pantalones en 32?", "us1.32", 2);
+  ok(
+    "«pantalones en 32»: azul (imagen, talla 32: 4 pieza) y negro (texto, talla 32: 1 pieza)",
+    resumen(en32.salientes).map((r) => r[0]).join(",") === "image,text" &&
+      textoDe(en32.salientes[0]) === "Déjame revisar.\nPantalón azul (PAN-AZ) talla 32: 4 pieza — $650 MXN" &&
+      textoDe(en32.salientes[1]) === "Pantalón negro (PAN-NG) talla 32: 1 pieza — $650 MXN",
+    JSON.stringify(resumen(en32.salientes))
+  );
+
+  // El hilo del Inbox conserva cada imagen con su URL y su pie (FR-1305 + persistencia de la 026).
+  const hiloG = await hiloDe("Lead inventario us1.G");
+  const salidasG = hiloG.mensajes.filter((m) => m.direction === "out");
+  ok(
+    "el hilo del Inbox de «playeras en G» tiene 3 salidas IA: image · text · image, con URL y pie, sin failed",
+    salidasG.length === 3 &&
+      salidasG.map((m) => m.type).join(",") === "image,text,image" &&
+      salidasG.every((m) => m.aiGenerated === true && m.status !== "failed") &&
+      salidasG[0]?.media?.payload?.url === fotoDe("/icon-192.png") &&
+      salidasG[2]?.media?.payload?.url === fotoDe("/icon-512.png?m=grs") &&
+      salidasG[2]?.media?.caption === salidasG[2]?.text,
+    JSON.stringify(salidasG.map((m) => [m.type, m.text, m.media?.payload?.url, m.status]))
+  );
+
+  // US4 — una foto falla: esa línea sale como texto, en su lugar; las demás con foto (FR-1306).
+  const modoImagen = (mode, link) =>
+    api("/api/dev/wa-mock/media-mode", { method: "POST", body: JSON.stringify(link ? { mode, link } : { mode }) });
+  await modoImagen("reject", "m=grs");
+  const rechazoG = await preguntarVarios("5214627028006", "¿tienen playeras en G?", "us4.reject", 3);
+  ok(
+    "Meta rechaza SOLO la foto de la gris: negra (imagen) · roja (texto) · gris (TEXTO con su línea), en ese orden",
+    resumen(rechazoG.salientes).map((r) => r[0]).join(",") === "image,text,text" &&
+      textoDe(rechazoG.salientes[2]) === "Playera gris (PLA-GRS) talla G: 3 pieza — $250 MXN" &&
+      rechazoG.salientes[0].body?.image?.link === fotoDe("/icon-192.png"),
+    JSON.stringify(resumen(rechazoG.salientes))
+  );
+  const hiloRechazoG = await hiloDe("Lead inventario us4.reject");
+  const salidasRechazo = hiloRechazoG.mensajes.filter((m) => m.direction === "out");
+  ok(
+    "y el hilo no enseña ningún mensaje fallido: 3 salidas (image, text, text), ninguna failed",
+    salidasRechazo.length === 3 &&
+      salidasRechazo.map((m) => m.type).join(",") === "image,text,text" &&
+      salidasRechazo.every((m) => m.status !== "failed"),
+    JSON.stringify(salidasRechazo.map((m) => [m.type, m.status]))
+  );
+  await modoImagen("slow", "m=vrd");
+  const lentaM = await preguntarVarios("5214627028007", "¿tienen playeras en M?", "us4.slow", 2);
+  ok(
+    `Meta tarda SOLO con la foto de la verde: negra (imagen) y verde como texto, dentro del límite (${lentaM.ms} ms)`,
+    resumen(lentaM.salientes).map((r) => r[0]).join(",") === "image,text" &&
+      textoDe(lentaM.salientes[1]) === "Playera verde (PLA-VRD) talla M: 10 pieza — $200 MXN" &&
+      lentaM.ms < coalesce + 5000 + 4000,
+    JSON.stringify({ ...lentaM, salientes: resumen(lentaM.salientes) })
+  );
+  await api("/api/dev/wa-mock/media-mode", { method: "DELETE" });
+  // El mock lento termina igual (como Meta): se le deja acabar para que no
+  // contamine a los siguientes leads.
+  await sleep(7500);
+
+  /* ---------- Foto del producto (contrato §4, FR-1119..FR-1121; varios resultados según la 028) ---------- */
   console.log("\n== 026: foto del producto en check_stock ==");
   // El stock-mock arma image_url con el origen de la petición: la app misma.
   const FOTO = `${new URL(STOCK).origin}/icon-192.png`;
@@ -1642,17 +1794,21 @@ async function inventarioChecks() {
     gorra1.length === 1 && gorra1[0].type === "text",
     JSON.stringify(gorra1.map((o) => o.type))
   );
-  const varias = await preguntar("5214627026006", "¿tienen playera?", "foto.varias");
-  const variasOut = await outboxDe("5214627026006");
+  // 028 (deroga en parte FR-1119/FR-1111): con varios resultados, un mensaje por modelo
+  // CON existencia, en orden, cada uno con su foto; agotados fuera; tope 5 + cierre.
+  const varias = await preguntarVarios("5214627026006", "¿tienen playera?", "foto.varias", 6);
+  const variasOut = varias.salientes;
   ok(
-    "búsqueda con varios resultados: a lo sumo UNA imagen (la del primero) con todas las líneas en el pie",
-    variasOut.length === 1 &&
-      variasOut[0].type === "image" &&
+    "búsqueda con varios resultados (028): un mensaje por modelo con existencia, con su foto; la blanca agotada no aparece; 5 + «Hay más coincidencias»",
+    variasOut.length === 6 &&
+      variasOut.map((o) => o.type).join(",") === "image,text,image,image,image,text" &&
+      textoDe(variasOut[0]) === "Déjame revisar.\nPlayera negra (PLY-NEG): 7 pieza — $199 MXN" &&
       variasOut[0].body?.image?.link === FOTO &&
-      typeof varias.text === "string" &&
-      varias.text.includes("Playera negra (PLY-NEG)") &&
-      varias.text.includes("Playera blanca (PLY-BLA): agotado"),
-    JSON.stringify({ tipos: variasOut.map((o) => o.type), texto: varias.text })
+      textoDe(variasOut[1]) === "Playera roja (PLY-ROJ) — $219 MXN. Tallas: CH 4, M agotada, G 7, XG 1" &&
+      textoDe(variasOut[5]) === "Hay más coincidencias, ¿me dices cuál te interesa?" &&
+      !variasOut.some((o) => textoDe(o).includes("PLY-BLA")) &&
+      new Set(variasOut.filter((o) => o.type === "image").map((o) => o.body?.image?.link)).size === 4,
+    JSON.stringify(variasOut.map((o) => [o.type, textoDe(o)]))
   );
   ok(
     "image_url nunca aparece en el texto que recibe el cliente",

@@ -308,14 +308,26 @@ apagada, la sección no existe y su ruta responde como inexistente.
   que el sistema devuelva.
 - **FR-1110**: Al ejecutar `check_stock`, Uniko MUST consultar MS-Stock con la llave
   de la instancia según el contrato: si la consulta tiene forma de SKU, primero el
-  producto exacto y, si no existe, la búsqueda por nombre/SKU con un máximo de 5
-  resultados; con un límite de 3 s por llamada y sin reintentos dentro del turno.
+  producto exacto y, si no existe, la búsqueda por nombre/SKU
+  ~~con un máximo de 5 resultados~~; con un límite de 3 s por llamada y sin
+  reintentos dentro del turno.
+  **DEROGADO** (parcial, 028 `028-respuesta-por-talla`, PR #31): el máximo de 5 en la **consulta**. Se piden hasta
+  25 (FR-1308) porque Uniko filtra por talla y existencia del lado suyo y muestra 5;
+  de 5 recortados podrían quedar 0 con la talla pedida aunque existan. Sigue vigente:
+  SKU exacto primero, 3 s por llamada, sin reintentos.
 - **FR-1111**: La respuesta al cliente MUST construirse con los datos devueltos
   (nombre, SKU, existencia con unidad, precio con moneda o "sin precio"), en un
-  formato pequeño y determinista: una línea por producto, máximo 5; "no encontré
+  formato pequeño y determinista: ~~una línea por producto, máximo 5~~; "no encontré
   productos para «…»" si no hay coincidencias; y una invitación a precisar si hubo
   más coincidencias de las mostradas. La frase de entrada del modelo, si la hay,
   precede a los datos.
+  **DEROGADO** (parcial, 028 `028-respuesta-por-talla`, PR #31): "una línea por producto" cuando se resuelven **dos o
+  más** productos: se muestran solo los que tienen existencia —en la talla pedida, si
+  la hubo—, uno por mensaje, máximo 5, y los demás no se mencionan (FR-1301, FR-1303,
+  FR-1304, FR-1307). Motivo: con varios modelos, los que no tienen lo pedido son ruido
+  (decisión del dueño, 2026-09-15). Sigue vigente: los datos, "no encontré…", la
+  invitación a precisar, la frase de entrada delante, y todo el requisito cuando se
+  resuelve un solo producto.
 - **FR-1112**: Ante cualquier fallo (red, tiempo agotado, llave rechazada, servicio
   no disponible, respuesta con forma inesperada, consulta inválida), el turno MUST
   degradarse a una respuesta sin inventario (la frase del modelo o ninguna acción),
@@ -333,11 +345,18 @@ apagada, la sección no existe y su ruta responde como inexistente.
 - **FR-1118**: El adaptador MUST aceptar `image_url` (URL pública http/https o
   `null`; ausente o malformada ⇒ `null`) en la forma del producto, sin que su
   ausencia o forma inválida invalide la respuesta.
-- **FR-1119**: Cuando el primer producto resuelto trae `image_url`, el motor MUST
-  enviar por WhatsApp un único mensaje de imagen por URL (`link = image_url`) con el
+- **FR-1119**: Cuando ~~el primer producto resuelto~~ trae `image_url`, el motor MUST
+  enviar por WhatsApp ~~un único~~ mensaje de imagen por URL (`link = image_url`) con el
   texto del turno como pie, en lugar del mensaje de texto; MUST NOT descargar,
-  reescalar ni proxear la foto; MUST NOT enviar más de una imagen por turno; y en
+  reescalar ni proxear la foto; ~~MUST NOT enviar más de una imagen por turno~~; y en
   canales sin imágenes salientes MUST enviar solo el texto.
+  **DEROGADO** (parcial, 028 `028-respuesta-por-talla`, PR #31): "el primer producto" y "nunca más de una imagen por
+  turno". Con varios productos mostrados, va **una imagen por producto** con foto, con
+  la línea de ese producto como pie, en serie y en orden, con tope de **5** por turno
+  (FR-1305, FR-1306). Motivo: el cliente que pregunta por una talla quiere ver lo que
+  sí hay; la foto del primero (que podía ni venir en esa talla) no servía. Sigue
+  vigente: imagen por URL sin descargar ni proxear, el texto como pie, y solo texto en
+  canales sin imágenes (y, con un producto, exactamente como antes).
 - **FR-1120**: La foto MUST NOT bloquear ni retrasar la respuesta: si el envío de
   la imagen falla o supera 5 s, o Meta la reporta `failed` después de aceptarla,
   el motor MUST enviar el texto solo (una vez), registrar el motivo en el servidor y
@@ -364,8 +383,17 @@ apagada, la sección no existe y su ruta responde como inexistente.
   talla, o "agotada" más las tallas con existencia, o "no viene en talla X" más las
   tallas que sí tiene; una talla resuelta por SKU exacto MUST mostrar su etiqueta.
   Un producto sin tallas MUST verse exactamente como antes.
+  **DEROGADO** (parcial, 028 `028-respuesta-por-talla`, PR #31): solo en su **alcance**, por eso no se tacha texto: las
+  redacciones "agotada más las tallas con existencia" y "no viene en talla X más las
+  tallas que sí tiene" rigen únicamente cuando se resuelve **un** producto (FR-1302);
+  con dos o más, los modelos agotados en la talla pedida o sin ella **se omiten**
+  (FR-1301, FR-1303). Motivo: con 20 modelos, enumerar agotados y ausentes es invasivo
+  y sin utilidad (decisión del dueño, 2026-09-15). Sin `size` y sin tallas: sin cambio.
 - **FR-1125**: La foto de un modelo (`image_url`, la misma en sus tallas) MUST
-  enviarse a lo sumo una vez por turno, con las reglas FR-1119..FR-1121.
+  enviarse a lo sumo una vez ~~por turno~~, con las reglas FR-1119..FR-1121.
+  **DEROGADO** (parcial, 028 `028-respuesta-por-talla`, PR #31): "por turno" pasa a "por **modelo**": la misma foto
+  nunca dos veces en un turno, pero un turno puede llevar hasta 5 fotos de modelos
+  distintos (FR-1305). Motivo: el de FR-1119.
 - **FR-1126**: El stock-mock MUST incluir un modelo con tallas (y su consulta por SKU
   de talla y por SKU del modelo) y el arnés E2E MUST cubrir los escenarios 13–16;
   la CI los ejercita con la bandera encendida.

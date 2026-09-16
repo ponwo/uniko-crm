@@ -52,6 +52,10 @@ llave solo viaja en el header `X-API-Key`; ningún log incluye la llave.
 
 ### Texto pegado por el sistema (FR-1111)
 
+> (028: con dos o más productos resueltos ya no es "una línea por producto" sino
+> solo los que tienen existencia, uno por mensaje con su foto; ver
+> `specs/028-respuesta-por-talla/data-model.md`. Con un producto, sin cambio.)
+
 ```
 <intro si la hubo>
 Playera negra (PLY-NEG): 7 pieza — $199 MXN

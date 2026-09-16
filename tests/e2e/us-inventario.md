@@ -54,8 +54,12 @@ El stock-mock devuelve `image_url` para `PLY-NEG` (`{origen}/icon-192.png`) y
    del producto). No sale ningún mensaje de texto aparte; la URL no aparece en
    ningún texto.
 8. "¿tienen gorra?" (sin foto) → solo texto, como siempre.
-9. "¿tienen playera?" (dos resultados) → **una** imagen (la del primero) con
-   las dos líneas en el pie; nunca una ráfaga.
+9. "¿tienen playera?" (varios resultados) → **(reescrito por la 028)** un mensaje
+   por modelo **con existencia**, en orden, cada uno con su foto (o texto si no la
+   tiene) y su línea como pie; la blanca (agotada) no aparece; máximo 5 y, si hay
+   más, `Hay más coincidencias, ¿me dices cuál te interesa?`. (Hasta la 028: una
+   imagen, la del primero, con todas las líneas en el pie; FR-1119 derogado en
+   parte.)
 10. En el hilo del Inbox el mensaje queda como `image` con `media.payload.url`
     = la URL pública, el pie como `text`, marcado IA y sin `failed`;
     `GET /api/media/{assetId}` responde **302** a esa URL (no sirve bytes).
@@ -80,6 +84,29 @@ El stock-mock devuelve `image_url` para `PLY-NEG` (`{origen}/icon-192.png`) y
 16. "¿cuánto cuesta la PLY-ROJ-G?" → el SKU de la talla se consulta exacto:
     `Playera roja (PLY-ROJ-G) talla G: 7 pieza — $219 MXN`.
 17. Los casos 1–5 responden exactamente igual que antes (productos sin tallas).
+18. **028 (2026-09-15)** "¿tienen playeras en G?" (plural) → solo los modelos con
+    existencia en G, uno por mensaje con su foto y su precio: `image` negra (simple,
+    talla única) con pie `Déjame revisar.\nPlayera negra (PLY-NEG): 7 pieza — $199
+    MXN`, `text` `Playera roja (PLY-ROJ) talla G: 7 pieza — $219 MXN` (sin foto),
+    `image` gris `Playera gris (PLA-GRS) talla G: 3 pieza — $250 MXN`; ningún texto
+    menciona "agotad", "no viene" ni otra talla.
+19. "¿tienen playeras en M?" → negra y verde (`talla M: 10 pieza — $200 MXN`); roja
+    y gris (M agotada), azul y amarilla (sin M) ausentes. "… en extra chica" → negra y
+    azul (`talla XCH: 1 pieza — $800 MXN`, equivalencia).
+20. "¿tienen pantalones en 40?" → un solo texto: `Déjame revisar.\nPor ahora no
+    tengo pantalones en talla 40.`; "¿… en 32?" → `image` Pantalón azul (`talla 32:
+    4 pieza — $650 MXN`) y `text` Pantalón negro (`talla 32: 1 pieza — $650 MXN`).
+21. Un solo modelo se contesta como en 13–16 ("¿tienen playera roja en M?" →
+    `agotada — … Con existencia: CH 4, G 7, XG 1`).
+22. "¿tienen playeras?" (sin talla, 6 con existencia) → 5 mensajes (negra img, roja
+    txt, azul img, verde img, gris img) + `Hay más coincidencias…`; nunca más de 5
+    `image` ni un `link` repetido.
+23. wa-mock `media-mode {reject, link:"m=grs"}` + "¿tienen playeras en G?" →
+    `image` negra · `text` roja · `text` gris, en ese orden; el hilo no tiene
+    `failed`; `[agente] foto:` en el log. `{slow, link:"m=vrd"}` + "… en M" → la
+    verde como texto dentro del límite.
+24. Laboratorio: "¿tienen playeras en M?" → dos mensajes `image` persistidos con la
+    URL y el pie, sin tocar Graph.
 
 ## US1 — Abrir el inventario desde Uniko sin llave
 

@@ -70,7 +70,9 @@ y [`sso-token.md`](../../../MS-Sotck/specs/003-sso-uniko/contracts/sso-token.md)
   ⇒ `ok: false` (el pipeline degrada). Precio con `Intl.NumberFormat("es-MX")` y la
   moneda que devuelve MS-Stock; cantidades hasta 2 decimales.
 - **Rationale**: FR-1111; determinista y sin segunda llamada al modelo (una acción
-  por turno, FR-021 de la 001); el mismo texto sirve en el Laboratorio.
+  por turno, FR-021 de la 001); el mismo texto sirve en el Laboratorio. (028: con
+  varios productos el turno pasa a ser una lista de mensajes filtrada por existencia;
+  FR-1111 derogado en parte, ver la 028.)
 
 ## R6. Pipeline: ejecutar y degradar
 

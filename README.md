@@ -153,7 +153,9 @@ tiene foto en MS-Stock, el agente la manda con existencia y precio como pie —p
 URL pública, sin que la foto pueda retrasar la respuesta. Variables, mock de pruebas
 y contrato en [`docs/inventario-conector.md`](docs/inventario-conector.md).
 Si el negocio vende por tallas, el agente responde con la existencia de cada
-talla (o de la que pidió el cliente) en una sola línea.
+talla (o de la que pidió el cliente) en una sola línea; y si la pregunta abarca
+varios modelos ("¿tienen playeras en G?"), solo los que sí la tienen, cada uno con
+su foto (máximo 5).
 
 ### 📄 Plantillas · 👥 Multi-usuario · 🔐 Self-hosted
 

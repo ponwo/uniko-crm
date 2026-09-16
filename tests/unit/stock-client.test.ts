@@ -4,11 +4,12 @@ import {
   health,
   lookup,
   looksLikeSku,
+  SEARCH_LIMIT,
   searchProducts,
 } from "@/server/inventario/client";
 
 /**
- * 026 — El adaptador de MS-Stock (FR-1110, FR-1114): el único módulo que
+ * 026 — El adaptador de MS-Stock (FR-1110 con el límite de la 028 FR-1308, FR-1114): el único módulo que
  * conoce HTTP de MS-Stock. Devuelve resultados tipados, nunca lanza, respeta
  * los 3 s y no reintenta. Todo con `fetch` falso: aquí no hay red.
  */
@@ -207,7 +208,7 @@ describe("026 — adaptador de MS-Stock", () => {
     expect(await pending).toEqual({ ok: false, error: "timeout" });
   });
 
-  it("búsqueda: q y limit en la URL; 200 → results + truncated", async () => {
+  it("búsqueda: q y limit en la URL; 200 → results + truncated (028: se piden 25, el máximo)", async () => {
     const fetchMock = vi
       .fn()
       .mockResolvedValue(json({ results: [PRODUCT], truncated: true }));
@@ -215,7 +216,10 @@ describe("026 — adaptador de MS-Stock", () => {
     const r = await searchProducts("playera negra");
     expect(r).toEqual({ ok: true, data: { results: [PARSED], truncated: true } });
     const [url] = fetchMock.mock.calls[0] as [string];
-    expect(url).toBe("https://stock.example/v1/agent/search?q=playera+negra&limit=5");
+    // FR-1308: Uniko filtra por talla y existencia del lado suyo y muestra 5; de 5
+    // recortados podrían quedar 0 con la talla pedida aunque existan.
+    expect(url).toBe("https://stock.example/v1/agent/search?q=playera+negra&limit=25");
+    expect(SEARCH_LIMIT).toBe(25);
   });
 
   it("lookup con forma de SKU: exacto primero y, si 404, la búsqueda", async () => {

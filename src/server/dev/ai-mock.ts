@@ -146,7 +146,8 @@ export function aiMockCompletion(messages: InMessage[]): string {
     if (m?.[1]) {
       let query = m[1].replace(/^(?:el|la|los|las|un|una|unos|unas)\s+/i, "").trim();
       // Tallas (005): "… en G", "… talla G", "… en talla G" ⇒ query = nombre base, size = G.
-      const talla = query.match(/^(.+?)\s+(?:en\s+talla|talla|en)\s+([^\s]{1,20})$/i);
+      // 028: la talla puede ser de varias palabras ("extra chica"); el nombre base es lo de antes del primer "en"/"talla".
+      const talla = query.match(/^(.+?)\s+(?:en\s+talla|talla|en)\s+(.{1,20})$/i);
       let size: string | undefined;
       if (talla?.[1] && talla[2]) {
         query = talla[1].trim();
