@@ -113,7 +113,8 @@ prenda en otra talla.
 026 (escenarios 1–17 del arnés) debe responder exactamente igual.
 
 **Independent Test**: los casos 1–17 del arnés E2E de la 026 pasan sin cambiar una
-letra de su texto esperado.
+letra de su texto esperado, salvo el 9 ("varios resultados → una imagen, la del
+primero"), que es exactamente la regla derogada y se reescribe con la nueva.
 
 **Acceptance Scenarios**:
 
@@ -192,6 +193,9 @@ termina dentro del límite.
   igual que si no la trajera; la única excepción es el caso de un solo modelo (US2).
 - **Ningún modelo tiene existencia en la talla** (24): una frase, sin fotos, sin
   enumerar modelos ni tallas alternativas. El cliente puede preguntar por otra talla.
+- **Sin talla, varios modelos y ninguno con existencia**: la misma idea, `Por ahora no
+  tengo <consulta> con existencia.`; enumerar veinte agotados sería el ruido que esta
+  feature elimina.
 - **Producto sin tallas en una pregunta con talla y varios resultados**: si tiene
   existencia, se muestra con su línea de siempre (no tiene tallas: es de talla única y
   existe); si está agotado, se omite como cualquier otro sin existencia.
@@ -230,7 +234,8 @@ termina dentro del límite.
 - **FR-1303**: Con `size`, varios productos y **ninguno** con existencia en la talla,
   el sistema MUST responder con una sola frase `Por ahora no tengo <consulta> en talla
   <talla>.` (la consulta tal como la pidió el cliente, la talla como la escribió), sin
-  fotos ni enumeración.
+  fotos ni enumeración; sin `size`, varios productos y ninguno con existencia, `Por
+  ahora no tengo <consulta> con existencia.`
 - **FR-1304**: Un producto **sin tallas** dentro de un conjunto de varios MUST
   mostrarse con su línea de siempre si tiene existencia, con o sin `size`, y MUST
   omitirse si está agotado. Un producto sin tallas que resuelve solo MUST verse
@@ -285,7 +290,8 @@ termina dentro del límite.
   modelo trae; una talla agotada en uno y con existencia en otros; una talla que nadie
   tiene con existencia), y el arnés E2E MUST cubrir los escenarios de US1, US3 y US4
   con la bandera encendida; los casos 1–17 de la 026 MUST seguir pasando con el mismo
-  texto esperado. El wa-mock MUST poder rechazar una imagen concreta para US4.
+  texto esperado, salvo el 9, que MUST reescribirse con la regla nueva (una imagen por
+  modelo con existencia). El wa-mock MUST poder rechazar una imagen concreta para US4.
 - **FR-1313**: Con la bandera apagada nada de esto MUST existir ni cambiar ninguna
   prueba; los productos sin tallas y las preguntas que resuelven a un solo producto
   MUST conservar exactamente el texto de la 026.
@@ -325,9 +331,10 @@ existen y se persisten como hoy; el conjunto filtrado vive solo en el turno.
   el modelo agotado en M y el que no la trae; una talla que solo un modelo trae
   produce un solo mensaje; una talla sin existencia en ningún modelo produce un solo
   mensaje de texto con la frase de FR-1303.
-- **SC-002**: Los 17 casos del arnés de la 026 (productos sin tallas, un modelo con y
-  sin talla, agotada, talla inexistente, SKU de talla, foto) pasan **sin cambiar una
-  letra** de su texto esperado; con la bandera apagada, 0 pruebas cambian de resultado.
+- **SC-002**: Los casos del arnés de la 026 (productos sin tallas, un modelo con y sin
+  talla, agotada, talla inexistente, SKU de talla, foto) pasan **sin cambiar una
+  letra** de su texto esperado, con la única excepción del caso 9 (la regla derogada);
+  con la bandera apagada, 0 pruebas cambian de resultado.
 - **SC-003**: Con la imagen de un modelo rechazada por el canal, el cliente recibe
   todas las líneas (esa como texto, las demás con foto) en el orden de MS-Stock, el
   turno termina dentro del límite de la degradación más 5 s por foto, y el fallo deja
