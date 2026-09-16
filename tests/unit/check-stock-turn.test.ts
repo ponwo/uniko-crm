@@ -2,9 +2,14 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import type { StockProduct, StockResult } from "@/server/inventario/client";
 
 /**
- * 026 — El sistema pega los datos (FR-1111): formato pequeño y determinista,
- * una línea por producto, máximo 5; y ante cualquier error del adaptador el
- * turno dice `ok: false` para que el pipeline degrade (FR-1112).
+ * 026 — El sistema pega los datos (FR-1111): formato pequeño y determinista;
+ * y ante cualquier error del adaptador el turno dice `ok: false` para que el
+ * pipeline degrade (FR-1112).
+ *
+ * 028 — El turno es una LISTA de mensajes (`messages`, cada uno con `text` y
+ * `imageUrl`): con un producto, uno solo con el texto de siempre (FR-1302);
+ * con varios, uno por producto mostrado (FR-1301, FR-1305, FR-1307). `textOf`
+ * une los textos con "\n" para fijar las redacciones de la 026 tal cual.
  */
 
 type Lookup = StockResult<{ products: StockProduct[]; truncated: boolean }>;
@@ -12,6 +17,11 @@ const lookup = vi.fn<(q: string) => Promise<Lookup>>();
 vi.mock("@/server/inventario/client", () => ({ lookup: (q: string) => lookup(q) }));
 
 const { checkStockTurn } = await import("@/server/inventario/agent");
+type Turn = Awaited<ReturnType<typeof checkStockTurn>>;
+/** Todo el texto del turno, en orden, como lo leería el cliente. */
+const textOf = (turn: Turn) => turn.messages.map((m) => m.text).join("\n");
+/** La foto del primer mensaje (la única que existía hasta la 028). */
+const imageOf = (turn: Turn) => turn.messages[0]?.imageUrl ?? null;
 
 const negra: StockProduct = {
   sku: "PLY-NEG",
@@ -54,14 +64,23 @@ describe("026 — checkStockTurn", () => {
     lookup.mockResolvedValue({ ok: true, data: { products: [negra], truncated: false } });
     const turn = await checkStockTurn({ query: "playera negra" });
     expect(turn.ok).toBe(true);
-    expect(turn.text).toBe("Playera negra (PLY-NEG): 7 pieza — $199 MXN");
+    expect(textOf(turn)).toBe("Playera negra (PLY-NEG): 7 pieza — $199 MXN");
     expect(lookup).toHaveBeenCalledWith("playera negra");
+  });
+
+  it("028 — forma del turno: con un producto, UN mensaje con el texto de siempre y su foto", async () => {
+    con([{ ...negra, image_url: FOTO }]);
+    const turn = await checkStockTurn({ query: "playera negra", intro: "Claro:" });
+    expect(turn).toEqual({
+      ok: true,
+      messages: [{ text: "Claro:\nPlayera negra (PLY-NEG): 7 pieza — $199 MXN", imageUrl: FOTO }],
+    });
   });
 
   it("la frase de entrada del modelo va antes de los datos", async () => {
     lookup.mockResolvedValue({ ok: true, data: { products: [negra], truncated: false } });
     const turn = await checkStockTurn({ query: "playera", intro: "Claro, te digo:" });
-    expect(turn.text).toBe("Claro, te digo:\nPlayera negra (PLY-NEG): 7 pieza — $199 MXN");
+    expect(textOf(turn)).toBe("Claro, te digo:\nPlayera negra (PLY-NEG): 7 pieza — $199 MXN");
   });
 
   it("agotado, sin precio y decimales", async () => {
@@ -77,7 +96,7 @@ describe("026 — checkStockTurn", () => {
       },
     });
     const turn = await checkStockTurn({ query: "x" });
-    expect(turn.text.split("\n")).toEqual([
+    expect(textOf(turn).split("\n")).toEqual([
       "Playera blanca (PLY-BLA): agotado — $199 MXN",
       "Gorra (GOR-01): 3 pieza — sin precio",
       "Harina (HAR-01): 2.5 kg — $1,234.50 MXN",
@@ -92,7 +111,7 @@ describe("026 — checkStockTurn", () => {
     }));
     lookup.mockResolvedValue({ ok: true, data: { products: many, truncated: true } });
     const turn = await checkStockTurn({ query: "prod" });
-    const lines = turn.text.split("\n");
+    const lines = textOf(turn).split("\n");
     expect(lines).toHaveLength(6);
     expect(lines[5]).toBe("Hay más coincidencias, ¿me dices cuál te interesa?");
   });
@@ -103,9 +122,9 @@ describe("026 — checkStockTurn", () => {
       data: { products: [{ ...negra, image_url: FOTO }], truncated: false },
     });
     const turn = await checkStockTurn({ query: "playera negra" });
-    expect(turn.imageUrl).toBe(FOTO);
-    expect(turn.text).toBe("Playera negra (PLY-NEG): 7 pieza — $199 MXN");
-    expect(turn.text).not.toContain("http");
+    expect(imageOf(turn)).toBe(FOTO);
+    expect(textOf(turn)).toBe("Playera negra (PLY-NEG): 7 pieza — $199 MXN");
+    expect(textOf(turn)).not.toContain("http");
   });
 
   it("foto: con varios resultados, a lo sumo la del primero", async () => {
@@ -120,8 +139,8 @@ describe("026 — checkStockTurn", () => {
       },
     });
     const turn = await checkStockTurn({ query: "playera" });
-    expect(turn.imageUrl).toBe(FOTO);
-    expect(turn.text).not.toContain("http");
+    expect(imageOf(turn)).toBe(FOTO);
+    expect(textOf(turn)).not.toContain("http");
   });
 
   it("foto: si el primero no tiene, ninguna (aunque el segundo sí)", async () => {
@@ -133,7 +152,7 @@ describe("026 — checkStockTurn", () => {
       },
     });
     const turn = await checkStockTurn({ query: "playera" });
-    expect(turn.imageUrl).toBeNull();
+    expect(imageOf(turn)).toBeNull();
   });
 
   /* ---------- Tallas (extensión 2026-09-14, FR-1124) ---------- */
@@ -141,19 +160,19 @@ describe("026 — checkStockTurn", () => {
   it("modelo sin talla pedida: una línea con precio y la existencia de cada talla en orden", async () => {
     con([roja]);
     const turn = await checkStockTurn({ query: "playera roja" });
-    expect(turn.text).toBe("Playera roja (PLY-ROJ) — $219 MXN. Tallas: CH 4, M agotada, G 7, XG 1");
+    expect(textOf(turn)).toBe("Playera roja (PLY-ROJ) — $219 MXN. Tallas: CH 4, M agotada, G 7, XG 1");
   });
 
   it("talla pedida con existencia: solo esa talla", async () => {
     con([roja]);
     const turn = await checkStockTurn({ query: "playera roja", size: "g" });
-    expect(turn.text).toBe("Playera roja (PLY-ROJ) talla G: 7 pieza — $219 MXN");
+    expect(textOf(turn)).toBe("Playera roja (PLY-ROJ) talla G: 7 pieza — $219 MXN");
   });
 
   it("talla pedida agotada: lo dice y ofrece las que sí hay", async () => {
     con([roja]);
     const turn = await checkStockTurn({ query: "playera roja", size: "M" });
-    expect(turn.text).toBe(
+    expect(textOf(turn)).toBe(
       "Playera roja (PLY-ROJ) talla M: agotada — $219 MXN. Con existencia: CH 4, G 7, XG 1"
     );
   });
@@ -161,38 +180,38 @@ describe("026 — checkStockTurn", () => {
   it("talla que el modelo no tiene: lo dice y lista sus tallas", async () => {
     con([roja]);
     const turn = await checkStockTurn({ query: "playera roja", size: "XXG" });
-    expect(turn.text).toBe(
+    expect(textOf(turn)).toBe(
       "Playera roja (PLY-ROJ) no viene en talla XXG. Tallas: CH 4, M agotada, G 7, XG 1"
     );
   });
 
   it("equivalencias solo de respaldo: «grande» ⇒ G, «extra grande» ⇒ XG, con acentos", async () => {
     con([roja]);
-    expect((await checkStockTurn({ query: "playera roja", size: "grande" })).text).toContain(
+    expect(textOf(await checkStockTurn({ query: "playera roja", size: "grande" }))).toContain(
       "talla G: 7 pieza"
     );
-    expect((await checkStockTurn({ query: "playera roja", size: "Extra Grande" })).text).toContain(
+    expect(textOf(await checkStockTurn({ query: "playera roja", size: "Extra Grande" }))).toContain(
       "talla XG: 1 pieza"
     );
     // Una etiqueta literal gana a la equivalencia: el negocio manda.
     const literal = { ...roja, variants: [{ sku: "X-L", label: "L", stock: 2, available: true }] };
     con([literal]);
-    expect((await checkStockTurn({ query: "x", size: "L" })).text).toContain("talla L: 2 pieza");
+    expect(textOf(await checkStockTurn({ query: "x", size: "L" }))).toContain("talla L: 2 pieza");
   });
 
   it("talla resuelta por SKU exacto: muestra su etiqueta y su existencia", async () => {
     con([{ ...negra, sku: "PLY-ROJ-G", name: "Playera roja", price: 219, label: "G", parent_sku: "PLY-ROJ" }]);
     const turn = await checkStockTurn({ query: "PLY-ROJ-G" });
-    expect(turn.text).toBe("Playera roja (PLY-ROJ-G) talla G: 7 pieza — $219 MXN");
+    expect(textOf(turn)).toBe("Playera roja (PLY-ROJ-G) talla G: 7 pieza — $219 MXN");
   });
 
   it("producto simple con talla pedida: se ignora la talla; modelo sin tallas activas: agotado", async () => {
     con([negra]);
-    expect((await checkStockTurn({ query: "playera negra", size: "G" })).text).toBe(
+    expect(textOf(await checkStockTurn({ query: "playera negra", size: "G" }))).toBe(
       "Playera negra (PLY-NEG): 7 pieza — $199 MXN"
     );
     con([{ ...roja, variants: [], stock: 0, available: false }]);
-    expect((await checkStockTurn({ query: "playera roja" })).text).toBe(
+    expect(textOf(await checkStockTurn({ query: "playera roja" }))).toBe(
       "Playera roja (PLY-ROJ): agotado — $219 MXN"
     );
   });
@@ -200,14 +219,17 @@ describe("026 — checkStockTurn", () => {
   it("la foto del modelo va una sola vez, aparte del texto, con las tallas en la línea", async () => {
     con([{ ...roja, image_url: FOTO }]);
     const turn = await checkStockTurn({ query: "playera roja", size: "G" });
-    expect(turn.imageUrl).toBe(FOTO);
-    expect(turn.text).not.toContain("http");
+    expect(imageOf(turn)).toBe(FOTO);
+    expect(textOf(turn)).not.toContain("http");
   });
 
   it("sin coincidencias: lo dice y sigue siendo un turno válido", async () => {
     lookup.mockResolvedValue({ ok: true, data: { products: [], truncated: false } });
     const turn = await checkStockTurn({ query: "zapatos" });
-    expect(turn).toEqual({ ok: true, text: "No encontré productos para «zapatos».", imageUrl: null });
+    expect(turn).toEqual({
+      ok: true,
+      messages: [{ text: "No encontré productos para «zapatos».", imageUrl: null }],
+    });
   });
 
   it("cualquier error del adaptador: ok=false y el texto es la frase del modelo o nada", async () => {
@@ -215,10 +237,9 @@ describe("026 — checkStockTurn", () => {
       lookup.mockResolvedValue({ ok: false, error });
       expect(await checkStockTurn({ query: "x", intro: "Déjame revisar." })).toEqual({
         ok: false,
-        text: "Déjame revisar.",
-        imageUrl: null,
+        messages: [{ text: "Déjame revisar.", imageUrl: null }],
       });
-      expect(await checkStockTurn({ query: "x" })).toEqual({ ok: false, text: "", imageUrl: null });
+      expect(await checkStockTurn({ query: "x" })).toEqual({ ok: false, messages: [] });
     }
   });
 });

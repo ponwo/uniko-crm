@@ -15,8 +15,13 @@ import { getEnv } from "@/lib/env";
  */
 
 export const TIMEOUT_MS = 3_000;
-/** Cuántas coincidencias se le enseñan al cliente (el contrato admite hasta 25). */
-export const SEARCH_LIMIT = 5;
+/**
+ * Cuántas coincidencias se le PIDEN a MS-Stock: el máximo del contrato. Desde la 028
+ * (FR-1308) el filtro por talla y existencia se hace del lado Uniko y `agent.ts`
+ * muestra a lo sumo `SHOW_LIMIT` (5); de 5 recortados podrían quedar 0 con la talla
+ * pedida aunque existan.
+ */
+export const SEARCH_LIMIT = 25;
 
 /**
  * Foto del producto (contrato §4, desde la feature 004 de MS-Stock): la URL
