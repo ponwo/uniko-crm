@@ -311,7 +311,7 @@ apagada, la sección no existe y su ruta responde como inexistente.
   producto exacto y, si no existe, la búsqueda por nombre/SKU
   ~~con un máximo de 5 resultados~~; con un límite de 3 s por llamada y sin
   reintentos dentro del turno.
-  **DEROGADO** (parcial, 028 `028-respuesta-por-talla`): el máximo de 5 en la **consulta**. Se piden hasta
+  **DEROGADO** (parcial, 028 `028-respuesta-por-talla`, PR #31): el máximo de 5 en la **consulta**. Se piden hasta
   25 (FR-1308) porque Uniko filtra por talla y existencia del lado suyo y muestra 5;
   de 5 recortados podrían quedar 0 con la talla pedida aunque existan. Sigue vigente:
   SKU exacto primero, 3 s por llamada, sin reintentos.
@@ -321,7 +321,7 @@ apagada, la sección no existe y su ruta responde como inexistente.
   productos para «…»" si no hay coincidencias; y una invitación a precisar si hubo
   más coincidencias de las mostradas. La frase de entrada del modelo, si la hay,
   precede a los datos.
-  **DEROGADO** (parcial, 028 `028-respuesta-por-talla`): "una línea por producto" cuando se resuelven **dos o
+  **DEROGADO** (parcial, 028 `028-respuesta-por-talla`, PR #31): "una línea por producto" cuando se resuelven **dos o
   más** productos: se muestran solo los que tienen existencia —en la talla pedida, si
   la hubo—, uno por mensaje, máximo 5, y los demás no se mencionan (FR-1301, FR-1303,
   FR-1304, FR-1307). Motivo: con varios modelos, los que no tienen lo pedido son ruido
@@ -350,7 +350,7 @@ apagada, la sección no existe y su ruta responde como inexistente.
   texto del turno como pie, en lugar del mensaje de texto; MUST NOT descargar,
   reescalar ni proxear la foto; ~~MUST NOT enviar más de una imagen por turno~~; y en
   canales sin imágenes salientes MUST enviar solo el texto.
-  **DEROGADO** (parcial, 028 `028-respuesta-por-talla`): "el primer producto" y "nunca más de una imagen por
+  **DEROGADO** (parcial, 028 `028-respuesta-por-talla`, PR #31): "el primer producto" y "nunca más de una imagen por
   turno". Con varios productos mostrados, va **una imagen por producto** con foto, con
   la línea de ese producto como pie, en serie y en orden, con tope de **5** por turno
   (FR-1305, FR-1306). Motivo: el cliente que pregunta por una talla quiere ver lo que
@@ -383,7 +383,7 @@ apagada, la sección no existe y su ruta responde como inexistente.
   talla, o "agotada" más las tallas con existencia, o "no viene en talla X" más las
   tallas que sí tiene; una talla resuelta por SKU exacto MUST mostrar su etiqueta.
   Un producto sin tallas MUST verse exactamente como antes.
-  **DEROGADO** (parcial, 028 `028-respuesta-por-talla`): solo en su **alcance**, por eso no se tacha texto: las
+  **DEROGADO** (parcial, 028 `028-respuesta-por-talla`, PR #31): solo en su **alcance**, por eso no se tacha texto: las
   redacciones "agotada más las tallas con existencia" y "no viene en talla X más las
   tallas que sí tiene" rigen únicamente cuando se resuelve **un** producto (FR-1302);
   con dos o más, los modelos agotados en la talla pedida o sin ella **se omiten**
@@ -391,7 +391,7 @@ apagada, la sección no existe y su ruta responde como inexistente.
   y sin utilidad (decisión del dueño, 2026-09-15). Sin `size` y sin tallas: sin cambio.
 - **FR-1125**: La foto de un modelo (`image_url`, la misma en sus tallas) MUST
   enviarse a lo sumo una vez ~~por turno~~, con las reglas FR-1119..FR-1121.
-  **DEROGADO** (parcial, 028 `028-respuesta-por-talla`): "por turno" pasa a "por **modelo**": la misma foto
+  **DEROGADO** (parcial, 028 `028-respuesta-por-talla`, PR #31): "por turno" pasa a "por **modelo**": la misma foto
   nunca dos veces en un turno, pero un turno puede llevar hasta 5 fotos de modelos
   distintos (FR-1305). Motivo: el de FR-1119.
 - **FR-1126**: El stock-mock MUST incluir un modelo con tallas (y su consulta por SKU
