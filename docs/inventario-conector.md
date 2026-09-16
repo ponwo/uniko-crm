@@ -77,10 +77,40 @@ redacta:
 Las etiquetas son las del negocio (`G`, `38`, `Única`); si el cliente escribe
 "grande", "mediana", "chica", "extra grande" o "extra chica" y ninguna etiqueta
 coincide literalmente, el motor las equipara a G, M, CH, XG y XCH. La foto de un
-modelo es una sola (la misma para todas sus tallas) y se envía a lo sumo una vez
-por turno. Un producto sin tallas (o un MS-Stock anterior a la 005) se responde
+modelo es una sola (la misma para todas sus tallas) y nunca se manda dos veces en
+un turno. Un producto sin tallas (o un MS-Stock anterior a la 005) se responde
 exactamente igual que antes: `variants`, `label` y `parent_sku` ausentes se
 toleran.
+
+## Respuesta por talla y fotos por producto (028)
+
+Lo de arriba es para **un** producto. Cuando la pregunta abarca **varios** modelos
+("¿tienen playeras en G?", que en un negocio de ropa coincide con todas las
+playeras), el agente ya no enumera cada modelo ni manda la foto del primero:
+
+- **Con talla pedida**: solo los modelos que tienen **existencia en esa talla**,
+  cada uno en **su propio mensaje**, con **su foto** (si la tiene) y su línea como
+  pie: `Playera Negra (PLA-NGO) talla G: 8 pieza — $300 MXN`. Los agotados en esa
+  talla y los que no la traen **no se mencionan**. Un producto sin tallas cuenta si
+  tiene existencia (es de talla única). Si ninguno tiene existencia: `Por ahora no
+  tengo playera en talla 24.`
+- **Sin talla pedida**: un mensaje por modelo con existencia, con la línea de sus
+  tallas y su foto; los agotados no aparecen. Ninguno con existencia: `Por ahora no
+  tengo playera con existencia.`
+- **Tope**: se muestran 5 (la búsqueda pide hasta 25 a MS-Stock para poder filtrar);
+  si quedan más, o MS-Stock recortó, cierra con `Hay más coincidencias, ¿me dices
+  cuál te interesa?`. Nunca más de 5 imágenes por turno ni la misma foto dos veces.
+- **Entrega**: los mensajes salen en orden, uno tras otro; la frase de entrada del
+  modelo va en el primero. Si la foto de un modelo falla o tarda más de 5 s, **esa**
+  línea sale como texto y las demás siguen con foto; en un canal sin imágenes, o si
+  ningún modelo tiene foto, todo el turno sale como un solo texto. El Laboratorio
+  persiste cada mensaje como lo vería el cliente.
+- **Plural**: el prompt pide el nombre base en singular y MS-Stock además tolera el
+  plural ("playeras negras" encuentra "Playera negra"), así que la palabra del cliente
+  no lo deja sin respuesta.
+
+Con un solo modelo resuelto nada cambia respecto a la sección anterior. Detalle y
+derogaciones de la 026: `specs/028-respuesta-por-talla/`.
 
 ## Qué pasa cuando MS-Stock falla
 

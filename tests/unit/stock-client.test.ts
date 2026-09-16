@@ -9,7 +9,7 @@ import {
 } from "@/server/inventario/client";
 
 /**
- * 026 — El adaptador de MS-Stock (FR-1110, FR-1114): el único módulo que
+ * 026 — El adaptador de MS-Stock (FR-1110 con el límite de la 028 FR-1308, FR-1114): el único módulo que
  * conoce HTTP de MS-Stock. Devuelve resultados tipados, nunca lanza, respeta
  * los 3 s y no reintenta. Todo con `fetch` falso: aquí no hay red.
  */

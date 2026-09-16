@@ -94,3 +94,36 @@ Gate verde · arnés verde en ambas configuraciones · §3 y §4 observados · S
 instancia de pruebas con los cuatro modelos · derogaciones marcadas en la 026 ·
 contrato §4 de MS-Stock actualizado antes del código · docs (`inventario-conector.md`,
 `us-inventario.md`, README, CLAUDE.md) al día.
+
+## Resultados del self-test local — 2026-09-16 (T036–T037)
+
+- **Gate**: `pnpm typecheck`, `pnpm lint`, `pnpm build` limpios; `pnpm test` **744** (85
+  archivos; nuevos: `deliver-replies` ×6, `wa-mock-media` ×3; `check-stock-turn` 28).
+- **Arnés con `INVENTARIO=on`** (base `uniko_dev_028e`): **163/163**. Sección 028: G (plural)
+  → negra img · roja txt · gris img; M → negra · verde; extra chica → negra · azul (XCH);
+  pantalones en 40 → «Por ahora no tengo pantalones en talla 40.»; en 32 → azul img ·
+  negro txt; hilo del Inbox con 3 salidas IA sin `failed`; rechazo por link de la gris
+  → image · text · text; foto lenta de la verde → negra img + verde txt en 12.4 s. Caso 9
+  reescrito: «¿tienen playera?» → 6 salientes (5 modelos con existencia, 4 fotos distintas,
+  cierre «Hay más coincidencias…»), la blanca agotada ausente.
+- **Arnés con la bandera vacía** (base `uniko_dev_028off`): **112/112**, sin cambios.
+- **Contra MS-Stock real en local** (`uv run uvicorn … --port 8000` con el stub S3 de
+  `tests/s3_stub.py` como R2, base `ms_stock_028` desechable, réplica de los 4 modelos
+  con foto; Uniko con `STOCK_BASE_URL=http://localhost:8000`, base `uniko_dev_028ms2`,
+  wa-mock + ai-mock): «¿tienen playeras en G?» → **Negra** (img, `talla G: 8 pieza —
+  $300 MXN`) y **roja** (img, `talla G: 7 pieza — $219 MXN`); «en M» → Negra (M 9) y
+  verde (M 10); «en XCH» → solo roja (2); «en 24» → «Por ahora no tengo playeras en
+  talla 24.»; «playeras negras» (plural doble) → Negra sola con sus tallas (D1 del
+  contrato, resuelto por MS-Stock); «playera roja en M» → `agotada — … Con existencia:
+  XCH 2, CH 4, G 7, XG 1` (026 intacta); «playeras» → 4 imágenes, una por modelo;
+  «playera roja en XXG» → `no viene en talla XXG. Tallas: …, 24 agotada`. Turnos de 6.8–11.6
+  s (coalesce 6 s). Sin ninguna línea `[agente]` en el log.
+- Gotchas del entorno (para no perder tiempo): (1) el arnés necesita base **nueva** por
+  corrida (los leads y `wa_message_id` se repiten); (2) `next dev` compila cada ruta al
+  primer uso: calentar `/api/inventario/status` y `POST /api/dev/ai-mock/v1/chat/
+  completions` antes de correrlo, o el primer `check_stock` se sale del límite de 14 s;
+  (3) `DELETE /api/dev/wa-mock/outbox` reinicia el contador de wamids del mock: sobre una
+  base con mensajes persistidos, las imágenes nuevas chocan con
+  `message_wa_message_id_unique` y salen como texto (falso rojo); (4) un `wa_message_id`
+  repetido se descarta por idempotencia: un guion que se relanza debe generar los suyos.
+

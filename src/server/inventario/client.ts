@@ -2,7 +2,8 @@ import { z } from "zod";
 import { getEnv } from "@/lib/env";
 
 /**
- * 026 — Adaptador de MS-Stock (FR-1110, FR-1114). Es el ÚNICO módulo que
+ * 026 — Adaptador de MS-Stock (FR-1110 —límite de búsqueda derogado por FR-1308 de la
+ * 028—, FR-1114). Es el ÚNICO módulo que
  * conoce las rutas y la forma HTTP del servicio de inventario; el dominio pide
  * "busca esto" y recibe datos o un motivo de fallo tipado.
  *

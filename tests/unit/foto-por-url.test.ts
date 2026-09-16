@@ -1,7 +1,8 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 /**
- * 026 — Foto del producto por URL (contrato §4 de MS-Stock, FR-1119..FR-1121).
+ * 026 — Foto del producto por URL (contrato §4 de MS-Stock, FR-1119..FR-1121; desde
+ * la 028 el motor manda una por producto mostrado, FR-1305, pero cada envío es este).
  *
  * `sendImageLink` manda UN mensaje de imagen con `link` + `caption` y lo
  * persiste como asset sin archivo (`payload.url`) y mensaje `image` con el pie

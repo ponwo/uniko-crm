@@ -1757,7 +1757,7 @@ async function inventarioChecks() {
   // contamine a los siguientes leads.
   await sleep(7500);
 
-  /* ---------- Foto del producto (contrato §4, FR-1119..FR-1121) ---------- */
+  /* ---------- Foto del producto (contrato §4, FR-1119..FR-1121; varios resultados según la 028) ---------- */
   console.log("\n== 026: foto del producto en check_stock ==");
   // El stock-mock arma image_url con el origen de la petición: la app misma.
   const FOTO = `${new URL(STOCK).origin}/icon-192.png`;

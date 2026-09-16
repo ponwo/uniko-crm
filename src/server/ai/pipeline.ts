@@ -292,7 +292,8 @@ const PHOTO_TIMEOUT_MS = 5_000;
  * 026 — Con `imageUrl` (foto del producto, contrato §4 de MS-Stock) el texto
  * viaja como pie de UN mensaje de imagen por URL; si la foto no puede salir
  * —canal sin imágenes, Meta la rechaza o no responde a tiempo— el texto sale
- * solo (FR-1119, FR-1120). Un pie más largo de lo que WhatsApp admite va como
+ * solo (FR-1119 —la parte "una sola imagen" derogada por FR-1305 de la 028—,
+ * FR-1120). Un pie más largo de lo que WhatsApp admite va como
  * texto aparte y la foto sin pie: nunca se recorta lo que el agente dijo.
  */
 async function deliverReply(

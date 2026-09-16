@@ -40,7 +40,7 @@ externas: el trabajo en segundo plano (agente, Laboratorio) es in-process.
 | La agenda (horarios, huecos, citas) | `src/server/agenda/` — detrás de la bandera `AGENDA` (`flag.ts`) |
 | Cómo se entrega la reunión (Zoom, Meet…) | `src/server/agenda/connectors/` + catálogo en `src/lib/agenda-connectors.ts` · guía: [docs/agenda-conectores.md](docs/agenda-conectores.md) |
 | La atribución de anuncios y el reporte a Meta | `src/server/attribution/` — detrás de la bandera `ATRIBUCION` (`flag.ts`) + `src/lib/meta/capi.ts` · guía: [docs/atribucion-capi.md](docs/atribucion-capi.md) |
-| El inventario (botón a MS-Stock y `check_stock` del agente) | `src/server/inventario/` — detrás de la bandera `INVENTARIO` (`flag.ts`); `client.ts` es el ÚNICO que conoce HTTP de MS-Stock; el contrato vive en el repo MS-Stock (`specs/003-sso-uniko/contracts/`) · guía: [docs/inventario-conector.md](docs/inventario-conector.md) |
+| El inventario (botón a MS-Stock y `check_stock` del agente) | `src/server/inventario/` — detrás de la bandera `INVENTARIO` (`flag.ts`); `client.ts` es el ÚNICO que conoce HTTP de MS-Stock; `agent.ts` redacta el turno (lista de mensajes: con varios modelos solo los con existencia, una foto por producto, tope 5 — 028) y `deliverReplies` en `src/server/ai/pipeline.ts` los entrega en serie; el contrato vive en el repo MS-Stock (`specs/003-sso-uniko/contracts/`) · guía: [docs/inventario-conector.md](docs/inventario-conector.md) |
 | UI | `src/components/` + `src/app/(app)/` |
 
 Los mocks del entorno de pruebas viven en `src/app/api/dev/` (wa-mock +
