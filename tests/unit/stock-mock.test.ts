@@ -93,13 +93,20 @@ describe("026 — stock-mock", () => {
       ["PLY-NEG", "http://localhost:3000/icon-192.png"],
       ["PLY-BLA", null],
       ["PLY-ROJ", null],
+      // 028: réplica del catálogo real; cada foto con URL distinta (dedupe por URL en el motor).
+      ["PLA-AZL", "http://localhost:3000/icon-512.png?m=azl"],
+      ["PLA-VRD", "http://localhost:3000/icon-192.png?m=vrd"],
+      ["PLA-GRS", "http://localhost:3000/icon-512.png?m=grs"],
+      ["PLA-AMA", "http://localhost:3000/icon-192.png?m=ama"],
     ]);
   });
 
   it("búsqueda sin acentos ni mayúsculas, q corta → 422, limit acota y marca truncated", async () => {
     const r = await get("v1/agent/search", { key: KEY, query: "q=PLÁYERA" });
     const body = await r.json();
-    expect(body.results.map((p: { sku: string }) => p.sku)).toEqual(["PLY-NEG", "PLY-BLA", "PLY-ROJ"]);
+    expect(body.results.map((p: { sku: string }) => p.sku)).toEqual([
+      "PLY-NEG", "PLY-BLA", "PLY-ROJ", "PLA-AZL", "PLA-VRD", "PLA-GRS", "PLA-AMA",
+    ]);
     expect(body.truncated).toBe(false);
     expect((await get("v1/agent/search", { key: KEY, query: "q=a" })).status).toBe(422);
     const limited = await (await get("v1/agent/search", { key: KEY, query: "q=gor&limit=1" })).json();
@@ -132,6 +139,35 @@ describe("026 — stock-mock", () => {
     expect((await get("v1/agent/products/PLY-ROJ-XXG", { key: KEY })).status).toBe(404);
     const found = await (await get("v1/agent/search", { key: KEY, query: "q=PLY-ROJ-G" })).json();
     expect(found.results.map((p: { sku: string }) => p.sku)).toEqual(["PLY-ROJ"]);
+  });
+
+  it("028: el plural de la consulta encuentra el nombre en singular (misma regla que MS-Stock)", async () => {
+    const plural = await (await get("v1/agent/search", { key: KEY, query: "q=playeras&limit=25" })).json();
+    expect(plural.results.map((p: { sku: string }) => p.sku)).toEqual([
+      "PLY-NEG", "PLY-BLA", "PLY-ROJ", "PLA-AZL", "PLA-VRD", "PLA-GRS", "PLA-AMA",
+    ]);
+    const pantalones = await (await get("v1/agent/search", { key: KEY, query: "q=pantalones" })).json();
+    expect(pantalones.results.map((p: { sku: string }) => p.sku)).toEqual(["PAN-AZ", "PAN-NG"]);
+    const negras = await (await get("v1/agent/search", { key: KEY, query: "q=playeras+negras" })).json();
+    expect(negras.results.map((p: { sku: string }) => p.sku)).toEqual(["PLY-NEG"]);
+    expect((await (await get("v1/agent/search", { key: KEY, query: "q=zapatos" })).json()).results).toEqual([]);
+  });
+
+  it("028: los modelos nuevos llevan sus tallas; el SKU de una talla devuelve la talla (incluidas numéricas)", async () => {
+    const gris = await (await get("v1/agent/products/PLA-GRS", { key: KEY })).json();
+    expect(gris).toMatchObject({ price: 250, stock: 7, image_url: "http://localhost:3000/icon-512.png?m=grs" });
+    expect(gris.variants).toEqual([
+      { sku: "PLA-GRS-M", label: "M", stock: 0, available: false },
+      { sku: "PLA-GRS-G", label: "G", stock: 3, available: true },
+      { sku: "PLA-GRS-XG", label: "XG", stock: 4, available: true },
+    ]);
+    const g = await (await get("v1/agent/products/PLA-GRS-G", { key: KEY })).json();
+    expect(g).toMatchObject({ sku: "PLA-GRS-G", label: "G", parent_sku: "PLA-GRS", stock: 3, variants: [] });
+    const t32 = await (await get("v1/agent/products/PAN-AZ-32", { key: KEY })).json();
+    expect(t32).toMatchObject({ sku: "PAN-AZ-32", name: "Pantalón azul", label: "32", parent_sku: "PAN-AZ", stock: 4 });
+    expect((await get("v1/agent/products/PAN-NG", { key: KEY })).status).toBe(200);
+    const negro = await (await get("v1/agent/products/PAN-NG", { key: KEY })).json();
+    expect(negro.image_url).toBeNull();
   });
 
   it("modo down → 503 en /v1 y /health; unauthorized → 401 aunque la llave sea buena; garbage → no JSON", async () => {

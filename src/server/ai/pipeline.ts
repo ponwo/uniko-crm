@@ -334,9 +334,9 @@ async function deliverReply(
  * mensaje tiene foto enviable —todas `null`, o el canal no manda imágenes y no es
  * conversación de prueba— todo el turno sale como UN solo texto, exactamente como
  * antes de la 028 (FR-1306). La ventana cerrada (ya escalada por `deliverReply`)
- * detiene la serie: los siguientes tampoco saldrían.
+ * detiene la serie: los siguientes tampoco saldrían. Exportada solo para su test.
  */
-async function deliverReplies(
+export async function deliverReplies(
   conversation: Conversation,
   messages: StockMessage[]
 ): Promise<void> {

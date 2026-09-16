@@ -48,7 +48,60 @@ export const STOCK_MOCK_CATALOG: MockProduct[] = [
     { label: "G", stock: 7 },
     { label: "XG", stock: 1 },
   ] },
+  // 028: réplica del catálogo real (tallas cruzadas, fotos con URL distinta por modelo,
+  // una talla que solo un modelo trae, una agotada en unos y con existencia en otros,
+  // y más de cinco con existencia). También al final, por el mismo motivo.
+  { sku: "PLA-AZL", name: "Playera azul", description: null, stock: 8, unit: "pieza", price: 800, currency: "MXN", active: true, imagePath: "/icon-512.png?m=azl", variants: [
+    { label: "XCH", stock: 1 },
+    { label: "CH", stock: 5 },
+    { label: "XG", stock: 2 },
+  ] },
+  { sku: "PLA-VRD", name: "Playera verde", description: null, stock: 22, unit: "pieza", price: 200, currency: "MXN", active: true, imagePath: "/icon-192.png?m=vrd", variants: [
+    { label: "CH", stock: 2 },
+    { label: "M", stock: 10 },
+    { label: "XG", stock: 10 },
+  ] },
+  { sku: "PLA-GRS", name: "Playera gris", description: null, stock: 7, unit: "pieza", price: 250, currency: "MXN", active: true, imagePath: "/icon-512.png?m=grs", variants: [
+    { label: "M", stock: 0 },
+    { label: "G", stock: 3 },
+    { label: "XG", stock: 4 },
+  ] },
+  { sku: "PLA-AMA", name: "Playera amarilla", description: null, stock: 1, unit: "pieza", price: 150, currency: "MXN", active: true, imagePath: "/icon-192.png?m=ama", variants: [
+    { label: "CH", stock: 1 },
+  ] },
+  { sku: "PAN-AZ", name: "Pantalón azul", description: null, stock: 6, unit: "pieza", price: 650, currency: "MXN", active: true, imagePath: "/icon-512.png?m=pan", variants: [
+    { label: "30", stock: 2 },
+    { label: "32", stock: 4 },
+    { label: "34", stock: 0 },
+  ] },
+  { sku: "PAN-NG", name: "Pantalón negro", description: null, stock: 6, unit: "pieza", price: 650, currency: "MXN", active: true, imagePath: null, variants: [
+    { label: "32", stock: 1 },
+    { label: "34", stock: 3 },
+    { label: "36", stock: 2 },
+  ] },
 ];
+
+/**
+ * 028 — Misma regla que `singular_candidates` de MS-Stock (ajuste a FR-017 de su 001):
+ * cada palabra de cuatro letras o más pierde la `s` final y, si termina en `es`,
+ * también `es`; a lo sumo dos candidatos distintos de la frase original.
+ */
+export function singularCandidates(needle: string): string[] {
+  const words = needle.split(" ");
+  const variant = (stripEs: boolean) =>
+    words
+      .map((w) => {
+        if (w.length >= 4 && stripEs && w.endsWith("es")) return w.slice(0, -2);
+        if (w.length >= 4 && w.endsWith("s")) return w.slice(0, -1);
+        return w;
+      })
+      .join(" ");
+  const out: string[] = [];
+  for (const c of [variant(false), variant(true)]) {
+    if (c !== needle && !out.includes(c)) out.push(c);
+  }
+  return out;
+}
 
 export function variantSku(model: MockProduct, label: string): string {
   return `${model.sku}-${label.toUpperCase()}`;
@@ -158,13 +211,17 @@ export function findActiveVariantBySku(sku: string): { model: MockProduct; label
   return undefined;
 }
 
-/** Como MS-Stock (005): coincide por nombre o SKU del padre, o por SKU de una talla. */
+/**
+ * Como MS-Stock (005): coincide por nombre o SKU del padre, o por SKU de una talla;
+ * y (028) el nombre también se prueba con los candidatos en singular de la consulta.
+ */
 export function searchActive(q: string, limit: number): { results: MockProduct[]; truncated: boolean } {
   const needle = normalize(q);
+  const byName = [needle, ...singularCandidates(needle)];
   const matches = STOCK_MOCK_CATALOG.filter(
     (p) =>
       p.active &&
-      (normalize(p.name).includes(needle) ||
+      (byName.some((n) => normalize(p.name).includes(n)) ||
         normalize(p.sku).includes(needle) ||
         (p.variants ?? []).some((v) => normalize(variantSku(p, v.label)).includes(needle)))
   );

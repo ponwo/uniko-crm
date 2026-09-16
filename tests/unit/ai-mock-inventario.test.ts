@@ -39,6 +39,9 @@ describe("026 — ai-mock y check_stock", () => {
     });
     expect(run(CON, "¿tienen playera roja talla M?")).toMatchObject({ query: "playera roja", size: "M" });
     expect(run(CON, "¿hay playera roja en talla XXG?")).toMatchObject({ query: "playera roja", size: "XXG" });
+    // 028: talla de varias palabras y plural tal cual (el stock-mock lo tolera, como MS-Stock).
+    expect(run(CON, "¿tienen playeras en extra chica?")).toMatchObject({ query: "playeras", size: "extra chica" });
+    expect(run(CON, "¿tienen pantalones en 40?")).toMatchObject({ query: "pantalones", size: "40" });
     expect(run(CON, "¿tienen playera negra?")).not.toHaveProperty("size");
   });
 

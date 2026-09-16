@@ -2,6 +2,7 @@ import { mockGuard } from "@/lib/dev-guard";
 import {
   allMockTemplates,
   getWaMockState,
+  mediaModeFor,
   nextN,
   nextOutboundWamid,
   nextTemplateId,
@@ -406,7 +407,9 @@ export async function POST(req: Request, ctx: Params) {
     // CRM ya haya cortado la espera.
     const link = (body.image as { link?: unknown } | undefined)?.link;
     if (body.type === "image" && typeof link === "string") {
-      if (state.mediaMode === "reject") {
+      // 028: con `mediaLink`, el modo infeliz aplica solo a la imagen que coincide.
+      const modo = mediaModeFor(link);
+      if (modo === "reject") {
         return Response.json(
           {
             error: {
@@ -419,7 +422,7 @@ export async function POST(req: Request, ctx: Params) {
           { status: 400 }
         );
       }
-      if (state.mediaMode === "slow") {
+      if (modo === "slow") {
         await new Promise((r) => setTimeout(r, 7_000));
       }
     }

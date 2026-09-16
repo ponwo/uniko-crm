@@ -68,14 +68,67 @@ export async function checkStockTurn(input: {
       messages: [{ text: `No encontré productos para «${input.query.trim()}».`, imageUrl: null }],
     };
   }
-  const lines = products.map((p) => formatProduct(p, size));
-  if (truncated) lines.push(HAY_MAS);
-  return {
-    ok: true,
-    messages: withIntro(intro, [
-      { text: lines.join("\n"), imageUrl: products[0]?.image_url ?? null },
-    ]),
-  };
+  // Un solo producto resuelto: la redacción de la 026, tal cual (FR-1302, FR-1304).
+  const only = products.length === 1 ? products[0] : undefined;
+  if (only) {
+    const messages = [{ text: formatProduct(only, size), imageUrl: only.image_url }];
+    if (truncated) messages.push({ text: HAY_MAS, imageUrl: null });
+    return { ok: true, messages: withIntro(intro, messages) };
+  }
+  // Varios: solo lo que tiene existencia (en la talla pedida, si la hubo), uno por
+  // mensaje con su foto; los demás no se mencionan (FR-1301, FR-1303, FR-1307).
+  const { shown, more } = selectProducts(products, size);
+  if (shown.length === 0) {
+    const query = input.query.trim();
+    const text = size
+      ? `Por ahora no tengo ${query} en talla ${size}.`
+      : `Por ahora no tengo ${query} con existencia.`;
+    return { ok: true, messages: withIntro(intro, [{ text, imageUrl: null }]) };
+  }
+  const messages = withPhotos(shown.map((p) => ({ product: p, text: lineaDe(p, size) })));
+  if (more || truncated) messages.push({ text: HAY_MAS, imageUrl: null });
+  return { ok: true, messages: withIntro(intro, messages) };
+}
+
+/**
+ * Con dos o más productos resueltos, los que tienen existencia: en la talla pedida
+ * (etiqueta literal o equivalencia) si la hubo; un producto sin tallas cuenta si tiene
+ * existencia (es de talla única); sin talla pedida, `stock > 0`. A lo sumo
+ * `SHOW_LIMIT`; `more` avisa que quedaron fuera (FR-1301, FR-1307, FR-1308).
+ */
+export function selectProducts(
+  products: StockProduct[],
+  size: string
+): { shown: StockProduct[]; more: boolean } {
+  const conExistencia = products.filter((p) => {
+    if (p.variants.length === 0) return p.stock > 0;
+    if (!size) return p.stock > 0;
+    return (matchVariant(p.variants, size)?.stock ?? 0) > 0;
+  });
+  return { shown: conExistencia.slice(0, SHOW_LIMIT), more: conExistencia.length > SHOW_LIMIT };
+}
+
+/** La línea de un producto dentro de un conjunto: nunca "agotada" ni "no viene" (eso es para uno solo). */
+function lineaDe(p: StockProduct, size: string): string {
+  if (p.variants.length === 0 || !size) return formatProduct(p);
+  const talla = matchVariant(p.variants, size);
+  if (!talla) return formatProduct(p);
+  const precio = p.price === null ? "sin precio" : formatPrice(p.price, p.currency);
+  return `${p.name} (${p.sku}) talla ${talla.label}: ${existenciaDe(talla.stock, p.unit)} — ${precio}`;
+}
+
+/**
+ * Una foto por producto mostrado que la tenga, nunca la misma dos veces en el turno
+ * ni más de `MAX_PHOTOS` (FR-1305). Sin foto (o fuera del tope), texto en su lugar.
+ */
+function withPhotos(items: { product: StockProduct; text: string }[]): StockMessage[] {
+  const usadas = new Set<string>();
+  return items.map(({ product, text }) => {
+    const url = product.image_url;
+    if (!url || usadas.has(url) || usadas.size >= MAX_PHOTOS) return { text, imageUrl: null };
+    usadas.add(url);
+    return { text, imageUrl: url };
+  });
 }
 
 /** La frase de entrada del modelo va al frente del primer mensaje; nunca sola (FR-1305). */

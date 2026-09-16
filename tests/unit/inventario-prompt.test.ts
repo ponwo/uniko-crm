@@ -37,6 +37,9 @@ describe("026 — el prompt y el inventario", () => {
     const p = prompt(true);
     expect(p).toContain('"size":"<talla que pidió el cliente');
     expect(p).toMatch(/NO la pongas en query: ponla en size/);
+    // 028 (FR-1309): el nombre base va en singular.
+    expect(p).toContain('"query":"<nombre base del producto, en singular y sin la talla, o su SKU>"');
+    expect(p).toMatch(/en singular \(playera, no playeras\)/);
   });
 
   it("encendida: describe check_stock y las reglas de no inventar", () => {

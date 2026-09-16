@@ -74,6 +74,12 @@ type WaMockState = {
   capiEvents: CapiMockEvent[];
   counter: number;
   mediaMode: MediaMode;
+  /**
+   * 028 — Si está definido, `mediaMode` aplica SOLO a las imágenes cuyo `link`
+   * contenga esta subcadena (p. ej. `m=grs`): así se rechaza UNA foto de un turno
+   * de varias y se comprueba que las demás salen y el orden se conserva (US4).
+   */
+  mediaLink?: string;
 };
 
 const globalForMock = globalThis as unknown as { __waMockState?: WaMockState };
@@ -89,6 +95,13 @@ export function getWaMockState(): WaMockState {
     };
   }
   return globalForMock.__waMockState;
+}
+
+/** Modo que le toca a una imagen por link según `mediaMode` y `mediaLink` (028). */
+export function mediaModeFor(link: string): MediaMode {
+  const state = getWaMockState();
+  if (state.mediaLink && !link.includes(state.mediaLink)) return "ok";
+  return state.mediaMode;
 }
 
 export function resetWaMockState(): void {
