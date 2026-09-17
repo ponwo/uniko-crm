@@ -326,4 +326,30 @@ describe("google", () => {
         /modo prueba/.test(err.message)
     );
   });
+
+  /**
+   * Hallazgo 2026-09-17 al conectar LanCo: `calendar.events` —el scope que
+   * pide la guía— NO autoriza `calendars.get` (referencia de Calendar API), así
+   * que «Probar» daba 403 con un token bien hecho. Este test modela a Google:
+   * calendars.get responde 403 y solo events.list sirve.
+   */
+  it("«Probar» usa events.list (calendar.events no autoriza calendars.get) y lee el título", async () => {
+    fetchMock.mockImplementation(async (url: string) => {
+      if (url.endsWith("/token")) {
+        return Response.json({ access_token: "tk", expires_in: 3600 });
+      }
+      if (/\/calendars\/[^/]+$/.test(url)) {
+        return Response.json(
+          { error: { code: 403, message: "Request had insufficient authentication scopes." } },
+          { status: 403 }
+        );
+      }
+      if (/\/calendars\/[^/]+\/events\?maxResults=1$/.test(url)) {
+        return Response.json({ kind: "calendar#events", summary: "Agenda LanCo", items: [] });
+      }
+      return new Response(null, { status: 404 });
+    });
+    const out = await googleConnector.testConnection(creds);
+    expect(out).toEqual({ ok: true, detail: "Agenda LanCo" });
+  });
 });

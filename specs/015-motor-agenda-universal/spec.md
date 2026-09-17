@@ -581,6 +581,27 @@ agenda con clientes; el guardarraíl de epoch exacto no se afloja.
   escenario «Quiere agendar una cita» del Laboratorio termina con cita de
   prueba y sin `alucinacion` por los horarios.
 
+### Google: «Probar» y el scope (mismo ajuste, segundo hallazgo)
+
+Al preparar la conexión de LanCo con Google Calendar se cotejó el conector
+contra la referencia de Calendar API: `calendar.events` —el scope que pide la
+guía y el mínimo para crear/mover/borrar eventos— **no autoriza
+`calendars.get`**, que era lo que llamaba la prueba de conexión. Un refresh
+token bien hecho daba 403 justo en «Probar» (y «Conectar» valida antes de
+guardar). El google-mock no lo delataba: no exigía scopes.
+
+- **FR-026**: La prueba de conexión del conector Google MUST usar una operación
+  autorizada por `calendar.events` (`events.list` sobre el calendario destino,
+  cuyo `summary` es el título del calendario) y MUST NOT usar `calendars.get`.
+  El google-mock MUST responder 403 a `calendars.get`, como Google con ese
+  scope, y el arnés MUST conectar Google con credenciales válidas (200) y
+  rechazar un refresh token revocado (422) contra el mock. La guía MUST traer
+  los pasos para obtener Client ID, Client Secret y refresh token.
+- **SC-009**: En el arnés, conectar Google contra el mock responde 200 con la
+  conexión guardada; volver a `calendars.get` en la prueba de conexión pone ese
+  check en rojo. En LanCo, «Probar» con el proyecto `agendamiento-lanco` y un
+  token de `calendar.events` conecta a la primera.
+
 ## Assumptions
 
 - **Un negocio = una agenda**: configuración por organización, no por usuario;

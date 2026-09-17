@@ -56,6 +56,36 @@ API de Calendar activada, y de ahí *Client ID*, *Client Secret* y un *refresh
 token* con el permiso `calendar.events`. El calendario destino es `primary`
 salvo que pongas otro.
 
+**Cómo obtenerlos, paso a paso** (en la cuenta de Google cuyo calendario
+recibirá las citas; ~20 minutos, una sola vez):
+
+1. [Google Cloud Console](https://console.cloud.google.com) → un proyecto del
+   negocio (nuevo o existente).
+2. *APIs y servicios → Biblioteca* → habilitar **Google Calendar API**.
+3. *Pantalla de consentimiento OAuth*: **Interno** si la cuenta es Google
+   Workspace (sin verificación, sin caducidad). Si es Gmail normal: **Externo**
+   y **publicar en producción** (ver la advertencia de abajo). El scope
+   `calendar.events` es "sensible": sin verificar, Google enseña un aviso de
+   "app no verificada" al autorizar — aceptable, porque solo autoriza el propio
+   dueño (*Avanzado → Ir a la app*).
+4. *Credenciales → Crear credenciales → ID de cliente OAuth*, tipo **Aplicación
+   web**, con URI de redirección `https://developers.google.com/oauthplayground`.
+   Anota *Client ID* y *Client Secret*.
+5. El refresh token, con [OAuth 2.0 Playground](https://developers.google.com/oauthplayground):
+   ⚙️ → *Use your own OAuth credentials* (pega ID y secreto) → en el paso 1
+   escribe el scope `https://www.googleapis.com/auth/calendar.events` →
+   *Authorize APIs* (con la cuenta del calendario) → *Exchange authorization
+   code for tokens* → copia el **Refresh token**. Uniko no trae un botón
+   "Conectar con Google" con redirect: quedó como mejora futura explícita
+   (research D6 de la 015).
+6. Uniko → *Ajustes → Agenda* → **Google Calendar + Meet** → pega los tres
+   datos (y el ID del calendario si no es el principal) → **Probar** →
+   **Conectar**. Se valida contra Google antes de guardar.
+
+> El botón **Probar** usa `events.list`, no `calendars.get`: el scope
+> `calendar.events` no autoriza el segundo, y con él un token perfectamente
+> válido fallaba con 403 justo al conectar (corregido el 2026-09-17).
+
 > ⚠️ **Publica tu app OAuth "en producción".** Si la dejas en modo prueba,
 > Google **revoca el refresh token a los 7 días** y tus citas dejarán de generar
 > enlace sin previo aviso. Cuando pasa, el CRM marca la conexión como rota y te
