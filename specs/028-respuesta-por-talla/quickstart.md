@@ -180,3 +180,14 @@ contrato §4 de MS-Stock actualizado antes del código · docs (`inventario-cone
   caso de la foto lenta sigue dentro del límite (12.4 s). Bandera vacía (base
   `uniko_dev_028foff`): **112/112**.
 
+## Ajuste 2026-09-17 — orden de llegada: instancia de pruebas (T045)
+
+- PR #32 mergeada por el dueño el 2026-09-17 17:12 UTC (`71e9abf`); CI `default` y
+  `completo` verdes. Coolify desplegó `uniko-lanco` a las 17:18 UTC (`Ready in 1301ms`);
+  `/api/health` **10/10** con `commit: 71e9abf`. En el log solo un `Failed to find Server
+  Action` de una pestaña abierta antes del deploy (Next.js, ajeno al agente); ninguna
+  línea `[agente]`.
+- **WhatsApp real** (el dueño): «¿tienen playeras en M?» → la Negra (con la frase de
+  entrada) llegó **antes** que la verde: «buen llegó correctamente». FR-1314 verificada
+  en vivo. **No se promueve a `production`** (señal aparte del dueño).
+

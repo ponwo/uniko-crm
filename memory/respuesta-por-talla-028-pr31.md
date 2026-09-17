@@ -1,6 +1,6 @@
 ---
 name: respuesta-por-talla-028-pr31
-description: "028 (respuesta por talla y fotos por producto en check_stock): PR #31 mergeada y desplegada en uniko-lanco el 2026-09-16 (4d3662f), verificada por WhatsApp con los 4 modelos reales el 2026-09-17 (cierra la T057 de la 026); pendiente de decidir: orden de llegada de las fotos (Meta reordena imágenes por URL); NO promovida a production"
+description: "028 (respuesta por talla y fotos por producto en check_stock): PR #31 (4d3662f) y su ajuste de orden PR #32 (71e9abf) mergeados, desplegados en uniko-lanco y verificados por WhatsApp con los 4 modelos reales el 2026-09-17 (cierra la T057 de la 026); NO promovida a production"
 metadata:
   type: project
 ---
@@ -43,15 +43,20 @@ grande» → Negra y roja, cada una con su foto y su línea (`talla G: 8 pieza �
 la roja sola con la redacción de la 026. Cierra la T057 de la 026. **No promovida a
 `production`** (señal aparte del dueño).
 
-Hallazgo en vivo (pendiente de decidir, fuera de la 028): Meta entrega cada imagen por
-URL cuando termina de descargarla, así que dos fotos seguidas pueden llegar
-**invertidas** (la verde apareció antes que la Negra, que llevaba la frase de entrada).
-Opciones: esperar el estado `sent` del mensaje anterior (tope ~2 s) antes del siguiente,
-o una pausa fija corta. No proponerlo como hecho: el dueño decide.
+Hallazgo en vivo y su ajuste (2026-09-17, PR #32 `028-orden-de-fotos`, `71e9abf`): Meta
+entrega cada imagen por URL cuando termina de descargarla y dos fotos seguidas llegaban
+**invertidas** (la verde antes que la Negra, que llevaba la frase de entrada). El dueño
+eligió la opción recomendada: `deliverReplies` espera el `sent` de la foto anterior
+(sondeo de `message.status` cada 100 ms, **tope 2 s**) antes del siguiente mensaje; no
+tras un texto, ni en el Laboratorio, ni en canales sin acuses (FR-1314). El wa-mock
+emite `sent` ~300 ms después de aceptar una imagen por link, como Meta (FR-1315), para
+que el arnés ejercite la espera real. Verificado por WhatsApp: «¿tienen playeras en M?»
+→ Negra (con la frase) antes que verde. Costo asumido: hasta ~2 s por foto si el estado
+no llega.
 
-**Why:** la feature está cerrada de punta a punta; lo único abierto es una decisión de
-UX sobre el orden de llegada que no estaba en la spec.
-**How to apply:** si el dueño pide arreglar el orden, es un ajuste pequeño en
-`deliverReplies` (`src/server/ai/pipeline.ts`) con su test y su caso en el arnés; si
-pide promover, seguir la puerta de promoción de la constitución. Ver [[tallas-026-pr29]]
-y [[conector-inventario-consume-el-contrato-de-ms-stock]].
+**Why:** la feature está cerrada de punta a punta, incluido el orden de llegada; solo
+queda la promoción a `production`, que es señal aparte del dueño.
+**How to apply:** si pide promover, seguir la puerta de promoción de la constitución
+(CI verde en `main`, uso real en la instancia de pruebas —hecho—, `git log
+production..main` revisado, `git push origin main:production` ff). Ver
+[[tallas-026-pr29]] y [[conector-inventario-consume-el-contrato-de-ms-stock]].
