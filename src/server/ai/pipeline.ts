@@ -19,7 +19,7 @@ import { matchesHandoffIntent } from "@/server/ai/handoff";
 import { avisarDeEscalacion } from "@/server/push/avisar";
 import { buildAgentSystemPrompt } from "@/server/ai/prompts";
 import { agendaEnabled } from "@/server/agenda/flag";
-import { bookSlot, offerSlots } from "@/server/agenda/agent";
+import { bookSlot, offerSlots, offeredSlotsFor } from "@/server/agenda/agent";
 import { inventarioEnabled } from "@/server/inventario/flag";
 import { checkStockTurn, type StockMessage } from "@/server/inventario/agent";
 
@@ -157,10 +157,22 @@ export async function runAgentTurn(conversationId: string): Promise<void> {
 
   const agenda = agendaEnabled();
   const inventario = inventarioEnabled();
+  // 015 (FR-023) — Lo ya ofrecido viaja al prompt con su instante exacto: es
+  // lo único que le permite al modelo reservar sin adivinar el ISO.
+  const offeredSlots = agenda
+    ? await offeredSlotsFor({ organizationId, conversationId })
+    : [];
   const messages: ChatMessage[] = [
     {
       role: "system",
-      content: buildAgentSystemPrompt({ profile, kb, stages, agenda, inventario }),
+      content: buildAgentSystemPrompt({
+        profile,
+        kb,
+        stages,
+        agenda,
+        offeredSlots,
+        inventario,
+      }),
     },
     ...history
       .filter((m) => m.text)

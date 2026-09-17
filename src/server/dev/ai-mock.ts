@@ -162,6 +162,36 @@ export function aiMockCompletion(messages: InMessage[]): string {
     }
   }
 
+  /**
+   * 015 (FR-025) — Agenda, SOLO si el system prompt nombra la acción (misma
+   * razón que check_stock: con la bandera apagada el esquema no la conoce).
+   *
+   * El mock reserva ÚNICAMENTE copiando el startUtc del bloque HORARIOS
+   * OFRECIDOS del prompt. Es lo que haría un modelo real —no puede copiar un
+   * ISO que no le enseñaron— y es lo que vuelve honesto al arnés: si ese
+   * contexto deja de viajar, el mock re-ofrece en bucle igual que hizo el LLM
+   * real en LanCo, y el check de la cita se pone rojo.
+   */
+  if (system.includes("offer_slots")) {
+    const eligio = /\b(el primero|primer horario|primera opci[oó]n|ese horario|ag[eé]nda(me|lo))\b/i.test(
+      lastUser
+    );
+    const ofrecido = system.match(/^1\. .+ → startUtc "([^"]+)"/m)?.[1];
+    if (eligio && ofrecido) {
+      return JSON.stringify({
+        action: "book_slot",
+        startUtc: ofrecido,
+        reply: "¡Perfecto, queda agendado!",
+      });
+    }
+    if (/\b(agendar|cita|horarios?)\b/i.test(lastUser)) {
+      return JSON.stringify({
+        action: "offer_slots",
+        reply: "Claro, tengo estos horarios:",
+      });
+    }
+  }
+
   // Intención de compra → mover a Interesado.
   //
   // 021 — "quiero contratar" se AÑADE, no sustituye: es como cierra ahora el

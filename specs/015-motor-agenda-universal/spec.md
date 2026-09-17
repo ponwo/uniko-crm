@@ -530,6 +530,57 @@ reconexión.
   y el arnés `pnpm test:e2e` cubre bandera, garantías, carrera, link pendiente
   y sandbox, saliendo distinto de cero si algo falla.
 
+## Ajuste 2026-09-17 — el agente incluido no podía reservar (extensión)
+
+**Hallazgo en la instancia de pruebas** (primer encendido real de `AGENDA` en
+`uniko-lanco`, corrida del Laboratorio `run_j5w65b123dwhccwjxty8` con el LLM
+real): ante «¿puedo agendar una cita?» el agente ofreció tres huecos reales del
+motor (`offer_slots` ✔), y ante «el primer horario que me diste me queda
+perfecto» respondió «Déjame confirmarte los horarios que tengo…» dos turnos
+seguidos, sin cita. Es la rama de rechazo de `bookSlot`: el modelo intentó
+`book_slot`, pero el único `startUtc` que podía producir era adivinado — en el
+historial solo ve «hoy jueves, 17 de septiembre a las 16:00», sin año ni zona, y
+el motor compara por epoch exacto **a propósito** (FR-011). El arnés no lo
+detectó porque el ai-mock nunca emitía `offer_slots` ni `book_slot`: la agenda
+se ejercitaba solo por `/api/bot/*`, donde el cerebro externo manda el ISO.
+
+En la misma corrida, el juez del Laboratorio marcó `alucinacion` en los dos
+casos en que el agente ofreció horarios —no sabe que la instancia tiene agenda
+ni que los horarios los pega el sistema— y su sugerencia habría escrito en el
+conocimiento que «no hay agenda». Mismo defecto que la 021 corrigió para el
+escalado (FR-610): el hecho no viajaba al juez.
+
+Decisión del dueño (2026-09-17): corregirlo en el core antes de estrenar la
+agenda con clientes; el guardarraíl de epoch exacto no se afloja.
+
+### Functional Requirements (extensión)
+
+- **FR-023**: Con la agenda encendida, el prompt del agente incluido MUST
+  llevar los huecos YA ofrecidos en esa conversación (los de `offered_slot`)
+  con su etiqueta y su `startUtc` exacto, y la regla de copiarlo tal cual en
+  `book_slot`; sin huecos ofrecidos MUST decirlo y remitir a `offer_slots`.
+  Con la agenda apagada MUST NOT aparecer ni una palabra de horarios ofrecidos.
+  La comparación por instante exacto de FR-011 MUST NOT cambiar.
+- **FR-024**: El juez del Laboratorio MUST recibir la agenda como HECHO: que la
+  instancia la tiene (los horarios que el agente enumera los pone el sistema y
+  no son alucinación ni fuera de conocimiento) y si en esa conversación quedó
+  cita, con su etiqueta. Elegir un horario ofrecido sin que quede cita SÍ es
+  hallazgo. Sin agenda MUST NOT mencionarse.
+- **FR-025**: El ai-mock MUST emitir `offer_slots` ante intención de agendar y
+  `book_slot` ÚNICAMENTE copiando el `startUtc` del bloque de ofrecidos del
+  prompt (sin el bloque, re-ofrece — como el LLM real), y solo si el prompt
+  nombra la acción; el arnés MUST conducir el flujo del agente incluido por
+  wa-mock (ofrecer → «el primer horario» → cita en Citas con `source: ai` en el
+  primer hueco ofrecido, con la sala fija en la confirmación).
+
+### Success Criteria (extensión)
+
+- **SC-008**: En el arnés, «quiero agendar una cita» seguido de «el primer
+  horario, agéndamelo» deja una cita `ai` en el primer hueco libre; retirar
+  del prompt el bloque de ofrecidos pone ese check en rojo. En LanCo, el
+  escenario «Quiere agendar una cita» del Laboratorio termina con cita de
+  prueba y sin `alucinacion` por los horarios.
+
 ## Assumptions
 
 - **Un negocio = una agenda**: configuración por organización, no por usuario;

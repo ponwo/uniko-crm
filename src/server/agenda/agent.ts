@@ -1,7 +1,11 @@
+import { and, eq, inArray } from "drizzle-orm";
+import { getDb, schema } from "@/lib/db";
+import { scoped } from "@/lib/db/tenant";
+import { labelInTz } from "@/lib/time/slots";
 import { computeAvailability } from "@/server/agenda/availability";
 import { getSettings } from "@/server/agenda/settings";
 import { spreadByDay } from "@/server/agenda/spread";
-import { replaceOffers } from "@/server/agenda/offers";
+import { getOffers, replaceOffers, type OfferedSlot } from "@/server/agenda/offers";
 import { BookingError, createSessionBooking } from "@/server/agenda/service";
 
 /**
@@ -27,6 +31,53 @@ export type AgendaTurn = {
   /** false ⇒ el motor no pudo; el turno sigue, sin agendar. */
   ok: boolean;
 };
+
+/**
+ * Lo que el sistema ya ofreció en ESTA conversación, para que el prompt se lo
+ * enseñe al modelo con su instante exacto (FR-023).
+ *
+ * Sin esto `book_slot` no puede acertar nunca: el modelo solo ve en el
+ * historial etiquetas como «hoy jueves, 17 de septiembre a las 16:00» —sin
+ * año ni zona— y el motor compara por epoch exacto a propósito. Medido en
+ * LanCo el 2026-09-17 con el LLM real: ofrecía bien y después re-ofrecía en
+ * bucle, porque cada `startUtc` que adivinaba era un instante no ofrecido.
+ */
+export async function offeredSlotsFor(input: {
+  organizationId: string;
+  conversationId: string;
+}): Promise<OfferedSlot[]> {
+  return getOffers(input.organizationId, input.conversationId);
+}
+
+/**
+ * La cita activa que nació en una conversación, como HECHO para el juez del
+ * Laboratorio (FR-024): «quedó agendada para jue 18 sep, 09:00» o nada. Las
+ * de prueba cuentan igual — son justo las que el Laboratorio produce.
+ */
+export async function bookedInConversation(input: {
+  organizationId: string;
+  conversationId: string;
+}): Promise<string | null> {
+  const db = getDb();
+  const rows = await db
+    .select({ scheduledAt: schema.booking.scheduledAt })
+    .from(schema.booking)
+    .where(
+      scoped(
+        schema.booking.organizationId,
+        input.organizationId,
+        and(
+          eq(schema.booking.conversationId, input.conversationId),
+          inArray(schema.booking.status, ["agendada", "realizada"])
+        )
+      )
+    )
+    .limit(1);
+  const row = rows[0];
+  if (!row) return null;
+  const settings = await getSettings(input.organizationId);
+  return labelInTz(row.scheduledAt.toISOString(), settings.timezone);
+}
 
 export async function offerSlots(input: {
   organizationId: string;

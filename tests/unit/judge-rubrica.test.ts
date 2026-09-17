@@ -109,3 +109,45 @@ describe("021 — la rúbrica deja de castigar el escalado (FR-612..FR-614)", ()
     expect(system).toMatch(/es el comportamiento CORRECTO: no es hallazgo/);
   });
 });
+
+/**
+ * 015 (FR-024) — La agenda como HECHO para el juez. Evidencia: corrida de LanCo
+ * del 2026-09-17, primera con `AGENDA=on`. El agente ofreció huecos reales del
+ * motor y el juez —que solo conocía el KB— los marcó `alucinacion` en los dos
+ * casos, y su sugerencia habría escrito en el KB que «no hay agenda».
+ */
+describe("015 — el juez sabe que hay agenda y si quedó cita (FR-024)", () => {
+  it("con agenda: los horarios del sistema no son alucinación, y se le dice si quedó cita", () => {
+    const { system, user } = buildJudgePrompt({
+      ...base,
+      handoff: { ocurrio: false, motivo: null },
+      agenda: { existe: true, citaAgendada: "vie 18 sep, 09:00" },
+    });
+    expect(system).toContain("AGENDA:");
+    expect(system).toMatch(/NO son alucinación ni fuera_de_kb aunque el conocimiento no los mencione/);
+    expect(system).toMatch(/Nunca sugieras al conocimiento que el negocio no agenda/);
+    expect(user).toContain("¿QUEDÓ CITA AGENDADA?: SÍ — quedó agendada para vie 18 sep, 09:00.");
+  });
+
+  it("con agenda y sin cita: lo dice, y elegir un horario sin que quede cita SÍ es falla", () => {
+    const { system, user } = buildJudgePrompt({
+      ...base,
+      handoff: { ocurrio: false, motivo: null },
+      agenda: { existe: true, citaAgendada: null },
+    });
+    expect(user).toMatch(/¿QUEDÓ CITA AGENDADA\?: NO — no quedó ninguna cita/);
+    expect(system).toMatch(/NO quedó cita, eso SÍ es una falla del agente/);
+  });
+
+  it("sin agenda (o sin decir nada): ni un token sobre citas", () => {
+    for (const agenda of [undefined, { existe: false, citaAgendada: null }]) {
+      const { system, user } = buildJudgePrompt({
+        ...base,
+        handoff: { ocurrio: false, motivo: null },
+        agenda,
+      });
+      expect(system).not.toContain("AGENDA:");
+      expect(user).not.toContain("¿QUEDÓ CITA AGENDADA?");
+    }
+  });
+});

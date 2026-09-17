@@ -1448,6 +1448,86 @@ async function agendaChecks() {
     });
   }
 
+  /* ---------- El agente INCLUIDO ofrece y agenda solo (FR-023, FR-025) ---------- */
+  //
+  // Hasta aquí la agenda se ejercitaba solo por /api/bot/* (cerebro externo, que
+  // manda el ISO exacto). El agente incluido con LLM real fallaba en LanCo
+  // (2026-09-17): ofrecía bien y después re-ofrecía en bucle, porque el modelo
+  // nunca veía el instante exacto de lo ofrecido. Este tramo conduce ese camino
+  // por wa-mock: el ai-mock solo reserva si el prompt trae el bloque HORARIOS
+  // OFRECIDOS, así que si ese contexto deja de viajar, la cita no aparece.
+  console.log("\n== 015: el agente incluido ofrece y agenda (FR-023/FR-025) ==");
+  {
+    const coalesce = Number(process.env.AGENT_COALESCE_MS ?? 6000);
+    const ventana = coalesce + 8000;
+    const alCable = (lead) => (lead.startsWith("521") ? `52${lead.slice(3)}` : lead);
+    const outboxDe = async (to) =>
+      ((await api("/api/dev/wa-mock/outbox")).json?.outbox ?? []).filter(
+        (o) => o.to === to || o.to === alCable(to)
+      );
+    const textoDe = (o) => o?.body?.text?.body ?? JSON.stringify(o?.body ?? "");
+    /** Manda un inbound y espera la PRIMERA respuesta del agente a ese lead. */
+    async function decir(lead, texto, n) {
+      const antes = (await outboxDe(lead)).length;
+      await api("/api/dev/wa-mock/inbound", {
+        method: "POST",
+        body: JSON.stringify({
+          phoneNumberId: PN,
+          from: lead,
+          name: "Lead agenda C",
+          text: texto,
+          waMessageId: `wamid.e2e.015.agente.${n}`,
+        }),
+      });
+      const hasta = Date.now() + ventana;
+      while (Date.now() < hasta) {
+        const ahora = await outboxDe(lead);
+        if (ahora.length > antes) return textoDe(ahora[ahora.length - 1]);
+        await sleep(400);
+      }
+      return null;
+    }
+
+    const perfilAntes = (await api("/api/agent/profile")).json?.profile;
+    await api("/api/agent/profile", { method: "PUT", body: JSON.stringify({ enabled: true }) });
+    const LEAD_C = "5214627015003";
+    // El primer hueco libre ANTES de ofrecer: es el que "el primero" debe reservar.
+    const primeroLibre = ((await api("/api/calendar/availability")).json?.slots ?? [])[0];
+
+    const oferta = await decir(LEAD_C, "Hola, quiero agendar una cita", "1");
+    ok(
+      "«quiero agendar una cita» → el agente ofrece horarios reales (offer_slots)",
+      typeof oferta === "string" && oferta.includes("•"),
+      JSON.stringify(oferta)
+    );
+    const reserva = await decir(LEAD_C, "El primer horario, agéndamelo por favor", "2");
+    ok(
+      "«el primer horario» → el agente agenda copiando el ISO ofrecido (book_slot)",
+      typeof reserva === "string" && /queda agendado|Te agendé/i.test(reserva),
+      JSON.stringify(reserva)
+    );
+    ok(
+      "…y comparte la sala fija en la confirmación",
+      typeof reserva === "string" && reserva.includes(SALA),
+      JSON.stringify(reserva)
+    );
+    const citaC = ((await api("/api/bookings")).json?.bookings ?? []).find(
+      (b) => b.contact?.name === "Lead agenda C" && b.status === "agendada"
+    );
+    ok(
+      "la cita existe en Citas, agendada por la IA, en el primer hueco que se ofreció",
+      citaC?.source === "ai" &&
+        Boolean(primeroLibre) &&
+        citaC?.scheduledAtUtc === primeroLibre?.startUtc,
+      JSON.stringify({ citaC, primeroLibre })
+    );
+
+    await api("/api/agent/profile", {
+      method: "PUT",
+      body: JSON.stringify({ enabled: perfilAntes?.enabled ?? false }),
+    });
+  }
+
   // El sandbox del Laboratorio (una cita de prueba jamás llega a un conector)
   // NO se verifica aquí: las conversaciones del Laboratorio no son alcanzables
   // desde la API pública —a propósito—, así que desde fuera solo podría

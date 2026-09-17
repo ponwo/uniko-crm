@@ -37,6 +37,13 @@ export function buildAgentSystemPrompt(input: {
    */
   agenda?: boolean;
   /**
+   * 015 (FR-023) — Los huecos que el sistema YA ofreció en esta conversación,
+   * con su instante exacto. Es lo único que hace posible `book_slot`: el
+   * historial solo lleva etiquetas («hoy jueves a las 16:00», sin año ni
+   * zona) y el motor compara por epoch exacto. Sin agenda se ignora.
+   */
+  offeredSlots?: { label: string; startUtc: string }[];
+  /**
    * 026 — ¿esta instancia tiene el conector de inventario? Apagado, el prompt
    * no menciona existencias ni precios consultables: aquí no hay inventario.
    */
@@ -47,9 +54,18 @@ export function buildAgentSystemPrompt(input: {
   const agendaLines = input.agenda
     ? [
         '- {"action":"offer_slots","reply":"..."} — ofrecer horarios para agendar (reply es solo la frase de entrada; los horarios los pone el sistema).',
-        '- {"action":"book_slot","startUtc":"<uno de los horarios que el sistema ofreció, en ISO UTC>","reply":"..."} — agendar el horario que el cliente eligió.',
+        '- {"action":"book_slot","startUtc":"<el startUtc EXACTO de uno de los HORARIOS OFRECIDOS, copiado tal cual>","reply":"..."} — agendar el horario que el cliente eligió.',
       ]
     : [];
+  const offered = input.agenda ? (input.offeredSlots ?? []) : [];
+  const offeredBlock = input.agenda
+    ? offered.length > 0
+      ? [
+          "HORARIOS OFRECIDOS EN ESTA CONVERSACIÓN (los puso el sistema desde la agenda real; son los ÚNICOS que book_slot acepta):",
+          ...offered.map((s, i) => `${i + 1}. ${s.label} → startUtc "${s.startUtc}"`),
+        ].join("\n")
+      : "HORARIOS OFRECIDOS EN ESTA CONVERSACIÓN: ninguno todavía. Para agendar, primero offer_slots."
+    : null;
   const inventarioLines = input.inventario
     ? [
         '- {"action":"check_stock","query":"<nombre base del producto, en singular y sin la talla, o su SKU>","size":"<talla que pidió el cliente, si dijo alguna: G, M, 38…>","reply":"..."} — consultar existencia y precio reales en el inventario (reply es solo la frase de entrada; los datos, tallas incluidas, los pega el sistema).',
@@ -66,7 +82,7 @@ export function buildAgentSystemPrompt(input: {
   const agendaRules = input.agenda
     ? [
         "- NUNCA escribas tú los horarios ni los inventes: usa offer_slots y el sistema pega los reales.",
-        "- book_slot solo acepta un horario que el sistema ofreció antes en ESTA conversación. Si el cliente pide otro, vuelve a ofrecer con offer_slots.",
+        "- book_slot solo acepta un horario de la lista HORARIOS OFRECIDOS: copia su startUtc TAL CUAL (nunca lo calcules ni lo conviertas). «El primero» es el 1 de esa lista. Si la lista está vacía o el cliente pide otro día, vuelve a ofrecer con offer_slots.",
         "- Si el cliente quiere CANCELAR una cita → handoff: esa decisión no es tuya.",
       ]
     : [];
@@ -80,6 +96,7 @@ export function buildAgentSystemPrompt(input: {
     profile.greeting ? `Saludo sugerido para conversaciones nuevas: ${profile.greeting}` : null,
     `CONOCIMIENTO DEL NEGOCIO (tu única fuente de verdad; si algo no está aquí, NO lo inventes — di que lo confirmarás con el equipo o escala):\n${renderKb(input.kb)}`,
     `Etapas del pipeline disponibles: ${stageNames}`,
+    offeredBlock,
     [
       "En cada turno respondes ÚNICAMENTE un objeto JSON con UNA acción:",
       '- {"action":"none"} — no responder nada.',
@@ -127,6 +144,15 @@ export function buildJudgePrompt(input: {
   expected: string;
   /** El escalado, como HECHO y no como deducción sobre el texto (FR-610). */
   handoff: { ocurrio: boolean; motivo: string | null };
+  /**
+   * 015 (FR-024) — La agenda, como HECHO. Si la instancia la tiene, los
+   * horarios que el agente enumera los pone el SISTEMA desde la disponibilidad
+   * real: el conocimiento no los menciona y aun así no son alucinación. Y si
+   * quedó cita, se dice con su etiqueta; el transcript no lo prueba. Sin esto
+   * el juez castigó en LanCo (2026-09-17) los dos casos en que el agente
+   * agendó bien, y sugirió al KB que «no hay agenda».
+   */
+  agenda?: { existe: boolean; citaAgendada: string | null };
   transcript: { role: "cliente" | "agente"; text: string }[];
   kbText: string;
   behaviorText: string;
@@ -150,6 +176,15 @@ export function buildJudgePrompt(input: {
     "- `alucinacion` si el agente afirmó datos concretos (precios, plazos, políticas, características) que el conocimiento no contiene.",
     "- `fuera_de_kb` si el agente respondió COMO SI SUPIERA algo que no está en el conocimiento.",
     "- Decir con claridad que no cuenta con esa información, y ofrecer confirmarla o escalar, es el comportamiento CORRECTO: no es hallazgo.",
+    ...(input.agenda?.existe
+      ? [
+          "",
+          "AGENDA:",
+          "- Esta instancia TIENE agenda. Los horarios que el agente enumera los pone el SISTEMA desde la disponibilidad real configurada: NO son alucinación ni fuera_de_kb aunque el conocimiento no los mencione. Ofrecerlos y agendar es comportamiento CORRECTO.",
+          "- Se te dice explícitamente si QUEDÓ CITA AGENDADA. No lo deduzcas del texto.",
+          "- Si el cliente eligió uno de los horarios ofrecidos y NO quedó cita, eso SÍ es una falla del agente (repórtala como `fuera_de_kb` con la evidencia). Nunca sugieras al conocimiento que el negocio no agenda o no tiene horarios: sí los tiene.",
+        ]
+      : []),
   ].join("\n");
 
   const transcript = input.transcript
@@ -160,15 +195,24 @@ export function buildJudgePrompt(input: {
     ? `SÍ — la conversación se escaló a una persona (motivo: ${input.handoff.motivo ?? "sin registrar"}). Por eso termina donde termina.`
     : "NO — no hubo escalado en esta conversación.";
 
+  const cita = input.agenda?.existe
+    ? input.agenda.citaAgendada
+      ? `SÍ — quedó agendada para ${input.agenda.citaAgendada}.`
+      : "NO — no quedó ninguna cita agendada en esta conversación."
+    : null;
+
   const user = [
     `PERSONA SIMULADA: ${input.persona}`,
     `RESULTADO ESPERADO DE ESTE ESCENARIO:\n${input.expected}`,
     `¿HUBO ESCALADO?: ${escalado}`,
+    cita ? `¿QUEDÓ CITA AGENDADA?: ${cita}` : null,
     `COMPORTAMIENTO CONFIGURADO:\n${input.behaviorText || "(sin configurar)"}`,
     `CONOCIMIENTO CONFIGURADO:\n${input.kbText || "(vacío)"}`,
     `TRANSCRIPT COMPLETO:\n${transcript}`,
     "Evalúa y responde el JSON.",
-  ].join("\n\n");
+  ]
+    .filter(Boolean)
+    .join("\n\n");
 
   return { system, user };
 }
