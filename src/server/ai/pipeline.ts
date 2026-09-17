@@ -285,6 +285,15 @@ type Conversation = typeof schema.conversation.$inferSelect;
 const CAPTION_MAX = 1024;
 /** Cuánto se espera a Meta por la foto antes de mandar el texto solo. */
 const PHOTO_TIMEOUT_MS = 5_000;
+/**
+ * 028 (ajuste 2026-09-17, FR-1314) — Meta entrega cada imagen por URL cuando termina
+ * de descargarla, así que dos fotos seguidas pueden llegar invertidas. Antes del
+ * siguiente mensaje se espera a que la foto anterior deje de estar `pending`
+ * (`sent` por el webhook de estados), con este tope para que un estado que no llega
+ * nunca detenga la respuesta.
+ */
+const PHOTO_ORDER_WAIT_MS = 2_000;
+const PHOTO_ORDER_POLL_MS = 100;
 
 /**
  * Entrega la respuesta: envío real o persistencia sandbox (is_test).
@@ -300,29 +309,32 @@ async function deliverReply(
   conversation: Conversation,
   text: string,
   opts: { imageUrl?: string | null } = {}
-): Promise<boolean> {
+): Promise<{ ok: boolean; photoMessageId: string | null }> {
   const imageUrl = opts.imageUrl ?? null;
   if (conversation.isTest) {
     await persistTestOutbound(conversation, text, imageUrl);
-    return true;
+    return { ok: true, photoMessageId: null };
   }
   const photo =
     imageUrl && capabilitiesFor(conversation.channel).outboundMedia ? imageUrl : null;
   const asCaption = photo !== null && text.length <= CAPTION_MAX;
   try {
-    if (asCaption && (await sendPhoto(conversation, photo, text))) return true;
+    if (asCaption) {
+      const sent = await sendPhoto(conversation, photo, text);
+      if (sent) return { ok: true, photoMessageId: sent };
+    }
     await sendText({
       conversationId: conversation.id,
       organizationId: conversation.organizationId,
       text,
       aiGenerated: true,
     });
-    if (photo && !asCaption) await sendPhoto(conversation, photo, undefined);
-    return true;
+    const tail = photo && !asCaption ? await sendPhoto(conversation, photo, undefined) : null;
+    return { ok: true, photoMessageId: tail };
   } catch (err) {
     if (err instanceof SendError && err.code === "window_closed") {
       await applyHandoff(conversation.id, conversation.organizationId, "ventana");
-      return false;
+      return { ok: false, photoMessageId: null };
     }
     throw err;
   }
@@ -343,30 +355,51 @@ export async function deliverReplies(
 ): Promise<void> {
   const pending = messages.filter((m) => m.text);
   if (pending.length === 0) return;
-  const canSendPhotos =
-    conversation.isTest || capabilitiesFor(conversation.channel).outboundMedia;
+  const caps = capabilitiesFor(conversation.channel);
+  const canSendPhotos = conversation.isTest || caps.outboundMedia;
   if (!canSendPhotos || !pending.some((m) => m.imageUrl)) {
     await deliverReply(conversation, pending.map((m) => m.text).join("\n"));
     return;
   }
-  for (const m of pending) {
-    const delivered = await deliverReply(conversation, m.text, { imageUrl: m.imageUrl });
-    if (!delivered) return;
+  const waitForOrder = !conversation.isTest && caps.deliveryReceipts;
+  for (const [i, m] of pending.entries()) {
+    const { ok, photoMessageId } = await deliverReply(conversation, m.text, { imageUrl: m.imageUrl });
+    if (!ok) return;
+    // FR-1314: solo entre un mensaje CON foto y el siguiente; tras un texto, o si la
+    // foto salió como texto, no hay nada que esperar. El Laboratorio no tiene estados.
+    if (waitForOrder && photoMessageId && i < pending.length - 1) {
+      await waitUntilSent(photoMessageId);
+    }
+  }
+}
+
+/** Sondea `message.status` hasta que deje de ser `pending` o venza el tope (FR-1314). */
+async function waitUntilSent(messageId: string): Promise<void> {
+  const db = getDb();
+  const deadline = Date.now() + PHOTO_ORDER_WAIT_MS;
+  while (Date.now() < deadline) {
+    const rows = await db
+      .select({ status: schema.message.status })
+      .from(schema.message)
+      .where(eq(schema.message.id, messageId))
+      .limit(1);
+    if (!rows[0] || rows[0].status !== "pending") return;
+    await new Promise((r) => setTimeout(r, PHOTO_ORDER_POLL_MS));
   }
 }
 
 /**
- * true ⇒ la foto salió (con su pie, si lo llevaba). Cualquier fallo de la
- * foto se registra y devuelve false para que el texto salga solo; la única
+ * El id del mensaje ⇒ la foto salió (con su pie, si lo llevaba). Cualquier fallo de
+ * la foto se registra y devuelve null para que el texto salga solo; la única
  * excepción que sube es la ventana cerrada, que tampoco dejaría pasar el texto.
  */
 async function sendPhoto(
   conversation: Conversation,
   link: string,
   caption: string | undefined
-): Promise<boolean> {
+): Promise<string | null> {
   try {
-    await sendImageLink({
+    const { messageId } = await sendImageLink({
       conversationId: conversation.id,
       organizationId: conversation.organizationId,
       link,
@@ -374,12 +407,12 @@ async function sendPhoto(
       aiGenerated: true,
       signal: AbortSignal.timeout(PHOTO_TIMEOUT_MS),
     });
-    return true;
+    return messageId;
   } catch (err) {
     if (err instanceof SendError && err.code === "window_closed") throw err;
     const motivo = err instanceof Error ? err.message : String(err);
     console.error(`[agente] foto: no se pudo enviar la imagen (${motivo}); sale solo el texto`);
-    return false;
+    return null;
   }
 }
 

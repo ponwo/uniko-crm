@@ -1,4 +1,5 @@
 import { mockGuard } from "@/lib/dev-guard";
+import { scheduleSentStatus } from "@/server/dev/wa-mock-inbound";
 import {
   allMockTemplates,
   getWaMockState,
@@ -437,6 +438,8 @@ export async function POST(req: Request, ctx: Params) {
       body,
       at: new Date().toISOString(),
     });
+    // 028 (FR-1315): como Meta, la imagen por URL pasa a `sent` poco después.
+    if (body.type === "image" && typeof link === "string") scheduleSentStatus(waMessageId);
     return Response.json({
       messaging_product: "whatsapp",
       contacts: [{ input: body.to, wa_id: body.to }],

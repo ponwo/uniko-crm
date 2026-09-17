@@ -30,13 +30,22 @@ vi.mock("@/server/push/avisar", () => ({ avisarDeEscalacion: vi.fn() }));
 
 const inserts: { table: string; values: Record<string, unknown> }[] = [];
 const updates: unknown[] = [];
+/** Ajuste 2026-09-17: estados que devuelve `message.status` en cada sondeo (vacío ⇒ sin fila). */
+const estados: string[] = [];
+let estadoFijo: string | null = null;
 vi.mock("@/lib/db", () => {
   const whereResult = {
     returning: () => Promise.resolve([{ isTest: false }]),
     then: (resolve: (v: unknown) => unknown) => Promise.resolve(undefined).then(resolve),
   };
+  const selectResult = () => {
+    const status = estadoFijo ?? estados.shift();
+    if (status) llamadas.push(`status:${status}`);
+    return Promise.resolve(status ? [{ status }] : []);
+  };
   return {
     getDb: () => ({
+      select: () => ({ from: () => ({ where: () => ({ limit: selectResult }) }) }),
       insert: (table: { name: string }) => ({
         values: (values: Record<string, unknown>) => {
           inserts.push({ table: table.name, values });
@@ -68,14 +77,18 @@ const conv = (over: Partial<Conversation> = {}) =>
 const FOTO_A = "https://img.stock.example/a.jpg";
 const FOTO_B = "https://img.stock.example/b.jpg";
 
+beforeEach(() => {
+  llamadas.length = 0;
+  inserts.length = 0;
+  updates.length = 0;
+  estados.length = 0;
+  estadoFijo = null;
+  sendText.mockClear();
+  sendImageLink.mockClear();
+  vi.useRealTimers();
+});
+
 describe("028 — deliverReplies", () => {
-  beforeEach(() => {
-    llamadas.length = 0;
-    inserts.length = 0;
-    updates.length = 0;
-    sendText.mockClear();
-    sendImageLink.mockClear();
-  });
 
   it("con fotos: un envío por mensaje, en orden; el sin foto va como texto en su lugar", async () => {
     await deliverReplies(conv(), [
@@ -148,5 +161,71 @@ describe("028 — deliverReplies", () => {
     ]);
     expect(llamadas).toEqual([]);
     expect(updates.some((u) => (u as { handoffReason?: string }).handoffReason === "ventana")).toBe(true);
+  });
+});
+
+/* ---------- Ajuste 2026-09-17: orden de llegada (FR-1314) ---------- */
+
+describe("028 — deliverReplies espera el `sent` de la foto anterior", () => {
+  it("la segunda imagen sale solo cuando Meta reportó `sent` de la primera", async () => {
+    estados.push("pending", "pending", "sent");
+    await deliverReplies(conv(), [
+      { text: "A", imageUrl: FOTO_A },
+      { text: "B", imageUrl: FOTO_B },
+    ]);
+    expect(llamadas).toEqual([
+      `image:${FOTO_A}:A`,
+      "status:pending",
+      "status:pending",
+      "status:sent",
+      `image:${FOTO_B}:B`,
+    ]);
+  });
+
+  it("si el estado no llega, el tope de 2 s manda el siguiente igual (ni antes ni nunca)", async () => {
+    vi.useFakeTimers();
+    estadoFijo = "pending";
+    const done = deliverReplies(conv(), [
+      { text: "A", imageUrl: FOTO_A },
+      { text: "B", imageUrl: FOTO_B },
+    ]);
+    await vi.advanceTimersByTimeAsync(1_900);
+    expect(sendImageLink).toHaveBeenCalledTimes(1);
+    await vi.advanceTimersByTimeAsync(300);
+    await done;
+    expect(sendImageLink).toHaveBeenCalledTimes(2);
+    expect(llamadas.filter((l) => l === "status:pending").length).toBeGreaterThan(10);
+  });
+
+  it("tras un texto no se espera nada; tras la última foto tampoco", async () => {
+    estados.push("sent");
+    await deliverReplies(conv(), [
+      { text: "A", imageUrl: FOTO_A },
+      { text: "B", imageUrl: null },
+      { text: "C", imageUrl: FOTO_B },
+    ]);
+    expect(llamadas).toEqual([`image:${FOTO_A}:A`, "status:sent", "text:B", `image:${FOTO_B}:C`]);
+  });
+
+  it("conversación de prueba: sin sondeos (no hay estados que esperar)", async () => {
+    estadoFijo = "pending";
+    await deliverReplies(conv({ isTest: true }), [
+      { text: "A", imageUrl: FOTO_A },
+      { text: "B", imageUrl: FOTO_B },
+    ]);
+    expect(llamadas).toEqual([]);
+    expect(inserts.filter((i) => i.table === "message")).toHaveLength(2);
+  });
+
+  it("una foto rechazada (salió como texto) no hace esperar al siguiente", async () => {
+    estadoFijo = "pending";
+    sendImageLink.mockImplementationOnce(async () => {
+      throw new SendError("meta_error", "(#100) Param image['link'] is not a valid URL");
+    });
+    await deliverReplies(conv(), [
+      { text: "A", imageUrl: FOTO_A },
+      { text: "B", imageUrl: FOTO_B },
+    ]);
+    expect(llamadas).toEqual(["text:A", `image:${FOTO_B}:B`]);
   });
 });

@@ -101,10 +101,13 @@ playeras), el agente ya no enumera cada modelo ni manda la foto del primero:
   si quedan más, o MS-Stock recortó, cierra con `Hay más coincidencias, ¿me dices
   cuál te interesa?`. Nunca más de 5 imágenes por turno ni la misma foto dos veces.
 - **Entrega**: los mensajes salen en orden, uno tras otro; la frase de entrada del
-  modelo va en el primero. Si la foto de un modelo falla o tarda más de 5 s, **esa**
-  línea sale como texto y las demás siguen con foto; en un canal sin imágenes, o si
-  ningún modelo tiene foto, todo el turno sale como un solo texto. El Laboratorio
-  persiste cada mensaje como lo vería el cliente.
+  modelo va en el primero. Como Meta entrega cada imagen por URL cuando termina de
+  descargarla (y dos fotos seguidas podían llegar invertidas), el motor espera el
+  `sent` de la foto anterior —tope 2 s— antes de mandar el siguiente mensaje. Si la
+  foto de un modelo falla o tarda más de 5 s, **esa** línea sale como texto y las demás
+  siguen con foto; en un canal sin imágenes, o si ningún modelo tiene foto, todo el
+  turno sale como un solo texto. El Laboratorio persiste cada mensaje como lo vería el
+  cliente.
 - **Plural**: el prompt pide el nombre base en singular y MS-Stock además tolera el
   plural ("playeras negras" encuentra "Playera negra"), así que la palabra del cliente
   no lo deja sin respuesta.
