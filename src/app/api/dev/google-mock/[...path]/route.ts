@@ -86,9 +86,30 @@ export async function GET(req: Request, ctx: Ctx) {
   const unauthorized = requireToken(req);
   if (unauthorized) return unauthorized;
 
-  // GET /calendars/{id} — la prueba de conexión.
+  // GET /calendars/{id} — como Google con un token de `calendar.events`: ese
+  // scope NO autoriza calendars.get (403). Fue el fallo real de «Probar» el
+  // 2026-09-17; el mock lo reproduce para que no vuelva.
   if (path[0] === "calendars" && path.length === 2) {
-    return Response.json({ id: path[1], summary: "Calendario de prueba" });
+    return Response.json(
+      {
+        error: {
+          code: 403,
+          message: "Request had insufficient authentication scopes.",
+          status: "PERMISSION_DENIED",
+        },
+      },
+      { status: 403 }
+    );
+  }
+
+  // GET /calendars/{id}/events — la prueba de conexión (events.list, que sí
+  // acepta `calendar.events`); `summary` es el título del calendario.
+  if (path[0] === "calendars" && path[2] === "events" && path.length === 3) {
+    return Response.json({
+      kind: "calendar#events",
+      summary: "Calendario de prueba",
+      items: [],
+    });
   }
 
   // GET /calendars/{id}/events/{eventId}

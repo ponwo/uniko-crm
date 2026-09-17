@@ -31,6 +31,13 @@ import {
  *     prueba.** Eso no se puede arreglar desde aquí: se advierte en la guía de
  *     conexión, y cuando pasa, el 401 marca la credencial como rota para que
  *     el dueño se entere por la UI y no por un cliente sin enlace.
+ *  3. **`calendar.events` NO autoriza `calendars.get`.** Es el scope que pide
+ *     la guía (el mínimo para crear/mover/borrar eventos), pero la referencia
+ *     de Calendar API lo excluye de `calendars.get`: un token bien hecho daba
+ *     403 justo en «Probar», y el mock no lo delataba porque no exigía scopes
+ *     (hallazgo 2026-09-17, al conectar LanCo). La prueba de conexión usa
+ *     `events.list?maxResults=1`, que sí lo acepta y devuelve el título del
+ *     calendario en `summary` — misma señal, mismo scope.
  */
 
 export const GOOGLE_SCOPE = "https://www.googleapis.com/auth/calendar.events";
@@ -220,9 +227,11 @@ export const googleConnector: AgendaConnector<GoogleCreds> = {
 
   async testConnection(creds): Promise<TestConnectionResult> {
     try {
+      // events.list y no calendars.get: ver el punto 3 de la cabecera. El
+      // `summary` de la lista es el título del calendario.
       const cal = (await googleFetch(
         creds,
-        `/calendars/${encodeURIComponent(creds.calendarId)}`
+        `${eventsPath(creds)}?maxResults=1`
       )) as { summary?: string } | null;
       return { ok: true, detail: cal?.summary };
     } catch (err) {

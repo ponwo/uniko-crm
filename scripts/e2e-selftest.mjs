@@ -1448,6 +1448,53 @@ async function agendaChecks() {
     });
   }
 
+  // Google: «Probar» con el scope que pide la guía. El mock responde 403 a
+  // calendars.get —como Google con `calendar.events`— así que si la prueba de
+  // conexión vuelve a usarlo, aquí sale rojo (hallazgo 2026-09-17 en LanCo).
+  console.log("\n== 015: conector Google contra su mock ==");
+  const googleMockUp = await fetch(`${BASE}/api/dev/google-mock/_state`);
+  if (!googleMockUp.ok) {
+    console.log("  (google-mock no disponible: se omiten los checks del conector)");
+  } else {
+    await fetch(`${BASE}/api/dev/google-mock/_reset`, { method: "POST" });
+    const revocado = await api("/api/settings/google", {
+      method: "PUT",
+      body: JSON.stringify({
+        clientId: "cli.apps.googleusercontent.com",
+        clientSecret: "secreto-google",
+        refreshToken: "ref-invalid",
+      }),
+    });
+    ok(
+      "un refresh token revocado NO se guarda (422) y el error explica el modo prueba",
+      revocado.res.status === 422 && /modo prueba/.test(JSON.stringify(revocado.json)),
+      `status=${revocado.res.status} ${JSON.stringify(revocado.json)}`
+    );
+    const conectado = await api("/api/settings/google", {
+      method: "PUT",
+      body: JSON.stringify({
+        clientId: "cli.apps.googleusercontent.com",
+        clientSecret: "secreto-google",
+        refreshToken: "ref-bueno",
+      }),
+    });
+    // El mock da 403 a calendars.get: un 200 aquí prueba que «Probar» pasó
+    // por events.list, el único camino que `calendar.events` autoriza.
+    ok(
+      "con calendar.events, «Probar» conecta (events.list; calendars.get daría 403)",
+      conectado.res.ok && conectado.json?.connection?.status === "connected",
+      `status=${conectado.res.status} ${JSON.stringify(conectado.json)}`
+    );
+    ok(
+      "hacia el navegador solo salen los últimos 4 del secreto de Google",
+      conectado.json?.connection?.secretLast4 === "ogle" &&
+        !JSON.stringify(conectado.json).includes("secreto-google") &&
+        !JSON.stringify(conectado.json).includes("ref-bueno"),
+      JSON.stringify(conectado.json)
+    );
+    await api("/api/settings/google", { method: "DELETE" });
+  }
+
   /* ---------- El agente INCLUIDO ofrece y agenda solo (FR-023, FR-025) ---------- */
   //
   // Hasta aquí la agenda se ejercitaba solo por /api/bot/* (cerebro externo, que
