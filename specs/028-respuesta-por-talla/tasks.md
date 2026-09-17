@@ -171,7 +171,17 @@ en G?" → `image` NEG · `text` ROJ · `text` GRS en ese orden, sin `failed` en
 
 ---
 
-## Dependencies & Execution Order
+## Phase 8: Ajuste 2026-09-17 — orden de llegada de las fotos (US5, FR-1314, FR-1315)
+
+**Goal**: el siguiente mensaje sale cuando Meta confirmó `sent` del anterior con foto
+(tope 2 s); el wa-mock emite `sent` como Meta; sin cambio de textos.
+
+- [ ] T041 [US5] Test primero en `tests/unit/deliver-replies.test.ts`: con dos imágenes, la segunda se manda solo después de que la consulta de estado del primer mensaje devuelve `sent` (mock de `select` con cola `pending`, `pending`, `sent`); con el estado siempre `pending`, la segunda sale a los 2 s (reloj falso) y no antes; tras un texto no hay consulta de estado; `isTest` y canal sin `deliveryReceipts` no consultan — deben fallar
+- [ ] T042 [US5] Implementar en `src/server/ai/pipeline.ts`: `sendPhoto` devuelve el `messageId` (o `null`); `deliverReply` devuelve `{ ok, photoMessageId }`; `deliverReplies` espera `waitUntilSent(photoMessageId, PHOTO_ORDER_WAIT_MS = 2000)` (sondeo de `message.status` cada 100 ms hasta salir de `pending`) antes del siguiente mensaje, solo si el anterior salió con foto, hay siguiente, no es conversación de prueba y el canal tiene `deliveryReceipts`
+- [ ] T043 [US5] wa-mock: en `src/app/api/dev/wa-mock/graph/[...path]/route.ts`, tras aceptar un mensaje `image` por link, programar (~300 ms) la emisión del estado `sent` por el webhook (helper `emitOutboundStatus(waMessageId, "sent")` en `src/server/dev/wa-mock-inbound.ts`, que resuelve la organización por el mensaje persistido y usa `buildStatusPayload` + `deliverToWebhook`; si el mensaje aún no está persistido, reintenta una vez a los 500 ms); `POST /api/dev/wa-mock/status` reutiliza el helper
+- [ ] T044 [US5] Arnés `scripts/e2e-selftest.mjs`, sección 028: tras «¿tienen playeras en G?», el hilo del Inbox tiene las dos imágenes con `status: "sent"` (no `pending`) y el outbox conserva el orden negra · roja · gris; las secciones de la 026 siguen verdes (la foto de PLY-NEG queda `sent`; el check «sin failed» no cambia)
+- [ ] T045 [US5] Docs: `docs/inventario-conector.md` §028 (entrega: espera el `sent` de Meta, tope 2 s), `tests/e2e/us-inventario.md` caso 25, comentario en `deliverReplies`; gate + arnés en ambas configuraciones; PR (merge = señal del dueño) → deploy → por WhatsApp «¿tienen playeras en M?» llega Negra (con la frase) antes que verde; registrar en el quickstart y en la memoria
+
 
 - **Phase 1 (MS-Stock)** → bloquea todo lo demás (FR-1310). Se hace y despliega primero.
 - **Phase 2 (Foundational)** → bloquea US1–US4: la forma del turno y `deliverReplies`

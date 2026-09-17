@@ -351,6 +351,57 @@ existen y se persisten como hoy; el conjunto filtrado vive solo en el turno.
   playera roja en M?" responde como en la 026. Esta verificación cierra también la
   T057 pendiente de la 026.
 
+## Ajuste 2026-09-17 — orden de llegada de las fotos (extensión)
+
+**Hallazgo en la instancia de pruebas** (SC-007, capturas del dueño): el motor manda
+los mensajes en orden (FR-1306), pero Meta entrega cada imagen por URL **cuando termina
+de descargarla**, así que dos fotos seguidas pueden llegar invertidas al teléfono: la
+verde apareció antes que la Negra, que llevaba la frase de entrada. Decisión del dueño
+(2026-09-17): garantizar el orden esperando la confirmación de Meta.
+
+### User Story 5 - Las fotos llegan en el orden en que se mandaron (Priority: P2)
+
+Cuando el turno lleva varios mensajes, el cliente los ve en el orden en que el sistema
+los redactó: la frase de entrada siempre en el primero. El motor no manda el siguiente
+mensaje hasta que Meta confirma que el anterior con foto ya salió (`sent`), con un
+tope corto para que una confirmación que no llega no detenga la respuesta.
+
+**Independent Test**: en el arnés, tras «¿tienen playeras en G?» las imágenes quedan
+`sent` en el hilo (el mock emite el estado) y el outbox conserva el orden; con el
+estado retrasado más que el tope, el turno sigue igual y termina dentro del límite.
+
+**Acceptance Scenarios**:
+
+1. **Given** un turno de tres mensajes (imagen, texto, imagen), **When** el motor los
+   entrega, **Then** el segundo sale solo después de que Meta reportó `sent` del
+   primero (o pasaron 2 s), y el tercero sale sin esperar por el texto.
+2. **Given** que Meta no reporta `sent` de una foto (o tarda más de 2 s), **When** el
+   motor espera, **Then** al cumplirse el tope manda el siguiente igualmente, sin
+   texto de error ni retraso adicional.
+3. **Given** una conversación de prueba del Laboratorio o un canal sin acuses de
+   entrega, **When** el turno lleva fotos, **Then** no se espera nada (no hay estados
+   que esperar).
+
+### Functional Requirements (extensión)
+
+- **FR-1314**: Antes de enviar cada mensaje de un turno de varios, si el mensaje
+  anterior salió **con foto** por un canal con acuses de entrega, el motor MUST esperar
+  a que ese mensaje deje de estar `pending` (`sent`, `delivered`, `read` o `failed`) o a
+  que pasen **2 s**, lo que ocurra primero; tras un texto, o en conversaciones de prueba
+  y canales sin acuses, MUST NOT esperar. La espera MUST NOT cambiar qué se envía ni
+  cuántos mensajes salen.
+- **FR-1315**: El wa-mock MUST reportar `sent` (por el webhook, como Meta) unos
+  cientos de milisegundos después de aceptar una imagen por URL, para que el arnés
+  ejercite la espera real y no el tope; el arnés MUST comprobar que las imágenes de un
+  turno de varios quedan `sent` en el hilo y que el orden del outbox es el de envío.
+
+### Success Criteria (extensión)
+
+- **SC-008**: en el arnés, «¿tienen playeras en G?» deja las dos imágenes `sent` en el
+  hilo y el outbox en el orden negra · roja · gris; con el tope (estado nunca
+  reportado, test unitario con reloj falso), el segundo envío ocurre a los 2 s y no
+  antes; ninguna prueba de la 026/028 cambia de texto.
+
 ## Assumptions
 
 - **Decisiones del dueño (2026-09-15)**: agotadas y modelos sin la talla se omiten del
@@ -375,3 +426,7 @@ existen y se persisten como hoy; el conjunto filtrado vive solo en el turno.
 - **Fuera de alcance**: recordar fotos ya enviadas en turnos anteriores; elegir qué
   foto mandar cuando un modelo tenga varias (hoy tiene una); paginar ("mándame las
   otras"); filtrar por color o cualquier atributo distinto de la talla.
+- **Orden de llegada (ajuste 2026-09-17)**: se garantiza esperando el `sent` de Meta
+  con tope de 2 s por foto; un turno de 5 fotos puede tardar hasta ~10 s más en el
+  peor caso (estados que no llegan), aceptado por el dueño frente a ver la frase de
+  entrada en el segundo globo.
