@@ -36,6 +36,11 @@ export async function judgeCase(input: {
    * invisible, porque escalar suele no dejar mensaje.
    */
   handoff: { ocurrio: boolean; motivo: string | null };
+  /**
+   * 015 (FR-024) — La agenda como HECHO: si la instancia la tiene, y si en
+   * esta conversación quedó cita (con su etiqueta). El transcript no lo dice.
+   */
+  agenda?: { existe: boolean; citaAgendada: string | null };
   transcript: { role: "cliente" | "agente"; text: string }[];
   kbText: string;
   behaviorText: string;
@@ -44,6 +49,7 @@ export async function judgeCase(input: {
     persona: input.personaKey,
     expected: input.expected,
     handoff: input.handoff,
+    agenda: input.agenda,
     transcript: input.transcript,
     kbText: input.kbText,
     behaviorText: input.behaviorText,

@@ -4,6 +4,8 @@ import { newId } from "@/lib/db/ids";
 import { publish } from "@/server/events/bus";
 import { runAgentTurn } from "@/server/ai/pipeline";
 import { renderKb } from "@/server/ai/prompts";
+import { bookedInConversation } from "@/server/agenda/agent";
+import { agendaEnabled } from "@/server/agenda/flag";
 import { computeScore, judgeCase } from "@/server/lab/judge";
 import { type Persona } from "@/server/lab/personas";
 import { escenariosDe } from "@/server/lab/escenarios";
@@ -146,10 +148,20 @@ async function runAllCases(
       persona
     );
 
+    // 015 (FR-024) — La agenda como hecho para el juez: existe, y si en esta
+    // conversación quedó cita. Sin agenda no se menciona (ni un token).
+    const agenda = agendaEnabled()
+      ? {
+          existe: true,
+          citaAgendada: await bookedInConversation({ organizationId, conversationId }),
+        }
+      : undefined;
+
     const outcome = await judgeCase({
       personaKey: persona.key,
       expected: persona.expected,
       handoff,
+      agenda,
       transcript,
       kbText,
       behaviorText,

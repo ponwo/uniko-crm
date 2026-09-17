@@ -383,6 +383,30 @@ verificación final.
 
 ---
 
+## Phase 10: Ajuste 2026-09-17 — el agente incluido reserva (FR-023..FR-025)
+
+**Purpose**: cerrar el hueco encontrado al estrenar `AGENDA` en LanCo: el
+modelo no podía producir el `startUtc` de un hueco ofrecido, y el juez no sabía
+que había agenda. Ver "Ajuste 2026-09-17" del spec.
+
+- [X] T059 `src/server/agenda/agent.ts`: `offeredSlotsFor()` (lo ofrecido en la
+      conversación, para el prompt) y `bookedInConversation()` (la cita como
+      hecho para el juez) — el pipeline sigue sin aprender de agendas
+- [X] T060 `src/server/ai/prompts.ts` + `src/server/ai/pipeline.ts`: bloque
+      HORARIOS OFRECIDOS (etiqueta → `startUtc`) y regla de copiarlo tal cual
+      (FR-023); sin agenda, cero tokens — `tests/unit/agenda-prompt.test.ts`
+- [X] T061 `buildJudgePrompt` + `judge.ts` + `runner.ts`: la agenda como hecho
+      y si quedó cita (FR-024) — `tests/unit/judge-rubrica.test.ts`
+- [X] T062 `src/server/dev/ai-mock.ts`: `offer_slots` / `book_slot` solo
+      copiando el ISO del prompt (FR-025) — `tests/unit/ai-mock-agenda.test.ts`
+- [X] T063 `scripts/e2e-selftest.mjs` (015): el agente incluido ofrece y
+      agenda por wa-mock; `tests/e2e/us-agenda.md` sección nueva
+- [ ] T064 Verificación en vivo en `uniko-lanco` tras el merge: repetir el
+      escenario «Quiere agendar una cita» del Laboratorio — cita de prueba en
+      Citas y sin `alucinacion` por los horarios (SC-008)
+
+---
+
 ## Dependencies & Execution Order
 
 ### Phase Dependencies

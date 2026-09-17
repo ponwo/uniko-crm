@@ -82,3 +82,22 @@ mismo evento: **nunca** crea uno duplicado en el calendario del dueño.
 2. Con un conector externo activo, el estado del mock queda **vacío**: el
    proveedor jamás se entera de una cita de prueba. Se verifica por ausencia, y
    vale igual para crear, reprogramar y cancelar.
+
+## El agente incluido ofrece y agenda (ajuste 2026-09-17, FR-023/FR-025)
+
+Con `AGENDA=on`, el agente del CRM (no un cerebro externo) conduce la reserva
+completa. Antes de este ajuste el LLM real ofrecía bien y después re-ofrecía en
+bucle: nunca veía el instante exacto de lo ofrecido y el motor compara por epoch.
+
+1. Con el agente encendido, un lead escribe por wa-mock «Hola, quiero agendar
+   una cita» → la respuesta trae **horarios reales** con viñetas
+   (`offer_slots`; los pega el sistema).
+2. El mismo lead escribe «El primer horario, agéndamelo por favor» → la
+   respuesta **confirma la cita** y comparte la sala fija (`book_slot` copió el
+   `startUtc` del bloque HORARIOS OFRECIDOS del prompt).
+3. En **Citas** aparece la cita con `source: ai`, en el **primer hueco libre**
+   que había antes de ofrecer.
+4. Camino infeliz (modelado por el ai-mock): sin el bloque de ofrecidos en el
+   prompt, «el primer horario» **no reserva** y vuelve a ofrecer — el check 3 se
+   pone rojo. Es exactamente el fallo observado en LanCo, y por eso el arnés lo
+   detectaría si el contexto dejara de viajar.
