@@ -31,3 +31,15 @@ Verificado 2026-09-10 en la 024, desde un worktree bajo `.claude/worktrees/`.
 **Why:** cada punto costó una vuelta; juntos son media hora de arranque.
 **How to apply:** al abrir sesión en un worktree, hacer estos pasos antes de
 declarar nada rojo "de entorno". Ver también [[build-rojo-desde-la-unidad-g]].
+
+**Añadido 2026-09-17 (falsos rojos de inventario en el arnés)**: `next dev`
+compila cada ruta y página al primer uso, y una página pesada (`/inbox`,
+11 s) en medio de los checks de `check_stock` deja la búsqueda al stock-mock
+detrás de la compilación → «timeout al consultar MS-Stock» → el agente degrada
+(«Déjame revisar.») o no llega a tiempo. Dos corridas seguidas fallaron en un
+caso distinto cada una por esto. Antes de correr el arnés: NO dejar abierta la
+pestaña del panel de vista previa sobre `localhost:3000` (carga `/inbox`,
+`/login`, `/api/sw`), y calentar con `curl` las rutas de mocks e inventario y
+las páginas `/login`, `/inbox`, `/bookings`, `/settings/calendar`. El log
+`[agente] inventario: timeout al consultar MS-Stock` junto a un `Compiled /…`
+largo es la firma. Alternativa robusta: `pnpm build && pnpm start -p 3100`.
