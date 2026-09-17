@@ -1,5 +1,8 @@
 import { createHmac } from "node:crypto";
+import { eq } from "drizzle-orm";
 import { getEnv } from "@/lib/env";
+import { getDb, schema } from "@/lib/db";
+import { getCredentialsByOrg } from "@/server/whatsapp/credentials";
 import { nextN } from "@/server/dev/wa-mock-state";
 
 /**
@@ -274,3 +277,56 @@ export function buildTemplateStatusPayload(input: {
     ],
   };
 }
+
+/**
+ * Emite un estado (`sent`, `delivered`, `read`, `failed`) de un mensaje saliente por
+ * el webhook, como lo haría Meta. Resuelve el número por el mensaje persistido
+ * (el payload real lleva `metadata`). Devuelve `not_found` si el CRM aún no lo
+ * persistió (el mock lo llama justo después de aceptar el envío: reintentar).
+ */
+export async function emitOutboundStatus(input: {
+  waMessageId: string;
+  status: "sent" | "delivered" | "read" | "failed";
+  errorCode?: number;
+  errorMessage?: string;
+}): Promise<"ok" | "not_found" | "not_connected" | "webhook_error"> {
+  const db = getDb();
+  const rows = await db
+    .select({ organizationId: schema.message.organizationId })
+    .from(schema.message)
+    .where(eq(schema.message.waMessageId, input.waMessageId))
+    .limit(1);
+  if (!rows[0]) return "not_found";
+  const creds = await getCredentialsByOrg(rows[0].organizationId);
+  if (!creds) return "not_connected";
+  const res = await deliverToWebhook(
+    buildStatusPayload({
+      wabaId: creds.wabaId,
+      phoneNumberId: creds.phoneNumberId,
+      waMessageId: input.waMessageId,
+      status: input.status,
+      errorCode: input.errorCode,
+      errorMessage: input.errorMessage,
+    })
+  );
+  return res.ok ? "ok" : "webhook_error";
+}
+
+/**
+ * 028 (ajuste 2026-09-17, FR-1315) — Meta reporta `sent` de una imagen por URL
+ * poco después de aceptarla. El mock lo imita a los ~300 ms (y reintenta una vez
+ * si el CRM todavía no persistió el mensaje) para que el motor ejercite la espera
+ * real del orden (FR-1314) y no solo su tope.
+ */
+export function scheduleSentStatus(waMessageId: string, delayMs = 300): void {
+  const intento = async (restantes: number): Promise<void> => {
+    try {
+      const r = await emitOutboundStatus({ waMessageId, status: "sent" });
+      if (r === "not_found" && restantes > 0) setTimeout(() => void intento(restantes - 1), 500);
+    } catch {
+      // El mock nunca tumba nada: sin estado, el motor aplica su tope.
+    }
+  };
+  setTimeout(() => void intento(1), delayMs);
+}
+

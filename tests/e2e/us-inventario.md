@@ -107,6 +107,10 @@ El stock-mock devuelve `image_url` para `PLY-NEG` (`{origen}/icon-192.png`) y
     verde como texto dentro del límite.
 24. Laboratorio: "¿tienen playeras en M?" → dos mensajes `image` persistidos con la
     URL y el pie, sin tocar Graph.
+25. **Orden de llegada (ajuste 2026-09-17, FR-1314/FR-1315)**: tras «¿tienen
+    playeras en G?» las imágenes del hilo quedan `sent` (el wa-mock emite el estado
+    como Meta) y el motor no mandó la roja hasta tener el `sent` de la negra; con el
+    estado ausente, el tope de 2 s manda el siguiente igual (test unitario).
 
 ## US1 — Abrir el inventario desde Uniko sin llave
 

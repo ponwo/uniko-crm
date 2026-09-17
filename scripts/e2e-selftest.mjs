@@ -1709,6 +1709,9 @@ async function inventarioChecks() {
   );
 
   // El hilo del Inbox conserva cada imagen con su URL y su pie (FR-1305 + persistencia de la 026).
+  // Ajuste 2026-09-17 (FR-1314/FR-1315): el mock reporta `sent` de cada imagen como Meta y el
+  // motor esperó ese estado antes del siguiente mensaje: las imágenes quedan `sent`, no `pending`.
+  await sleep(700);
   const hiloG = await hiloDe("Lead inventario us1.G");
   const salidasG = hiloG.mensajes.filter((m) => m.direction === "out");
   ok(
@@ -1720,6 +1723,12 @@ async function inventarioChecks() {
       salidasG[2]?.media?.payload?.url === fotoDe("/icon-512.png?m=grs") &&
       salidasG[2]?.media?.caption === salidasG[2]?.text,
     JSON.stringify(salidasG.map((m) => [m.type, m.text, m.media?.payload?.url, m.status]))
+  );
+  ok(
+    "orden garantizado (FR-1314): las dos imágenes quedaron `sent` (el motor esperó el estado de la primera antes de seguir) y el outbox va negra · roja · gris",
+    salidasG.filter((m) => m.type === "image").every((m) => m.status === "sent") &&
+      enG.salientes.map((o) => o.type).join(",") === "image,text,image",
+    JSON.stringify(salidasG.map((m) => [m.type, m.status]))
   );
 
   // US4 — una foto falla: esa línea sale como texto, en su lugar; las demás con foto (FR-1306).

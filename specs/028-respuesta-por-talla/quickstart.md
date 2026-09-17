@@ -167,3 +167,16 @@ contrato §4 de MS-Stock actualizado antes del código · docs (`inventario-cone
   sin garantía. Ninguna cambia el contrato.
 - **No se promueve a `production`** (puerta de promoción: señal explícita del dueño).
 
+## Ajuste 2026-09-17 — orden de llegada de las fotos: self-test local (T041–T044)
+
+- `deliverReplies` espera el `sent` de la foto anterior (sondeo de `message.status`
+  cada 100 ms, tope 2 s) antes del siguiente mensaje; no tras un texto, ni en el
+  Laboratorio, ni en canales sin acuses. El wa-mock emite `sent` de cada imagen por URL
+  a los ~300 ms (reintenta si el CRM no la persistió aún), como Meta.
+- Gate: typecheck/lint/build limpios; `pnpm test` **749** (`deliver-replies` 11: espera
+  real, tope con reloj falso, sin espera tras texto, Laboratorio, foto rechazada).
+- Arnés `INVENTARIO=on` (base `uniko_dev_028f`): **164/164** — nuevo check «orden
+  garantizado: las dos imágenes quedaron `sent` y el outbox va negra · roja · gris»; el
+  caso de la foto lenta sigue dentro del límite (12.4 s). Bandera vacía (base
+  `uniko_dev_028foff`): **112/112**.
+
