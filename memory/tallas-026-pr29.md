@@ -1,6 +1,6 @@
 ---
 name: tallas-026-pr29
-description: "Extensión de la 026 para MS-Stock 005 (tallas en check_stock: variants/label/parent_sku, size en la acción, línea por modelo) — PR #29 abierta el 2026-09-14 con gate y arnés verdes; merge y deploy = señal del dueño"
+description: "Extensión de la 026 para MS-Stock 005 (tallas en check_stock: variants/label/parent_sku, size en la acción, línea por modelo) — PR #29 mergeada y desplegada el 2026-09-14/15; T057 cerrada el 2026-09-17 con la verificación en vivo de la 028"
 metadata:
   type: project
 ---

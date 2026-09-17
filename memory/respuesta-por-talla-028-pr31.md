@@ -1,6 +1,6 @@
 ---
 name: respuesta-por-talla-028-pr31
-description: "028 (respuesta por talla y fotos por producto en check_stock): PR #31 abierta el 2026-09-16 con gate, arnés en ambas configuraciones y verificación contra MS-Stock real en local verdes; merge = señal del dueño; luego SC-007 con los 4 modelos reales y cierre de la T057 de la 026"
+description: "028 (respuesta por talla y fotos por producto en check_stock): PR #31 mergeada y desplegada en uniko-lanco el 2026-09-16 (4d3662f), verificada por WhatsApp con los 4 modelos reales el 2026-09-17 (cierra la T057 de la 026); pendiente de decidir: orden de llegada de las fotos (Meta reordena imágenes por URL); NO promovida a production"
 metadata:
   type: project
 ---
@@ -36,13 +36,22 @@ Gotchas del arnés en esta máquina (además de `taskkill` para `next dev`):
   (idempotencia) y no resetear el outbox.
 - Better Auth exige `origin` en los endpoints de auth (sign-up 403 sin él).
 
-Pendiente (T039–T040): merge (dueño) → deploy de `uniko-lanco` → `/api/health` 10/10 →
-por WhatsApp o Laboratorio de `uniko.lanco.cloud` contra `stock.lanco.cloud`: «¿tienen
-playeras en G?» → Negra y roja con foto; «en M» → Negra y verde; «en XCH» → solo roja;
-«en 24» → frase; «playera roja en M» → 026 intacta → registrar en `quickstart.md` de la
-028 y cerrar la T057 de la 026 con la misma evidencia. **No promover a `production`**.
+Estado 2026-09-17: **mergeada y desplegada** (`4d3662f`, `/api/health` 10/10) y
+verificada por el dueño por WhatsApp con los 4 modelos reales: «tienes playeras talla
+grande» → Negra y roja, cada una con su foto y su línea (`talla G: 8 pieza — $300 MXN` /
+`talla G: 7 pieza — $219 MXN`); «y en talla m» → Negra y verde; «y en rojo talla m» →
+la roja sola con la redacción de la 026. Cierra la T057 de la 026. **No promovida a
+`production`** (señal aparte del dueño).
 
-**Why:** el trabajo quedó a una señal del dueño; la verificación en la instancia de
-pruebas necesita el deploy.
-**How to apply:** empezar por la PR #31 (rebase si `main` avanzó), no por el código.
-Ver [[tallas-026-pr29]] y [[conector-inventario-consume-el-contrato-de-ms-stock]].
+Hallazgo en vivo (pendiente de decidir, fuera de la 028): Meta entrega cada imagen por
+URL cuando termina de descargarla, así que dos fotos seguidas pueden llegar
+**invertidas** (la verde apareció antes que la Negra, que llevaba la frase de entrada).
+Opciones: esperar el estado `sent` del mensaje anterior (tope ~2 s) antes del siguiente,
+o una pausa fija corta. No proponerlo como hecho: el dueño decide.
+
+**Why:** la feature está cerrada de punta a punta; lo único abierto es una decisión de
+UX sobre el orden de llegada que no estaba en la spec.
+**How to apply:** si el dueño pide arreglar el orden, es un ajuste pequeño en
+`deliverReplies` (`src/server/ai/pipeline.ts`) con su test y su caso en el arnés; si
+pide promover, seguir la puerta de promoción de la constitución. Ver [[tallas-026-pr29]]
+y [[conector-inventario-consume-el-contrato-de-ms-stock]].

@@ -244,3 +244,13 @@ instancia de pruebas §5.2 registrados aquí.
   apps tiene `INVENTARIO` ni `STOCK_*`): sin sesión `/api/inventario/*` → 401 (igual
   que toda ruta autenticada) y con sesión → 404, como la agenda; `/api/dev/*` → 404.
   Solo `uniko-lanco` tiene el conector encendido.
+
+## Resultados de las tallas en la instancia de pruebas — 2026-09-17 (T057, cerrada con la 028)
+
+La PR #29 se mergeó y desplegó el 2026-09-14/15; la verificación por WhatsApp con un
+modelo real de `stock.lanco.cloud` se hizo el 2026-09-17, ya con la 028 desplegada
+(`4d3662f`): «y en rojo talla m» → un mensaje con la foto de la roja y el pie `Playera
+roja (PLY-ROJ) talla M: agotada — $219 MXN. Con existencia: XCH 2, CH 4, G 7, XG 1` —
+la redacción de un solo modelo de esta extensión, intacta. Detalle y el resto de los
+casos en `specs/028-respuesta-por-talla/quickstart.md`.
+

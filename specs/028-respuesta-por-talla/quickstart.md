@@ -127,3 +127,43 @@ contrato §4 de MS-Stock actualizado antes del código · docs (`inventario-cone
   `message_wa_message_id_unique` y salen como texto (falso rojo); (4) un `wa_message_id`
   repetido se descarta por idempotencia: un guion que se relanza debe generar los suyos.
 
+## Resultados en la instancia de pruebas — 2026-09-17 (T039–T040, SC-007)
+
+- PR #31 mergeada por el dueño el 2026-09-16 20:41 UTC (`4d3662f`); CI `default` y
+  `completo` verdes en `8497ba5`. Coolify desplegó `uniko-lanco` a las 20:48 UTC
+  (`[migrate] migraciones aplicadas`, `Ready in 1100ms`); `/api/health` **10/10** con
+  `commit: 4d3662f`. Log del contenedor sin ninguna línea `[agente]` (el camino feliz
+  no escribe).
+- **WhatsApp real** (el dueño, 2026-09-17 10:29–10:35 hora local; capturas en el chat),
+  contra los cuatro modelos reales de `stock.lanco.cloud`:
+  - «tienes playeras talla grande» → **dos mensajes de imagen**: foto de la Negra con pie
+    `Claro, déjame revisar qué playeras tenemos en talla grande, un momentito 😊` +
+    `Playera Negra (PLA-NGO) talla G: 8 pieza — $300 MXN`; foto de la roja con pie
+    `Playera roja (PLY-ROJ) talla G: 7 pieza — $219 MXN`. Azul y verde (sin G) no se
+    mencionan. La equivalencia «grande» ⇒ G funcionó con el modelo real.
+  - «y en talla m» → foto de la Negra (`talla M: 9 pieza — $300 MXN`, con la frase de
+    entrada) y foto de la verde (`talla M: 10 pieza — $200 MXN`); la roja (M agotada) y
+    la Azul (sin M) ausentes. **Observación**: en el teléfono la verde apareció (10:34)
+    antes que la Negra (10:35) aunque el motor las manda en ese orden: Meta descarga
+    cada imagen por URL y entrega cuando la tiene; la frase de entrada quedó en el
+    segundo globo. Ver "Ajuste pendiente" abajo.
+  - «y en rojo talla m» → un solo mensaje con foto: `Playera roja (PLY-ROJ) talla M:
+    agotada — $219 MXN. Con existencia: XCH 2, CH 4, G 7, XG 1` (026 intacta).
+  - Log de `ms-stock`: las tres consultas del agente (16:30:02, 16:34:50, 16:35:53 UTC)
+    llegaron como `GET /v1/agent/products/PLAYERA` → 404 → `GET /v1/agent/search` 200
+    (la palabra en singular, como pide el prompt; el primer intento como SKU es el
+    comportamiento vigente de `lookup`) y `GET /v1/agent/search` 200 para «playera
+    roja». Latencias 48–312 ms.
+  - No ejercidos por WhatsApp (sí en el arnés y contra MS-Stock local): «en XCH» (solo la
+    roja) y «en 24» (`Por ahora no tengo … en talla 24.`).
+- **Cierra la T057 de la 026** con esta misma evidencia (modelo real con tallas
+  respondido en la instancia de pruebas).
+- **Ajuste pendiente (decisión del dueño, fuera de la 028)**: garantizar el orden de
+  llegada de las fotos. Meta entrega cada imagen por URL cuando termina de
+  descargarla, así que dos fotos enviadas seguidas pueden llegar invertidas y la frase
+  de entrada aparecer en el segundo globo. Opciones: (a) esperar a que Meta reporte
+  `sent` del mensaje anterior (webhook de estado, ya se procesa) con tope de ~2 s antes
+  de mandar el siguiente; (b) una pausa fija corta (~1 s) entre imágenes — más simple,
+  sin garantía. Ninguna cambia el contrato.
+- **No se promueve a `production`** (puerta de promoción: señal explícita del dueño).
+
