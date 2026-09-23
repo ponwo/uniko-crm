@@ -73,3 +73,29 @@ describe("015 — el prompt y los horarios ofrecidos (FR-023)", () => {
     }
   });
 });
+
+/**
+ * 015 (ajuste 2026-09-23) — La otra mitad del fallo de LanCo fue de REDACCIÓN:
+ * el agente afirmó «a las 11:00 no tengo disponibilidad» cuando las 11:00
+ * estaban libres. No podía saberlo —no estaban en su lista—, así que la regla
+ * le prohíbe afirmarlo.
+ */
+describe("015 — el prompt prohíbe declarar falta de disponibilidad (ajuste 2026-09-23)", () => {
+  it("dice que la lista es más ancha que el menú y manda buscar la hora pedida", () => {
+    const p = prompt({ agenda: true, offeredSlots: ofrecidos });
+    expect(p).toMatch(/búscalos en HORARIOS OFRECIDOS y reserva ese/);
+    expect(p).toMatch(/muchos más de los tres que se le enseñaron/);
+  });
+
+  it("prohíbe afirmar ocupado/lleno/sin disponibilidad, y manda volver a ofrecer", () => {
+    const p = prompt({ agenda: true, offeredSlots: ofrecidos });
+    expect(p).toMatch(/NUNCA afirmes que está ocupado, lleno o que no hay disponibilidad/);
+    expect(p).toMatch(/di que lo confirmas y usa offer_slots/);
+  });
+
+  it("sin agenda, ninguna de esas reglas aparece", () => {
+    const p = prompt({ agenda: false, offeredSlots: ofrecidos });
+    expect(p).not.toMatch(/no hay disponibilidad/);
+    expect(p).not.toMatch(/HORARIOS OFRECIDOS/);
+  });
+});

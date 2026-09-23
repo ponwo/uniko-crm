@@ -101,3 +101,17 @@ bucle: nunca veía el instante exacto de lo ofrecido y el motor compara por epoc
    prompt, «el primer horario» **no reserva** y vuelve a ofrecer — el check 3 se
    pone rojo. Es exactamente el fallo observado en LanCo, y por eso el arnés lo
    detectaría si el contexto dejara de viajar.
+
+## El cliente pide SU hora, no la del menú (ajuste 2026-09-23, FR-027/FR-029)
+
+Medido en vivo en LanCo con un cliente real: tras ver tres horarios pidió «para
+mañana a las 11am», las 11:00 estaban libres y el agente le contestó que no
+había disponibilidad — el catálogo solo registraba tres huecos por día.
+
+1. Un lead nuevo escribe «Hola, quiero agendar una cita» → el menú enseña tres
+   horarios **y avisa** de que hay más («si te acomoda mejor otra hora…»).
+2. El mismo lead pide una hora libre **que no está en esos tres** («Mejor a las
+   14:30») → el agente **la agenda**.
+3. La cita queda en **esa** hora, no en una del menú.
+4. La respuesta **no** contiene «no hay disponibilidad», «ocupado» ni «lleno»:
+   el agente no puede saberlo, así que tiene prohibido afirmarlo.

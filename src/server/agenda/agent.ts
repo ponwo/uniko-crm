@@ -4,7 +4,7 @@ import { scoped } from "@/lib/db/tenant";
 import { labelInTz } from "@/lib/time/slots";
 import { computeAvailability } from "@/server/agenda/availability";
 import { getSettings } from "@/server/agenda/settings";
-import { spreadByDay } from "@/server/agenda/spread";
+import { catalogByDay } from "@/server/agenda/spread";
 import { getOffers, replaceOffers, type OfferedSlot } from "@/server/agenda/offers";
 import { BookingError, createSessionBooking } from "@/server/agenda/service";
 
@@ -22,8 +22,14 @@ import { BookingError, createSessionBooking } from "@/server/agenda/service";
 
 /** Cuántos huecos se le enseñan al cliente en un mensaje. */
 const SHOWN = 3;
-/** Cuántos se guardan como reservables: el catálogo es más ancho que el menú. */
-const OFFERED = 12;
+/**
+ * El CATÁLOGO reservable (lo que el modelo puede aceptar) es mucho más ancho
+ * que el menú: denso en los días próximos, ralo después. Ver `catalogByDay` —
+ * el porqué está medido en vivo con un cliente real.
+ */
+const OFFERED_DENSE_DAYS = 2;
+const OFFERED_PER_DAY_AFTER = 3;
+const OFFERED_MAX = 40;
 
 export type AgendaTurn = {
   /** Lo que hay que enviarle al cliente. */
@@ -90,10 +96,11 @@ export async function offerSlots(input: {
     settings,
     now,
   });
-  const spread = spreadByDay(all, {
+  const spread = catalogByDay(all, {
     timezone: settings.timezone,
-    limit: OFFERED,
-    perDay: 3,
+    denseDays: OFFERED_DENSE_DAYS,
+    perDayAfter: OFFERED_PER_DAY_AFTER,
+    limit: OFFERED_MAX,
     now,
   });
 
@@ -118,7 +125,13 @@ export async function offerSlots(input: {
   const shown = spread.slice(0, SHOWN);
   const lista = shown.map((s) => `• ${s.dayLabel} a las ${s.time}`).join("\n");
   const intro = input.intro?.trim() || "Tengo estos horarios disponibles:";
-  return { ok: true, text: `${intro}\n${lista}` };
+  // El menú son tres, el catálogo son decenas: si el cliente no lo sabe, cree
+  // que esas tres son toda la agenda y se va. Decírselo cuesta una línea.
+  const masOpciones =
+    spread.length > shown.length
+      ? "\nSi te acomoda mejor otra hora o algún otro día, dímelo y lo reviso."
+      : "";
+  return { ok: true, text: `${intro}\n${lista}${masOpciones}` };
 }
 
 export async function bookSlot(input: {

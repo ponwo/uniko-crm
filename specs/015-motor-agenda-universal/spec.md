@@ -581,7 +581,55 @@ agenda con clientes; el guardarraíl de epoch exacto no se afloja.
   escenario «Quiere agendar una cita» del Laboratorio termina con cita de
   prueba y sin `alucinacion` por los horarios.
 
-### Google: «Probar» y el scope (mismo ajuste, segundo hallazgo)
+## Ajuste 2026-09-23 — el catálogo reservable era demasiado ralo (extensión)
+
+**Hallazgo en la instancia de pruebas**, con un cliente real por WhatsApp
+(`uniko-lanco`, commit `f4c47d2`, conector Google ya conectado):
+
+```
+CLIENTE: Hola quiero agendar una cita
+AGENTE:  • jue 24, 09:00  • 09:30  • 10:00
+CLIENTE: Para mañana a las 11am
+AGENTE:  A las 11:00 am mañana no tengo disponibilidad 😅, pero estos sí…
+CLIENTE: Para las 10am
+AGENTE:  ¡Perfecto! … Enlace: https://meet.google.com/idw-qtvx-drn
+```
+
+Las **11:00 estaban libres** (los huecos reales de ese día eran 09:00, 09:30,
+10:30, 11:00 … 15:30). El motor registraba como reservables solo **3 huecos por
+día** (`spreadByDay` con `perDay: 3`), pensado para repartir ENTRE días; desde
+FR-023 ese catálogo es además lo único que el modelo ve, así que lo interpretó
+como la disponibilidad completa y **negó un hueco libre**. La cita se salvó
+porque el cliente insistió.
+
+Dos causas, una de datos y otra de redacción — y ninguna se arregla con un
+modelo mejor: con esos tres horarios delante, cualquier modelo respondería
+igual o inventaría uno.
+
+### Functional Requirements (extensión)
+
+- **FR-027**: El catálogo reservable del agente incluido MUST ser **denso en
+  los días próximos** (todos los huecos libres de los primeros N días) y ralo
+  después (unos pocos por día, para que «¿y el viernes?» siga teniendo
+  respuesta), con un tope duro porque lo registrado viaja al prompt. Pedir una
+  hora libre del día próximo MUST poder reservarse directamente.
+- **FR-028**: El prompt MUST prohibir afirmar que un horario está ocupado,
+  lleno o sin disponibilidad cuando no está en la lista —el agente no lo
+  sabe— y MUST mandar volver a ofrecer. El mensaje de oferta MUST avisar de que
+  hay más horarios que los tres que enseña.
+- **FR-029**: El ai-mock MUST modelar al cliente que pide una hora concreta
+  (busca esa hora en el bloque de ofrecidos y reserva ese instante; si no está,
+  re-ofrece sin declarar nada ocupado), y el arnés MUST comprobar que una hora
+  libre fuera del menú se agenda.
+
+### Success Criteria (extensión)
+
+- **SC-010**: En el arnés, tras ver el menú de tres, pedir una hora libre que
+  no está en él deja la cita **en esa hora**, y la respuesta no contiene
+  «no hay disponibilidad», «ocupado» ni «lleno». Volver a `perDay: 3` pone en
+  rojo `tests/unit/agenda-catalogo.test.ts` y ese check del arnés.
+
+### Google: «Probar» y el scope (segundo hallazgo del 2026-09-17)
 
 Al preparar la conexión de LanCo con Google Calendar se cotejó el conector
 contra la referencia de Calendar API: `calendar.events` —el scope que pide la

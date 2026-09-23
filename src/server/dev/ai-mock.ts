@@ -173,6 +173,36 @@ export function aiMockCompletion(messages: InMessage[]): string {
    * real en LanCo, y el check de la cita se pone rojo.
    */
   if (system.includes("offer_slots")) {
+    /*
+     * Una hora CONCRETA ("a las 11", "a las 11am"): se busca en el bloque de
+     * ofrecidos y se reserva esa. Modela lo que pasó en vivo en LanCo el
+     * 2026-09-23 — el cliente no elige del menú, pide su hora— y por eso este
+     * mock se pone rojo si el catálogo vuelve a registrar solo tres por día:
+     * la hora pedida no estaría en el prompt y no habría ISO que copiar.
+     */
+    const hora = lastUser.match(/\ba\s+las?\s+(\d{1,2})(?::(\d{2}))?\s*(am|pm|hrs?)?/i);
+    if (hora?.[1]) {
+      let h = Number(hora[1]);
+      if (/pm/i.test(hora[3] ?? "") && h < 12) h += 12;
+      const hhmm = `${String(h).padStart(2, "0")}:${hora[2] ?? "00"}`;
+      const linea = system
+        .split("\n")
+        .find((l) => /→ startUtc "/.test(l) && l.includes(hhmm));
+      const iso = linea?.match(/→ startUtc "([^"]+)"/)?.[1];
+      if (iso) {
+        return JSON.stringify({
+          action: "book_slot",
+          startUtc: iso,
+          reply: "¡Perfecto, queda agendado!",
+        });
+      }
+      // No está en el catálogo: se re-ofrece SIN afirmar que no hay hueco.
+      return JSON.stringify({
+        action: "offer_slots",
+        reply: "Déjame confirmarte los horarios que tengo:",
+      });
+    }
+
     const eligio = /\b(el primero|primer horario|primera opci[oó]n|ese horario|ag[eé]nda(me|lo))\b/i.test(
       lastUser
     );

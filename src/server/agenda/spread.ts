@@ -60,3 +60,63 @@ export function spreadByDay(
 export function daysWithAgenda(slots: SpreadSlot[]): string[] {
   return [...new Set(slots.map((s) => s.dayIso))];
 }
+
+/**
+ * 015 (ajuste 2026-09-23) — El CATÁLOGO reservable del agente incluido: DENSO
+ * en los días próximos, ralo en los siguientes.
+ *
+ * `spreadByDay` con `perDay: 3` reparte bien ENTRE días, pero deja casi vacío
+ * el día de hoy: de catorce huecos libres registraba tres. Medido en vivo en
+ * LanCo (2026-09-23) con un cliente real: pidió «para mañana a las 11am», las
+ * 11:00 estaban libres pero no estaban en el catálogo, y el agente le contestó
+ * que NO había disponibilidad. El cliente insistió y acabó agendando; otro se
+ * habría ido.
+ *
+ * Denso donde la gente pide hora ("¿y a las 11?") y ralo donde pide día ("¿y
+ * el viernes?"): las dos preguntas tienen respuesta legítima sin inflar el
+ * prompt, porque el catálogo entero viaja al modelo con su instante exacto
+ * (FR-023).
+ */
+export function catalogByDay(
+  slots: AvailableSlot[],
+  opts: {
+    timezone: string;
+    /** Días próximos de los que se registra TODO hueco libre. */
+    denseDays: number;
+    /** Cuántos por día a partir de ahí, para que "otro día" siga teniendo respuesta. */
+    perDayAfter: number;
+    /** Tope duro: lo que se registra también se le enseña al modelo. */
+    limit: number;
+    now?: Date;
+  }
+): SpreadSlot[] {
+  const { timezone, denseDays, perDayAfter, limit } = opts;
+  const now = opts.now ?? new Date();
+  if (limit <= 0) return [];
+
+  const byDay = new Map<string, AvailableSlot[]>();
+  for (const slot of slots) {
+    const dayIso = dayIsoInTz(new Date(slot.startUtc), timezone);
+    const bucket = byDay.get(dayIso);
+    if (bucket) bucket.push(slot);
+    else byDay.set(dayIso, [slot]);
+  }
+
+  const out: SpreadSlot[] = [];
+  let dayIndex = 0;
+  for (const [dayIso, daySlots] of byDay) {
+    const cuantos = dayIndex < denseDays ? daySlots.length : perDayAfter;
+    dayIndex += 1;
+    if (cuantos <= 0) continue;
+    for (const slot of daySlots.slice(0, cuantos)) {
+      if (out.length >= limit) return out;
+      out.push({
+        ...slot,
+        dayIso,
+        dayLabel: dayLabelInTz(slot.startUtc, timezone, now),
+        time: timeInTz(slot.startUtc, timezone),
+      });
+    }
+  }
+  return out;
+}

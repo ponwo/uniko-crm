@@ -54,3 +54,37 @@ describe("015 — ai-mock y la agenda", () => {
     expect(r.text).toContain("Respuesta de prueba");
   });
 });
+
+/**
+ * Ajuste 2026-09-23 — El cliente real no elige del menú: pide SU hora. El mock
+ * lo modela buscando esa hora en el bloque de ofrecidos; si el catálogo vuelve
+ * a ser ralo, no la encuentra y el arnés se pone rojo.
+ */
+describe("015 — ai-mock y la hora concreta", () => {
+  it("«a las 16:30» con esa hora en el catálogo → la reserva", () => {
+    const system = [
+      ACCIONES,
+      "HORARIOS OFRECIDOS EN ESTA CONVERSACIÓN:",
+      '1. jue 24 sep, 09:00 → startUtc "2026-09-24T15:00:00.000Z"',
+      '2. jue 24 sep, 16:30 → startUtc "2026-09-24T22:30:00.000Z"',
+    ].join("\n");
+    const r = run(system, "Mejor a las 16:30");
+    expect(r.action).toBe("book_slot");
+    expect(r.startUtc).toBe("2026-09-24T22:30:00.000Z");
+  });
+
+  it("«a las 11am» entiende el am/pm y elige esa línea", () => {
+    const system = [
+      ACCIONES,
+      '1. jue 24 sep, 09:00 → startUtc "2026-09-24T15:00:00.000Z"',
+      '2. jue 24 sep, 11:00 → startUtc "2026-09-24T17:00:00.000Z"',
+    ].join("\n");
+    expect(run(system, "Para mañana a las 11am").startUtc).toBe("2026-09-24T17:00:00.000Z");
+  });
+
+  it("una hora que NO está en el catálogo se re-ofrece, sin declarar nada ocupado", () => {
+    const r = run(CON_OFRECIDOS, "Para mañana a las 11am");
+    expect(r.action).toBe("offer_slots");
+    expect(r.reply).not.toMatch(/no hay disponibilidad|ocupad|lleno/i);
+  });
+});

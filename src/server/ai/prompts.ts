@@ -83,6 +83,8 @@ export function buildAgentSystemPrompt(input: {
     ? [
         "- NUNCA escribas tú los horarios ni los inventes: usa offer_slots y el sistema pega los reales.",
         "- book_slot solo acepta un horario de la lista HORARIOS OFRECIDOS: copia su startUtc TAL CUAL (nunca lo calcules ni lo conviertas). «El primero» es el 1 de esa lista. Si la lista está vacía o el cliente pide otro día, vuelve a ofrecer con offer_slots.",
+        "- Si el cliente pide una hora o un día CONCRETOS, búscalos en HORARIOS OFRECIDOS y reserva ese: la lista trae muchos más de los tres que se le enseñaron.",
+        "- Si lo que pide NO está en la lista, NUNCA afirmes que está ocupado, lleno o que no hay disponibilidad —no lo sabes—: di que lo confirmas y usa offer_slots.",
         "- Si el cliente quiere CANCELAR una cita → handoff: esa decisión no es tuya.",
       ]
     : [];
