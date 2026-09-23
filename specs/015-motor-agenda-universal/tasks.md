@@ -401,9 +401,20 @@ que había agenda. Ver "Ajuste 2026-09-17" del spec.
       copiando el ISO del prompt (FR-025) — `tests/unit/ai-mock-agenda.test.ts`
 - [X] T063 `scripts/e2e-selftest.mjs` (015): el agente incluido ofrece y
       agenda por wa-mock; `tests/e2e/us-agenda.md` sección nueva
-- [ ] T064 Verificación en vivo en `uniko-lanco` tras el merge: repetir el
+- [X] T064 Verificación en vivo en `uniko-lanco` tras el merge: repetir el
       escenario «Quiere agendar una cita» del Laboratorio — cita de prueba en
-      Citas y sin `alucinacion` por los horarios (SC-008)
+      Citas y sin `alucinacion` por los horarios (SC-008). **Hecha 2026-09-17**
+      con `e44d91b` desplegado (corrida `run_ntw8oru9cot0fissi84p`, LLM real):
+      ofreció vie 18 sep 09:00/09:30/10:00, «¡Listo! Te agendé el viernes 18 de
+      septiembre a las 09:00», veredicto verde sin hallazgos; en Citas la cita
+      `ai` de prueba a las 09:00; «Errores y modismos» pasó de rojo/alucinación
+      a verde; score 46 → 65
+- [X] T065 Google «Probar» con `events.list` (FR-026): conector, google-mock
+      (403 a `calendars.get`), suite de contrato, tramo de Google en el arnés y
+      pasos de obtención de credenciales en `docs/agenda-conectores.md`
+- [ ] T066 Conectar Google en `uniko-lanco` con el proyecto `agendamiento-lanco`
+      (el dueño obtiene las credenciales; «Probar» conecta a la primera) y una
+      cita real con evento + Meet (SC-009)
 
 ---
 
