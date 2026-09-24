@@ -59,6 +59,8 @@ export function agendaDisabledResponse(): Response {
  * puede no bastar ahí. Poner el modelo bueno en TODOS los turnos multiplica el
  * costo de cada conversación del negocio; aquí se paga solo en la ventana en
  * la que se decide una cita.
+ *
+ * Ej.: `AGENDA_MODEL=openai/gpt-6-luna`.
  */
 export function agendaModel(): string | undefined {
   const raw = (process.env.AGENDA_MODEL ?? "").trim();

@@ -38,7 +38,7 @@ const envSchema = z.object({
   // esta eligiendo horario (hay horarios ofrecidos en esa conversacion). Sin
   // ella se usa OPENROUTER_MODEL en todos los turnos. Existe para pagar un
   // modelo mejor donde se decide una cita sin multiplicar el costo de toda la
-  // conversacion. Ej.: AGENDA_MODEL=anthropic/claude-sonnet-5
+  // conversacion. Ej.: AGENDA_MODEL=openai/gpt-6-luna
   AGENDA_MODEL: z.string().optional(),
   // 020: notificaciones push cuando el agente escala. Apagadas por defecto
   // (ADR-003): Web Push se entrega por FCM/APNs, que es un tercero en runtime,
