@@ -412,9 +412,34 @@ que había agenda. Ver "Ajuste 2026-09-17" del spec.
 - [X] T065 Google «Probar» con `events.list` (FR-026): conector, google-mock
       (403 a `calendars.get`), suite de contrato, tramo de Google en el arnés y
       pasos de obtención de credenciales en `docs/agenda-conectores.md`
-- [ ] T066 Conectar Google en `uniko-lanco` con el proyecto `agendamiento-lanco`
+- [X] T066 Conectar Google en `uniko-lanco` con el proyecto `agendamiento-lanco`
       (el dueño obtiene las credenciales; «Probar» conecta a la primera) y una
-      cita real con evento + Meet (SC-009)
+      cita real con evento + Meet (SC-009). **Hecha 2026-09-23**: conectado
+      (`primary`), contrato completo verificado contra Google real — crear
+      (Meet a la primera, sin `linkPending`), reprogramar (mueve y CONSERVA el
+      enlace) y cancelar (borra el evento), confirmado por el dueño en su
+      calendario; conector de la agenda puesto en `google`
+
+---
+
+## Phase 11: Ajuste 2026-09-23 — el catálogo denso (FR-027..FR-029)
+
+**Purpose**: un cliente real pidió una hora libre y el agente le dijo que no
+había disponibilidad. Ver "Ajuste 2026-09-23" del spec.
+
+- [X] T067 `spread.ts`: `catalogByDay` (denso en los días próximos, ralo
+      después, con tope) y `agent.ts` lo usa — `tests/unit/agenda-catalogo.test.ts`
+- [X] T068 `prompts.ts`: prohibido declarar ocupado/lleno/sin disponibilidad;
+      buscar la hora pedida en el catálogo (FR-028). El mensaje de oferta avisa
+      de que hay más horarios — `tests/unit/agenda-prompt.test.ts`
+- [X] T069 `ai-mock.ts`: el cliente que pide SU hora (FR-029) y el tramo del
+      arnés que lo comprueba — `tests/unit/ai-mock-agenda.test.ts`
+- [ ] T070 Etapa 2 (acordada con el dueño): escenarios duros de agenda en el
+      Laboratorio de LanCo —hora fuera del menú, hora fuera de horario,
+      lenguaje vago ("temprano", "después de comer"), cambio de opinión a media
+      conversación— y comparar contra el baseline (score 65, mismo conjunto y
+      rúbrica). Solo si queda algo rojo se pasa a la etapa 3 (`AGENDA_MODEL`
+      con un modelo especializado; hoy la instancia corre `z-ai/glm-5.3-flash`)
 
 ---
 

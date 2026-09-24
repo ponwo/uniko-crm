@@ -1569,6 +1569,70 @@ async function agendaChecks() {
       JSON.stringify({ citaC, primeroLibre })
     );
 
+    /* -- El cliente no elige del menú: pide SU hora (ajuste 2026-09-23) -- */
+    //
+    // Medido en vivo en LanCo con un cliente real: tras ver tres horarios pidió
+    // «para mañana a las 11am». Las 11:00 estaban LIBRES, pero el catálogo solo
+    // registraba tres huecos por día, así que no había ISO que copiar y el
+    // agente le contestó que no había disponibilidad. Si el catálogo vuelve a
+    // ser ralo, este check se pone rojo.
+    const libres = (await api("/api/calendar/availability")).json?.slots ?? [];
+    const dia0 = libres[0]?.dayIso;
+    const delDia = libres.filter((s) => s.dayIso === dia0);
+    if (delDia.length > 4) {
+      const pedido = delDia[Math.min(5, delDia.length - 1)];
+      const LEAD_D = "5214627015004";
+      async function decirD(texto, n) {
+        const antes = (await outboxDe(LEAD_D)).length;
+        await api("/api/dev/wa-mock/inbound", {
+          method: "POST",
+          body: JSON.stringify({
+            phoneNumberId: PN,
+            from: LEAD_D,
+            name: "Lead agenda D",
+            text: texto,
+            waMessageId: `wamid.e2e.015.hora.${n}`,
+          }),
+        });
+        const hasta = Date.now() + ventana;
+        while (Date.now() < hasta) {
+          const ahora = await outboxDe(LEAD_D);
+          if (ahora.length > antes) return textoDe(ahora[ahora.length - 1]);
+          await sleep(400);
+        }
+        return null;
+      }
+
+      const menu = await decirD("Hola, quiero agendar una cita", "1");
+      ok(
+        "el menú avisa de que hay más horarios que los tres que enseña",
+        typeof menu === "string" && /otra hora|otro d[ií]a/i.test(menu),
+        JSON.stringify(menu)
+      );
+      const respuesta = await decirD(`Mejor a las ${pedido.time}`, "2");
+      ok(
+        "una hora libre FUERA del menú se agenda, no se rechaza",
+        typeof respuesta === "string" && /queda agendado|Te agendé/i.test(respuesta),
+        JSON.stringify({ pidio: pedido.time, respuesta })
+      );
+      ok(
+        "…y NUNCA se le dice al cliente que no hay disponibilidad",
+        typeof respuesta === "string" &&
+          !/no hay disponibilidad|no tengo disponibilidad|est[áa] ocupad|lleno/i.test(respuesta),
+        JSON.stringify(respuesta)
+      );
+      const citaD = ((await api("/api/bookings")).json?.bookings ?? []).find(
+        (b) => b.contact?.name === "Lead agenda D" && b.status === "agendada"
+      );
+      ok(
+        "la cita quedó en la hora que pidió el cliente, no en la del menú",
+        citaD?.scheduledAtUtc === pedido.startUtc,
+        JSON.stringify({ pedido, citaD })
+      );
+    } else {
+      console.log("  (quedan pocos huecos hoy: se omite el check de «pide su hora»)");
+    }
+
     await api("/api/agent/profile", {
       method: "PUT",
       body: JSON.stringify({ enabled: perfilAntes?.enabled ?? false }),
