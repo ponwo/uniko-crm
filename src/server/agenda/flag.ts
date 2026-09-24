@@ -49,3 +49,41 @@ export function agendaEnabled(): boolean {
 export function agendaDisabledResponse(): Response {
   return new Response(null, { status: 404 });
 }
+
+/**
+ * 015 (ajuste 2026-09-23) — Modelo distinto SOLO para los turnos en los que se
+ * está agendando. Sin definir, no cambia nada: se usa `OPENROUTER_MODEL`.
+ *
+ * Existe porque elegir horario premia obediencia literal (copiar un ISO exacto
+ * de una lista) más que conversar, y un modelo barato que basta para charlar
+ * puede no bastar ahí. Poner el modelo bueno en TODOS los turnos multiplica el
+ * costo de cada conversación del negocio; aquí se paga solo en la ventana en
+ * la que se decide una cita.
+ */
+export function agendaModel(): string | undefined {
+  const raw = (process.env.AGENDA_MODEL ?? "").trim();
+  return raw.length > 0 ? raw : undefined;
+}
+
+/**
+ * Qué modelo conduce ESTE turno.
+ *
+ * La ventana es "hay horarios ofrecidos en esta conversación": el motor los
+ * registra al ofrecer y los borra al reservar, así que cubre exactamente los
+ * turnos en los que el cliente elige («a las 11», «mejor el viernes», «el
+ * primero») — que es donde se pierde o se gana la cita.
+ *
+ * El turno de ENTRADA («quiero agendar») lo sigue resolviendo el modelo
+ * normal: ahí solo hay que reconocer la intención, y los horarios los pega el
+ * motor, no el modelo. Si algún día se midiera que la intención se falla, esa
+ * es la decisión a revisar — no esta función.
+ *
+ * `undefined` significa "el de siempre": `chatJson` cae en `OPENROUTER_MODEL`.
+ */
+export function modelForTurn(input: {
+  agenda: boolean;
+  ofrecidos: number;
+}): string | undefined {
+  if (!input.agenda || input.ofrecidos <= 0) return undefined;
+  return agendaModel();
+}

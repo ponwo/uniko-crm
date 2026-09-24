@@ -1513,15 +1513,21 @@ async function agendaChecks() {
         (o) => o.to === to || o.to === alCable(to)
       );
     const textoDe = (o) => o?.body?.text?.body ?? JSON.stringify(o?.body ?? "");
-    /** Manda un inbound y espera la PRIMERA respuesta del agente a ese lead. */
-    async function decir(lead, texto, n) {
+    /**
+     * Manda un inbound y espera la PRIMERA respuesta del agente a ese lead.
+     * Devuelve también cuánto tardó: un `null` sin el tiempo no deja
+     * distinguir "el agente no contestó" de "contestó fuera de la ventana",
+     * que son dos diagnósticos muy distintos.
+     */
+    async function decir(lead, texto, n, nombre = "Lead agenda C") {
       const antes = (await outboxDe(lead)).length;
+      const t0 = Date.now();
       await api("/api/dev/wa-mock/inbound", {
         method: "POST",
         body: JSON.stringify({
           phoneNumberId: PN,
           from: lead,
-          name: "Lead agenda C",
+          name: nombre,
           text: texto,
           waMessageId: `wamid.e2e.015.agente.${n}`,
         }),
@@ -1529,14 +1535,24 @@ async function agendaChecks() {
       const hasta = Date.now() + ventana;
       while (Date.now() < hasta) {
         const ahora = await outboxDe(lead);
-        if (ahora.length > antes) return textoDe(ahora[ahora.length - 1]);
+        if (ahora.length > antes) {
+          return { text: textoDe(ahora[ahora.length - 1]), ms: Date.now() - t0 };
+        }
         await sleep(400);
       }
-      return null;
+      return { text: null, ms: Date.now() - t0 };
     }
 
     const perfilAntes = (await api("/api/agent/profile")).json?.profile;
     await api("/api/agent/profile", { method: "PUT", body: JSON.stringify({ enabled: true }) });
+
+    // Turno de descarte: el PRIMER turno del agente en la corrida paga el
+    // arranque en frío (el pipeline y el proveedor entran por primera vez), y
+    // con el debounce encima se come la ventana. Se paga aquí, fuera de los
+    // checks, para que lo que se mide sea el comportamiento y no el arranque.
+    const calentar = await decir("5214627015009", "hola", "0", "Lead calentamiento");
+    console.log(`  (turno de calentamiento: ${calentar.ms} ms)`);
+
     const LEAD_C = "5214627015003";
     // El primer hueco libre ANTES de ofrecer: es el que "el primero" debe reservar.
     const primeroLibre = ((await api("/api/calendar/availability")).json?.slots ?? [])[0];
@@ -1544,20 +1560,21 @@ async function agendaChecks() {
     const oferta = await decir(LEAD_C, "Hola, quiero agendar una cita", "1");
     ok(
       "«quiero agendar una cita» → el agente ofrece horarios reales (offer_slots)",
-      typeof oferta === "string" && oferta.includes("•"),
+      typeof oferta.text === "string" && oferta.text.includes("•"),
       JSON.stringify(oferta)
     );
     const reserva = await decir(LEAD_C, "El primer horario, agéndamelo por favor", "2");
     ok(
       "«el primer horario» → el agente agenda copiando el ISO ofrecido (book_slot)",
-      typeof reserva === "string" && /queda agendado|Te agendé/i.test(reserva),
+      typeof reserva.text === "string" && /queda agendado|Te agendé/i.test(reserva.text),
       JSON.stringify(reserva)
     );
     ok(
       "…y comparte la sala fija en la confirmación",
-      typeof reserva === "string" && reserva.includes(SALA),
+      typeof reserva.text === "string" && reserva.text.includes(SALA),
       JSON.stringify(reserva)
     );
+    console.log(`  (turnos de agenda: ${oferta.ms} ms y ${reserva.ms} ms)`);
     const citaC = ((await api("/api/bookings")).json?.bookings ?? []).find(
       (b) => b.contact?.name === "Lead agenda C" && b.status === "agendada"
     );
@@ -1603,13 +1620,42 @@ async function agendaChecks() {
         return null;
       }
 
+        // AGENDA_MODEL (ajuste 2026-09-23): el modelo bueno SOLO en la ventana
+      // de elegir horario. Es una promesa de costo, así que se comprueba con
+      // el modelo que el ai-mock recibió en cada turno, no de palabra.
+      const AGENDA_MODEL = (process.env.AGENDA_MODEL ?? "").trim();
+      const MODELO_BASE = (process.env.OPENROUTER_MODEL ?? "").trim();
+      await fetch(`${BASE}/api/dev/ai-mock/_state`, { method: "POST" });
+
       const menu = await decirD("Hola, quiero agendar una cita", "1");
       ok(
         "el menú avisa de que hay más horarios que los tres que enseña",
         typeof menu === "string" && /otra hora|otro d[ií]a/i.test(menu),
         JSON.stringify(menu)
       );
+      const trasMenu = (await (await fetch(`${BASE}/api/dev/ai-mock/_state`)).json())
+        .lastModel;
       const respuesta = await decirD(`Mejor a las ${pedido.time}`, "2");
+      const trasElegir = (await (await fetch(`${BASE}/api/dev/ai-mock/_state`)).json())
+        .lastModel;
+      if (AGENDA_MODEL) {
+        ok(
+          "el turno de ENTRADA no paga el modelo de agenda",
+          trasMenu === MODELO_BASE,
+          JSON.stringify({ trasMenu, MODELO_BASE })
+        );
+        ok(
+          "el turno de ELEGIR horario sí lo usa (AGENDA_MODEL)",
+          trasElegir === AGENDA_MODEL,
+          JSON.stringify({ trasElegir, AGENDA_MODEL })
+        );
+      } else {
+        ok(
+          "sin AGENDA_MODEL, todos los turnos usan el modelo de siempre",
+          trasMenu === MODELO_BASE && trasElegir === MODELO_BASE,
+          JSON.stringify({ trasMenu, trasElegir, MODELO_BASE })
+        );
+      }
       ok(
         "una hora libre FUERA del menú se agenda, no se rechaza",
         typeof respuesta === "string" && /queda agendado|Te agendé/i.test(respuesta),
@@ -2185,6 +2231,13 @@ async function inventarioChecks() {
 
   /* ---------- US3: estado del conector ---------- */
   console.log("\n== 026: estado del conector en Ajustes (US3) ==");
+  // Este check mide lo que tarda el CONECTOR, no lo que tarda `next dev` en
+  // compilar la ruta. Medido el 2026-09-23: el servidor de desarrollo descarta
+  // las rutas inactivas, así que a mitad de corrida recompiló esta en 8,1 s y
+  // el primer GET tardó 8.901 ms — ya compilada responde en ~100 ms. Calentar
+  // al arrancar el arnés no basta (para entonces ya se descartó), así que se
+  // hace aquí, pegado a la medición. Un fallo tras esto SÍ es del producto.
+  await api("/api/inventario/status");
   const t0 = Date.now();
   const st = await api("/api/inventario/status");
   ok(

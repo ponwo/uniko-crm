@@ -434,6 +434,18 @@ había disponibilidad. Ver "Ajuste 2026-09-23" del spec.
       de que hay más horarios — `tests/unit/agenda-prompt.test.ts`
 - [X] T069 `ai-mock.ts`: el cliente que pide SU hora (FR-029) y el tramo del
       arnés que lo comprueba — `tests/unit/ai-mock-agenda.test.ts`
+- [X] T071 `AGENDA_MODEL` (FR-030): modelo solo en los turnos con horarios
+      ofrecidos; `modelForTurn` en `agenda/flag.ts`, el ai-mock registra el
+      modelo de cada turno (`GET /api/dev/ai-mock/_state`) y el arnés comprueba
+      la ventana — `tests/unit/agenda-model.test.ts`
+- [X] T072 El juez entra en la rúbrica (021 FR-632..FR-634): sin migración,
+      dentro de `rubric_version`; motivo `juez` en la UI —
+      `tests/unit/lab-conjunto.test.ts`
+- [X] T073 Arnés: turno de calentamiento y tiempos reportados. Medido el
+      2026-09-23: el PRIMER turno del agente de la corrida tarda 18.522 ms
+      (arranque en frío del pipeline) y no cabía en la ventana de 14 s; los
+      siguientes, 9.449 y 6.735 ms. Se paga fuera de los checks en vez de
+      relajar el límite, y un `null` mudo pasa a decir cuántos ms tardó
 - [ ] T070 Etapa 2 (acordada con el dueño): escenarios duros de agenda en el
       Laboratorio de LanCo —hora fuera del menú, hora fuera de horario,
       lenguaje vago ("temprano", "después de comer"), cambio de opinión a media
