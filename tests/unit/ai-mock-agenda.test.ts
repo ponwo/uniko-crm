@@ -88,3 +88,95 @@ describe("015 — ai-mock y la hora concreta", () => {
     expect(r.reply).not.toMatch(/no hay disponibilidad|ocupad|lleno/i);
   });
 });
+
+/**
+ * Ajuste 2026-09-25 — Mover no es reservar. El mock distingue por el verbo,
+ * como haría un modelo real; si no hay cita que mover, eso lo dice el motor.
+ */
+describe("015 — ai-mock y mover la cita", () => {
+  const CON_MOVE = [
+    ACCIONES,
+    '- {"action":"move_slot","startUtc":"..."}',
+    "HORARIOS OFRECIDOS EN ESTA CONVERSACIÓN:",
+    '1. lun 28 sep, 11:00 → startUtc "2026-09-28T17:00:00.000Z"',
+    '2. lun 28 sep, 14:00 → startUtc "2026-09-28T20:00:00.000Z"',
+  ].join("\n");
+
+  it("«cámbiamela a las 14:00» → move_slot con ese instante", () => {
+    const r = run(CON_MOVE, "Uy, ya no puedo. ¿Me la cambias a las 14:00?");
+    expect(r.action).toBe("move_slot");
+    expect(r.startUtc).toBe("2026-09-28T20:00:00.000Z");
+  });
+
+  it("«resérvame a las 14:00» sigue siendo book_slot", () => {
+    const r = run(CON_MOVE, "Agéndamela a las 14:00");
+    expect(r.action).toBe("book_slot");
+    expect(r.startUtc).toBe("2026-09-28T20:00:00.000Z");
+  });
+
+  it("sin la acción en el prompt no se propone mover (bandera apagada)", () => {
+    const sinMove = [
+      ACCIONES,
+      '1. lun 28 sep, 14:00 → startUtc "2026-09-28T20:00:00.000Z"',
+    ].join("\n");
+    expect(run(sinMove, "¿Me la cambias a las 14:00?").action).toBe("book_slot");
+  });
+});
+
+/**
+ * Ajuste 2026-09-25 — Con cita ya hecha, pedir otra hora es MOVER aunque el
+ * cliente no use el verbo («sí, a las 14:00»). Es el caso que producía dos
+ * citas para el mismo cliente.
+ */
+describe("015 — ai-mock: con cita actual, elegir hora mueve", () => {
+  const CON_CITA = [
+    ACCIONES,
+    '- {"action":"move_slot","startUtc":"..."}',
+    "CITA ACTUAL DE ESTE CLIENTE: lun 28 sep, 11:00.",
+    "HORARIOS OFRECIDOS EN ESTA CONVERSACIÓN:",
+    '1. lun 28 sep, 14:00 → startUtc "2026-09-28T20:00:00.000Z"',
+  ].join("\n");
+
+  it("«sí, a las 14:00» con cita actual → move_slot", () => {
+    const r = run(CON_CITA, "Sí, a las 14:00");
+    expect(r.action).toBe("move_slot");
+    expect(r.startUtc).toBe("2026-09-28T20:00:00.000Z");
+  });
+
+  it("sin cita actual, «sí, a las 14:00» sigue siendo reservar", () => {
+    const sinCita = [
+      ACCIONES,
+      '- {"action":"move_slot","startUtc":"..."}',
+      '1. lun 28 sep, 14:00 → startUtc "2026-09-28T20:00:00.000Z"',
+    ].join("\n");
+    expect(run(sinCita, "Sí, a las 14:00").action).toBe("book_slot");
+  });
+});
+
+/**
+ * Ajuste 2026-09-25 — La hora se busca en la ETIQUETA, no en la línea entera.
+ *
+ * Salió en el arnés: México es UTC-6, así que la línea de las 10:00 lleva
+ * «T16:00:00.000Z» en su ISO. Buscando en toda la línea, pedir las 16:00
+ * movía la cita a las 10:00 — y el arnés habría dado por bueno el mock.
+ */
+describe("015 — ai-mock: la hora del ISO no se confunde con la pedida", () => {
+  const CATALOGO = [
+    ACCIONES,
+    "HORARIOS OFRECIDOS EN ESTA CONVERSACIÓN:",
+    '1. sáb 26 sep, 10:00 → startUtc "2026-09-26T16:00:00.000Z"',
+    '2. sáb 26 sep, 16:00 → startUtc "2026-09-26T22:00:00.000Z"',
+  ].join("\n");
+
+  it("«a las 16:00» toma la de las 16:00, no la que la lleva en el ISO", () => {
+    expect(run(CATALOGO, "Agéndame a las 16:00").startUtc).toBe(
+      "2026-09-26T22:00:00.000Z"
+    );
+  });
+
+  it("«a las 10:00» sigue tomando la suya", () => {
+    expect(run(CATALOGO, "Agéndame a las 10:00").startUtc).toBe(
+      "2026-09-26T16:00:00.000Z"
+    );
+  });
+});

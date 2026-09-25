@@ -45,6 +45,18 @@ const agendaActions = [
     startUtc: z.string().min(1),
     reply: z.string().optional(),
   }),
+  /*
+   * Mover la cita de ESTA conversación (ajuste 2026-09-25). Cambiar de hora es
+   * lo más común que pasa de verdad, y sin esta acción acababa en un humano.
+   *
+   * Cancelar NO está aquí, a propósito: borrar la cita de un cliente es
+   * irreversible y esa decisión sigue siendo de una persona.
+   */
+  z.object({
+    action: z.literal("move_slot"),
+    startUtc: z.string().min(1),
+    reply: z.string().optional(),
+  }),
 ] as const;
 
 /**
@@ -107,6 +119,7 @@ export function degradeAction(action: AgentActionType): AgentActionType {
     action.action === "move_stage" ||
     action.action === "offer_slots" ||
     action.action === "book_slot" ||
+    action.action === "move_slot" ||
     action.action === "check_stock"
   ) {
     return action.reply

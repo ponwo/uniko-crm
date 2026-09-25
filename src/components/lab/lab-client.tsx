@@ -26,7 +26,7 @@ import { Textarea } from "@/components/ui/textarea";
 
 type Run = {
   id: string;
-  status: "running" | "done" | "failed";
+  status: "running" | "done" | "failed" | "incompleto";
   score: number | null;
   error: string | null;
   startedAt: string;
@@ -371,6 +371,12 @@ function ScoreBadge({ run }: { run: Run }) {
   if (run.status === "running") return <Badge variant="secondary">En curso…</Badge>;
   if (run.status === "failed") return <Badge variant="destructive">Fallida</Badge>;
   const score = run.score ?? 0;
+  // Una corrida incompleta SÍ enseña su score —se juzgaron casos de verdad y
+  // se pagaron— pero nunca disfrazado del de una completa: es parcial y no se
+  // compara con nada.
+  if (run.status === "incompleto") {
+    return <Badge variant="warning">Score {score} · parcial</Badge>;
+  }
   const variant = score >= 80 ? "success" : score >= 50 ? "warning" : "destructive";
   return <Badge variant={variant}>Score {score}</Badge>;
 }
@@ -397,8 +403,13 @@ function Report({
               intentarlo.
             </p>
           )}
+          {run.status === "incompleto" && (
+            <p className="text-sm text-warning-text">
+              {run.error ?? "La corrida no dio tiempo a juzgarlo todo."}
+            </p>
+          )}
         </CardHeader>
-        {run.status === "done" && (
+        {(run.status === "done" || run.status === "incompleto") && (
           <CardContent>
             <div className="grid grid-cols-3 gap-3 text-center text-sm">
               {(["verde", "amarillo", "rojo"] as const).map((v) => (

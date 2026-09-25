@@ -6,7 +6,11 @@ import { computeAvailability } from "@/server/agenda/availability";
 import { getSettings } from "@/server/agenda/settings";
 import { catalogByDay } from "@/server/agenda/spread";
 import { getOffers, replaceOffers, type OfferedSlot } from "@/server/agenda/offers";
-import { BookingError, createSessionBooking } from "@/server/agenda/service";
+import {
+  BookingError,
+  createSessionBooking,
+  rescheduleForConversation,
+} from "@/server/agenda/service";
 
 /**
  * 015 — Lo que el agente incluido puede hacer con la agenda.
@@ -181,6 +185,76 @@ export async function bookSlot(input: {
     return {
       ok: false,
       text: "No pude agendarlo en este momento. Lo reviso con el equipo y te confirmo.",
+    };
+  }
+}
+
+/**
+ * 015 (ajuste 2026-09-25) — Mover la cita de ESTA conversación.
+ *
+ * Medido en el Laboratorio de LanCo con el LLM real: ante «uy, a esa hora ya
+ * no puedo, ¿me la cambias a la tarde?» el agente escalaba a un humano —
+ * correctamente, porque cancelar es de humanos y el modelo lo extendió a
+ * reprogramar—. Pero el motor SÍ sabe mover una cita (el cerebro externo lo
+ * hace por `/api/bot/bookings`); al agente incluido simplemente no se le había
+ * dado la acción. Y cambiar de hora es lo más común que pasa de verdad.
+ *
+ * Cancelar sigue SIN ser suya: borrar la cita de un cliente es irreversible y
+ * esa decisión se queda en manos de una persona.
+ *
+ * Las garantías son las mismas que al reservar: el instante nuevo tiene que
+ * haberse ofrecido en esta conversación (comparación por epoch exacto), y el
+ * enlace de la reunión se conserva — el conector mueve el evento, no crea otro.
+ */
+export async function moveSlot(input: {
+  organizationId: string;
+  conversationId: string;
+  startUtc: string;
+  confirmation?: string;
+}): Promise<AgendaTurn> {
+  try {
+    const result = await rescheduleForConversation({
+      organizationId: input.organizationId,
+      conversationId: input.conversationId,
+      startUtc: input.startUtc,
+    });
+
+    const base =
+      input.confirmation?.trim() || `¡Listo! La moví a ${result.label}.`;
+    if (result.meetingLink) {
+      return { ok: true, text: `${base}\nEnlace: ${result.meetingLink}` };
+    }
+    if (result.linkPending) {
+      return {
+        ok: true,
+        text: `${base}\nEn un momento te comparto el enlace por aquí.`,
+      };
+    }
+    return { ok: true, text: base };
+  } catch (err) {
+    if (!(err instanceof BookingError)) throw err;
+
+    // No hay cita que mover: no es un error del cliente, es que se adelantó.
+    if (err.code === "not_found") {
+      return {
+        ok: false,
+        text: "No encuentro una cita activa tuya que mover. ¿Quieres que te ofrezca horarios para agendar?",
+      };
+    }
+    if (err.slots.length > 0) {
+      const lista = err.slots
+        .slice(0, SHOWN)
+        .map((s) => `• ${s.label}`)
+        .join("\n");
+      const disculpa =
+        err.code === "slot_taken"
+          ? "Se me acaba de ocupar ese horario, ¡perdón!"
+          : "Déjame confirmarte los horarios que tengo:";
+      return { ok: false, text: `${disculpa}\n${lista}` };
+    }
+    return {
+      ok: false,
+      text: "No pude moverla en este momento. Lo reviso con el equipo y te confirmo.",
     };
   }
 }

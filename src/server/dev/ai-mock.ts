@@ -180,21 +180,44 @@ export function aiMockCompletion(messages: InMessage[]): string {
      * mock se pone rojo si el catálogo vuelve a registrar solo tres por día:
      * la hora pedida no estaría en el prompt y no habría ISO que copiar.
      */
+    /*
+     * Mover vs reservar (ajuste 2026-09-25): si el cliente pide CAMBIAR la
+     * cita, la acción es `move_slot`. Se distingue por el verbo, como haría un
+     * modelo real; el mock no adivina si ya hay cita — de eso se encarga el
+     * motor, que responde «no hay cita que mover» si no la hay.
+     */
+    const yaTieneCita = system.includes("CITA ACTUAL DE ESTE CLIENTE");
+    const quiereMover =
+      system.includes("move_slot") &&
+      // Si YA tiene cita, pedir otra hora es moverla: reservar otra le dejaría
+      // dos. El verbo sirve cuando el prompt no trae ese hecho.
+      (yaTieneCita ||
+        // Conjugaciones enteras (`camb\w*`): con `\bcambia\b` no entraba
+        // «¿me la cambias?», que es como se dice de verdad.
+        /\b(camb\w*|mov\w*|muev\w*|reprogram\w*|recorr\w*)\b/i.test(lastUser));
+
     const hora = lastUser.match(/\ba\s+las?\s+(\d{1,2})(?::(\d{2}))?\s*(am|pm|hrs?)?/i);
     if (hora?.[1]) {
       let h = Number(hora[1]);
       if (/pm/i.test(hora[3] ?? "") && h < 12) h += 12;
       const hhmm = `${String(h).padStart(2, "0")}:${hora[2] ?? "00"}`;
-      const linea = system
+      /*
+       * La hora se busca SOLO en la etiqueta, nunca en la línea entera: el ISO
+       * lleva la hora en UTC, así que «sáb 26 sep, 10:00 → …T16:00:00.000Z»
+       * contiene "16:00" y se llevaba por delante la petición de las 16:00
+       * (México es UTC-6). Salió en el arnés: pidió las 16:00 y movió las
+       * 10:00.
+       */
+      const iso = system
         .split("\n")
-        .find((l) => /→ startUtc "/.test(l) && l.includes(hhmm));
-      const iso = linea?.match(/→ startUtc "([^"]+)"/)?.[1];
+        .map((l) => l.match(/^\s*\d+\.\s*(.+?)\s*→ startUtc "([^"]+)"/))
+        .find((m) => m?.[1]?.includes(hhmm))?.[2];
       if (iso) {
-        return JSON.stringify({
-          action: "book_slot",
-          startUtc: iso,
-          reply: "¡Perfecto, queda agendado!",
-        });
+        return JSON.stringify(
+          quiereMover
+            ? { action: "move_slot", startUtc: iso, reply: "¡Listo, la moví!" }
+            : { action: "book_slot", startUtc: iso, reply: "¡Perfecto, queda agendado!" }
+        );
       }
       // No está en el catálogo: se re-ofrece SIN afirmar que no hay hueco.
       return JSON.stringify({

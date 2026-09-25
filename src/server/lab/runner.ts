@@ -23,7 +23,25 @@ import { selloDeConjunto, selloDeRubrica } from "@/server/lab/conjunto";
  * si algo intenta enviarlas.
  */
 
-const RUN_TIMEOUT_MS = 10 * 60 * 1000;
+/**
+ * 021 (ajuste 2026-09-25) — El presupuesto de una corrida ESCALA con el examen.
+ *
+ * Era un tope fijo de 10 minutos mientras el examen crece hasta catorce
+ * escenarios (seis del producto + ocho propios). Medido en LanCo: catorce
+ * escenarios tardan ~10,5 min y la corrida moría — no por un fallo, sino por
+ * existir. Y el aviso de coste (FR-631) estimaba 590 s, por debajo del tope,
+ * así que la pantalla no podía advertir nada.
+ *
+ * 90 s por caso sobre los ~45 s observados deja margen para un proveedor lento
+ * sin volver el tope inútil. El suelo de 10 minutos conserva el comportamiento
+ * de siempre para exámenes pequeños.
+ */
+const PRESUPUESTO_POR_CASO_MS = 90 * 1000;
+const PRESUPUESTO_MINIMO_MS = 10 * 60 * 1000;
+
+export function presupuestoDeCorrida(casos: number): number {
+  return Math.max(PRESUPUESTO_MINIMO_MS, casos * PRESUPUESTO_POR_CASO_MS);
+}
 
 export class RunConflictError extends Error {}
 
@@ -70,7 +88,7 @@ export async function startRun(organizationId: string): Promise<string> {
   );
 
   // Fire-and-forget in-process: el POST regresa ya; el progreso va por SSE.
-  void executeRun(runId, organizationId).catch(async (err) => {
+  void executeRun(runId, organizationId, escenarios.length).catch(async (err) => {
     console.error("[lab] corrida falló:", err);
     await failRun(runId, organizationId, String(err));
   });
@@ -78,18 +96,28 @@ export async function startRun(organizationId: string): Promise<string> {
   return runId;
 }
 
+/**
+ * 021 (ajuste 2026-09-25) — El presupuesto se comprueba DENTRO del bucle, no
+ * con un `Promise.race`.
+ *
+ * La carrera no cancelaba nada: al saltar el tope marcaba la corrida `failed`,
+ * pero el bucle seguía vivo por detrás y al terminar escribía `done` encima —
+ * una corrida fallida que se rehabilitaba sola minutos después, con el error
+ * de timeout pegado. Comprobar el reloj entre casos corta de verdad, conserva
+ * lo ya juzgado y no deja trabajo colgando que siga escribiendo en la BD.
+ *
+ * Cada caso está acotado por su lado: `chatJson` aborta cada llamada al
+ * proveedor a los 60 s, así que un caso no puede colgarse para siempre y basta
+ * con mirar el reloj antes de empezar el siguiente.
+ */
 async function executeRun(
   runId: string,
-  organizationId: string
+  organizationId: string,
+  casos: number
 ): Promise<void> {
-  const timeout = new Promise<never>((_, reject) =>
-    setTimeout(
-      () => reject(new Error("timeout de 10 minutos superado")),
-      RUN_TIMEOUT_MS
-    )
-  );
+  const deadline = Date.now() + presupuestoDeCorrida(casos);
   try {
-    await Promise.race([runAllCases(runId, organizationId), timeout]);
+    await runAllCases(runId, organizationId, deadline);
   } catch (err) {
     await failRun(runId, organizationId, String(err));
   }
@@ -97,7 +125,8 @@ async function executeRun(
 
 async function runAllCases(
   runId: string,
-  organizationId: string
+  organizationId: string,
+  deadline: number
 ): Promise<void> {
   const db = getDb();
   const cases = await db
@@ -135,7 +164,14 @@ async function runAllCases(
 
   const escenarios = await escenariosDe(organizationId);
 
+  let sinTiempo = false;
   for (const testCase of cases) {
+    // El reloj se mira ANTES de empezar un caso: empezarlo para abandonarlo a
+    // medias gasta llamadas al proveedor que nadie va a juzgar.
+    if (Date.now() > deadline) {
+      sinTiempo = true;
+      break;
+    }
     const persona = escenarios.find((p) => p.key === testCase.persona);
     if (!persona) continue;
 
@@ -192,11 +228,26 @@ async function runAllCases(
     .where(eq(schema.agentTestCase.runId, runId));
   const score = computeScore(finalCases);
 
+  /*
+   * 021 (ajuste 2026-09-25) — Una corrida que se queda sin tiempo NO se tira.
+   *
+   * Antes se perdía entera: score `null` y los casos ya juzgados —y ya
+   * pagados al proveedor— a la basura. Ahora se guarda lo que dio tiempo a
+   * juzgar y se marca `incompleto`, que es distinto de `done`: el histórico ya
+   * exige `done` para calcular un delta, así que un score parcial se ve pero
+   * NO contamina ninguna comparación. Eso es justo lo que se quiere, porque un
+   * score sobre menos casos es otro examen.
+   */
+  const estado = sinTiempo ? "incompleto" : "done";
+  const error = sinTiempo
+    ? `Sin tiempo: se juzgaron ${finalCases.filter((c) => c.status === "done").length} de ${total} casos. El score es parcial y no se compara con otras corridas.`
+    : null;
+
   await getDb()
     .update(schema.agentTestRun)
-    .set({ status: "done", score, finishedAt: new Date() })
+    .set({ status: estado, score, error, finishedAt: new Date() })
     .where(eq(schema.agentTestRun.id, runId));
-  publishProgress(organizationId, runId, "done", done, total, score);
+  publishProgress(organizationId, runId, estado, done, total, score);
 }
 
 /** Conversa el guion completo contra el agente real; corta al primer handoff. */

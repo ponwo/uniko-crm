@@ -446,7 +446,19 @@ había disponibilidad. Ver "Ajuste 2026-09-23" del spec.
       (arranque en frío del pipeline) y no cabía en la ventana de 14 s; los
       siguientes, 9.449 y 6.735 ms. Se paga fuera de los checks en vez de
       relajar el límite, y un `null` mudo pasa a decir cuántos ms tardó
-- [ ] T070 Etapa 2 (acordada con el dueño): escenarios duros de agenda en el
+- [X] T074 Etapa 2, primera mitad: escenario duro de agenda en el Laboratorio
+      de LanCo («hora vaga → hora concreta → cambio de opinión»). Resultado
+      2026-09-25: el ajuste del catálogo denso FUNCIONA con el LLM real («mejor
+      el lunes a las 11» → agendado lunes 11:00). Dos fricciones nuevas: el
+      menú no se adapta a lo que piden (T076) y reprogramar escalaba (T075)
+- [X] T075 `move_slot` (FR-031/FR-032): acción de mover para el agente incluido
+      sobre `rescheduleForConversation`, y la CITA ACTUAL en el prompt para que
+      no reserve una segunda — `tests/unit/agenda-prompt.test.ts`,
+      `ai-mock-agenda.test.ts`, tramo nuevo del arnés (211/211)
+- [ ] T076 `offer_slots` con preferencia («el lunes», «por la tarde»): hoy
+      siempre enseña los tres primeros del catálogo, ignorando lo que pidió el
+      cliente. No es urgente —puede nombrar su hora y se agenda— pero se nota
+- [ ] T070 Etapa 2, segunda mitad (acordada con el dueño): escenarios duros de agenda en el
       Laboratorio de LanCo —hora fuera del menú, hora fuera de horario,
       lenguaje vago ("temprano", "después de comer"), cambio de opinión a media
       conversación— y comparar contra el baseline (score 65, mismo conjunto y

@@ -629,6 +629,47 @@ igual o inventaría uno.
   «no hay disponibilidad», «ocupado» ni «lleno». Volver a `perDay: 3` pone en
   rojo `tests/unit/agenda-catalogo.test.ts` y ese check del arnés.
 
+## Ajuste 2026-09-25 — mover la cita es trabajo del agente (extensión)
+
+**Hallazgo en el Laboratorio de LanCo**, con el LLM real y un escenario que
+junta lo difícil (hora vaga, hora concreta fuera del menú, cambio de opinión):
+
+```
+CLIENTE: Mejor el lunes a las 11
+AGENTE:  ¡Listo! Agendé tu asesoría para el lunes 28 de septiembre a las 11:00.   ← el ajuste del 23 funciona
+CLIENTE: Uy, a esa hora ya no puedo. ¿Me la cambias a la tarde del lunes?
+AGENTE:  esa parte va con un consultor, yo nomás no tengo la varita 😅            ← escala
+```
+
+El agente tenía razón con lo que sabía: el prompt dice que CANCELAR es de
+humanos y el modelo lo extendió a reprogramar. Pero el motor **sí sabe mover**
+(`rescheduleForConversation`, que el cerebro externo ya usa por `/api/bot/*`);
+al agente incluido no se le había dado esa acción. Cambiar de hora es lo más
+común que pasa de verdad.
+
+Al implementarlo, el arnés encontró algo peor que el problema original:
+reservar **borra los horarios ofrecidos**, así que pedir un cambio vuelve a
+ofrecer, y en el turno siguiente el modelo —que no sabía que el cliente YA
+tenía cita— emitía `book_slot`: **dos citas para el mismo cliente**.
+
+### Functional Requirements (extensión)
+
+- **FR-031**: El agente incluido MUST poder MOVER la cita de su conversación
+  (`move_slot`), con las mismas garantías que al reservar: el instante nuevo
+  tiene que haberse ofrecido (epoch exacto) y el enlace de la reunión se
+  conserva. CANCELAR MUST seguir siendo de humanos: es irreversible.
+- **FR-032**: Si el cliente ya tiene una cita activa en esa conversación, el
+  prompt MUST decirlo (como ya se le dice al juez, FR-024) y MUST prohibir
+  reservar una segunda: pedir otra hora es moverla. Sin ese hecho el agente
+  duplica la cita, porque en el historial no se ve.
+
+### Success Criteria (extensión)
+
+- **SC-012**: En el arnés, con una cita ya agendada, pedir el cambio vuelve a
+  ofrecer sin escalar ni negar disponibilidad; elegir la hora deja **UNA sola**
+  cita, en la hora nueva, y la conversación NO queda escalada. Quitar el bloque
+  `CITA ACTUAL` del prompt produce dos citas y pone el check en rojo.
+
 ### Un modelo distinto solo para elegir horario
 
 Elegir horario premia obediencia literal —copiar un ISO exacto de una lista—
