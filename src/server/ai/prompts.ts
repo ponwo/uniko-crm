@@ -44,6 +44,16 @@ export function buildAgentSystemPrompt(input: {
    */
   offeredSlots?: { label: string; startUtc: string }[];
   /**
+   * 015 (ajuste 2026-09-25) — La cita que este cliente YA tiene, si tiene una.
+   *
+   * Sin este dato el agente no distingue «quiero cita» de «cámbiame la cita»:
+   * reservar borra los horarios ofrecidos, así que al volver a ofrecer y
+   * elegir hora el modelo emitía `book_slot` y el cliente acababa con DOS
+   * citas. Es el mismo hecho que ya recibe el juez (FR-024), y por la misma
+   * razón: en el historial de la conversación no se ve.
+   */
+  citaActual?: string | null;
+  /**
    * 026 — ¿esta instancia tiene el conector de inventario? Apagado, el prompt
    * no menciona existencias ni precios consultables: aquí no hay inventario.
    */
@@ -55,6 +65,7 @@ export function buildAgentSystemPrompt(input: {
     ? [
         '- {"action":"offer_slots","reply":"..."} — ofrecer horarios para agendar (reply es solo la frase de entrada; los horarios los pone el sistema).',
         '- {"action":"book_slot","startUtc":"<el startUtc EXACTO de uno de los HORARIOS OFRECIDOS, copiado tal cual>","reply":"..."} — agendar el horario que el cliente eligió.',
+        '- {"action":"move_slot","startUtc":"<el startUtc EXACTO de uno de los HORARIOS OFRECIDOS>","reply":"..."} — MOVER a otra hora la cita que ya tiene este cliente.',
       ]
     : [];
   const offered = input.agenda ? (input.offeredSlots ?? []) : [];
@@ -66,6 +77,10 @@ export function buildAgentSystemPrompt(input: {
         ].join("\n")
       : "HORARIOS OFRECIDOS EN ESTA CONVERSACIÓN: ninguno todavía. Para agendar, primero offer_slots."
     : null;
+  const citaBlock =
+    input.agenda && input.citaActual
+      ? `CITA ACTUAL DE ESTE CLIENTE: ${input.citaActual}. Ya tiene cita: si pide otra hora, es MOVERLA (move_slot), NUNCA reservar una segunda.`
+      : null;
   const inventarioLines = input.inventario
     ? [
         '- {"action":"check_stock","query":"<nombre base del producto, en singular y sin la talla, o su SKU>","size":"<talla que pidió el cliente, si dijo alguna: G, M, 38…>","reply":"..."} — consultar existencia y precio reales en el inventario (reply es solo la frase de entrada; los datos, tallas incluidas, los pega el sistema).',
@@ -85,7 +100,8 @@ export function buildAgentSystemPrompt(input: {
         "- book_slot solo acepta un horario de la lista HORARIOS OFRECIDOS: copia su startUtc TAL CUAL (nunca lo calcules ni lo conviertas). «El primero» es el 1 de esa lista. Si la lista está vacía o el cliente pide otro día, vuelve a ofrecer con offer_slots.",
         "- Si el cliente pide una hora o un día CONCRETOS, búscalos en HORARIOS OFRECIDOS y reserva ese: la lista trae muchos más de los tres que se le enseñaron.",
         "- Si lo que pide NO está en la lista, NUNCA afirmes que está ocupado, lleno o que no hay disponibilidad —no lo sabes—: di que lo confirmas y usa offer_slots.",
-        "- Si el cliente quiere CANCELAR una cita → handoff: esa decisión no es tuya.",
+        "- Si el cliente quiere CAMBIAR o mover su cita a otra hora, es trabajo TUYO: usa move_slot (si no sabe a cuál, primero offer_slots). No lo mandes con una persona por esto.",
+        "- Si el cliente quiere CANCELAR una cita → handoff: esa decisión no es tuya. Cancelar y mover no son lo mismo.",
       ]
     : [];
   return [
@@ -98,6 +114,7 @@ export function buildAgentSystemPrompt(input: {
     profile.greeting ? `Saludo sugerido para conversaciones nuevas: ${profile.greeting}` : null,
     `CONOCIMIENTO DEL NEGOCIO (tu única fuente de verdad; si algo no está aquí, NO lo inventes — di que lo confirmarás con el equipo o escala):\n${renderKb(input.kb)}`,
     `Etapas del pipeline disponibles: ${stageNames}`,
+    citaBlock,
     offeredBlock,
     [
       "En cada turno respondes ÚNICAMENTE un objeto JSON con UNA acción:",

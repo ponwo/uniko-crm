@@ -127,3 +127,22 @@ había disponibilidad — el catálogo solo registraba tres huecos por día.
 Se comprueba con el modelo que el ai-mock recibió en cada turno
 (`GET /api/dev/ai-mock/_state`), no de palabra: la promesa es de COSTO y de
 otro modo solo se podría verificar mirando la factura del proveedor.
+
+## Cambiar de opinión: mover la cita (ajuste 2026-09-25, FR-031)
+
+Medido en el Laboratorio de LanCo con el LLM real: ante «uy, a esa hora ya no
+puedo, ¿me la cambias a la tarde?» el agente escalaba a un humano. Tenía razón
+con lo que sabía —el prompt solo hablaba de cancelar—, pero el motor sí sabe
+mover, y cambiar de hora es lo más común que pasa de verdad.
+
+1. Con una cita ya agendada, el cliente pide cambiarla → el agente **vuelve a
+   ofrecer** (reservar borra los horarios ofrecidos, y el instante nuevo
+   también tiene que haberse ofrecido). No escala ni dice que no hay hueco.
+2. El cliente elige la hora nueva → el agente **mueve** la cita.
+3. Queda **UNA sola** cita, en la hora nueva, y con el mismo enlace de reunión:
+   el conector mueve el evento, no crea otro.
+4. La conversación **no** queda escalada: mover es trabajo del agente.
+5. Cancelar sigue fuera: eso es irreversible y va con una persona.
+
+Camino infeliz cubierto por el mock: sin `CITA ACTUAL` en el prompt, elegir una
+hora reserva una SEGUNDA cita — que es justo lo que el arnés detectó.

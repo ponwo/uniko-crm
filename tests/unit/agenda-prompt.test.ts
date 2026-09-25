@@ -99,3 +99,68 @@ describe("015 — el prompt prohíbe declarar falta de disponibilidad (ajuste 20
     expect(p).not.toMatch(/HORARIOS OFRECIDOS/);
   });
 });
+
+/**
+ * 015 (ajuste 2026-09-25) — Mover la cita es trabajo del agente; cancelar no.
+ *
+ * Medido en el Laboratorio de LanCo con el LLM real: ante «¿me la cambias a la
+ * tarde?» escalaba a un humano. Y tenía razón con lo que sabía — el prompt solo
+ * hablaba de cancelar, y él lo extendió. El motor sí sabe mover.
+ */
+describe("015 — mover vs cancelar en el prompt (ajuste 2026-09-25)", () => {
+  it("con agenda: move_slot existe y se dice que mover es trabajo suyo", () => {
+    const p = prompt({ agenda: true, offeredSlots: ofrecidos });
+    expect(p).toContain('"action":"move_slot"');
+    expect(p).toMatch(/es trabajo TUYO: usa move_slot/);
+    expect(p).toMatch(/No lo mandes con una persona por esto/);
+  });
+
+  it("…y cancelar SIGUE siendo de humanos, dicho como algo distinto de mover", () => {
+    const p = prompt({ agenda: true, offeredSlots: ofrecidos });
+    expect(p).toMatch(/CANCELAR una cita → handoff/);
+    expect(p).toMatch(/Cancelar y mover no son lo mismo/);
+  });
+
+  it("sin agenda: ni move_slot ni la regla aparecen", () => {
+    const p = prompt({ agenda: false, offeredSlots: ofrecidos });
+    expect(p).not.toContain("move_slot");
+    expect(p).not.toMatch(/Cancelar y mover/);
+  });
+});
+
+/**
+ * 015 (ajuste 2026-09-25) — El agente tiene que SABER si el cliente ya tiene
+ * cita.
+ *
+ * Medido en el arnés: reservar borra los horarios ofrecidos, así que al pedir
+ * un cambio el agente vuelve a ofrecer; y en el turno siguiente, sin este
+ * hecho, emitía `book_slot` — el cliente acababa con DOS citas. En el historial
+ * de la conversación ese dato no se ve.
+ */
+describe("015 — la cita actual viaja al prompt (ajuste 2026-09-25)", () => {
+  it("con cita: la dice y prohíbe reservar una segunda", () => {
+    const p = buildAgentSystemPrompt({
+      profile,
+      kb: [],
+      stages: [{ name: "Nuevo" }],
+      agenda: true,
+      offeredSlots: ofrecidos,
+      citaActual: "sáb 26 sep, 10:30",
+    });
+    expect(p).toContain("CITA ACTUAL DE ESTE CLIENTE: sáb 26 sep, 10:30");
+    expect(p).toMatch(/es MOVERLA \(move_slot\), NUNCA reservar una segunda/);
+  });
+
+  it("sin cita, o sin agenda, no aparece el bloque", () => {
+    const sinCita = prompt({ agenda: true, offeredSlots: ofrecidos });
+    expect(sinCita).not.toContain("CITA ACTUAL");
+    const sinAgenda = buildAgentSystemPrompt({
+      profile,
+      kb: [],
+      stages: [{ name: "Nuevo" }],
+      agenda: false,
+      citaActual: "sáb 26 sep, 10:30",
+    });
+    expect(sinAgenda).not.toContain("CITA ACTUAL");
+  });
+});

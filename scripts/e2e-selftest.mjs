@@ -1594,10 +1594,25 @@ async function agendaChecks() {
     // agente le contestó que no había disponibilidad. Si el catálogo vuelve a
     // ser ralo, este check se pone rojo.
     const libres = (await api("/api/calendar/availability")).json?.slots ?? [];
-    const dia0 = libres[0]?.dayIso;
-    const delDia = libres.filter((s) => s.dayIso === dia0);
-    if (delDia.length > 4) {
-      const pedido = delDia[Math.min(5, delDia.length - 1)];
+    // El día que se use NO puede ser "hoy" sin más: corrido por la tarde, hoy
+    // quedan dos huecos y el bloque entero se saltaba en silencio — un check
+    // que desaparece según la hora no verifica nada. Se toma el primer día con
+    // huecos de sobra (el horario del arnés es 09:00-18:00 todos los días).
+    const porDia = new Map();
+    for (const s of libres) {
+      const b = porDia.get(s.dayIso);
+      if (b) b.push(s);
+      else porDia.set(s.dayIso, [s]);
+    }
+    const delDia = [...porDia.values()].find((d) => d.length > 6) ?? [];
+    // Una hora que no exista en los días ANTERIORES: el modelo elige por hora,
+    // y una hora repetida resolvería al día de antes.
+    const horasPrevias = new Set(
+      libres.filter((s) => s.dayIso < (delDia[0]?.dayIso ?? "")).map((s) => s.time)
+    );
+    const candidatos = delDia.slice(3).filter((s) => !horasPrevias.has(s.time));
+    if (candidatos.length > 1) {
+      const pedido = candidatos[0];
       const LEAD_D = "5214627015004";
       async function decirD(texto, n) {
         const antes = (await outboxDe(LEAD_D)).length;
@@ -1675,8 +1690,52 @@ async function agendaChecks() {
         citaD?.scheduledAtUtc === pedido.startUtc,
         JSON.stringify({ pedido, citaD })
       );
+
+      /* -- Cambiar de opinión: mover la cita (ajuste 2026-09-25) -- */
+      //
+      // Medido en el Laboratorio de LanCo con el LLM real: ante «uy, a esa
+      // hora ya no puedo, ¿me la cambias?» el agente escalaba a un humano,
+      // porque no tenía la acción de mover. Cambiar de hora es lo más común
+      // que pasa de verdad.
+      const nuevo = candidatos[candidatos.length - 1];
+      if (nuevo && nuevo.time !== pedido.time) {
+        // Reservar BORRA los horarios ofrecidos (la oferta cumplió su
+        // propósito), así que pedir el cambio vuelve a ofrecer primero: el
+        // instante nuevo también tiene que haberse ofrecido. Son dos turnos,
+        // como en una conversación de verdad.
+        const reoferta = await decirD(`Uy, ya no puedo. ¿Me la cambias a las ${nuevo.time}?`, "3");
+        ok(
+          "pedir el cambio vuelve a ofrecer, sin escalar ni negar nada",
+          typeof reoferta === "string" &&
+            reoferta.includes("•") &&
+            !/no hay disponibilidad|un consultor|una persona/i.test(reoferta),
+          JSON.stringify({ reoferta })
+        );
+        const movida = await decirD(`Sí, a las ${nuevo.time}`, "4");
+        ok(
+          "elegir la hora MUEVE la cita (no reserva una segunda)",
+          typeof movida === "string" && /la mov[íi]|qued[óo].*\b(movid|cambiad)/i.test(movida),
+          JSON.stringify({ pidio: nuevo.time, movida })
+        );
+        const citaMovida = ((await api("/api/bookings")).json?.bookings ?? []).filter(
+          (b) => b.contact?.name === "Lead agenda D" && b.status === "agendada"
+        );
+        ok(
+          "…y sigue habiendo UNA sola cita, en la hora nueva",
+          citaMovida.length === 1 && citaMovida[0]?.scheduledAtUtc === nuevo.startUtc,
+          JSON.stringify({ nuevo, citaMovida })
+        );
+        const convD = ((await api("/api/conversations")).json?.conversations ?? []).find(
+          (c) => c.contact?.name === "Lead agenda D"
+        );
+        ok(
+          "…y la conversación NO quedó escalada por mover una cita",
+          convD ? !convD.handoffAt : true,
+          JSON.stringify({ handoffAt: convD?.handoffAt })
+        );
+      }
     } else {
-      console.log("  (quedan pocos huecos hoy: se omite el check de «pide su hora»)");
+      console.log("  (sin un día con huecos de sobra: se omite el check de «pide su hora»)");
     }
 
     await api("/api/agent/profile", {

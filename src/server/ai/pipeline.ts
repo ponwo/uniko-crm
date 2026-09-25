@@ -19,7 +19,13 @@ import { matchesHandoffIntent } from "@/server/ai/handoff";
 import { avisarDeEscalacion } from "@/server/push/avisar";
 import { buildAgentSystemPrompt } from "@/server/ai/prompts";
 import { agendaEnabled, modelForTurn } from "@/server/agenda/flag";
-import { bookSlot, offerSlots, offeredSlotsFor } from "@/server/agenda/agent";
+import {
+  bookedInConversation,
+  bookSlot,
+  moveSlot,
+  offerSlots,
+  offeredSlotsFor,
+} from "@/server/agenda/agent";
 import { inventarioEnabled } from "@/server/inventario/flag";
 import { checkStockTurn, type StockMessage } from "@/server/inventario/agent";
 
@@ -162,6 +168,11 @@ export async function runAgentTurn(conversationId: string): Promise<void> {
   const offeredSlots = agenda
     ? await offeredSlotsFor({ organizationId, conversationId })
     : [];
+  // 015 (ajuste 2026-09-25) — Y si ya tiene cita, el agente tiene que saberlo:
+  // si no, al pedir otra hora reserva una SEGUNDA en vez de mover la suya.
+  const citaActual = agenda
+    ? await bookedInConversation({ organizationId, conversationId })
+    : null;
   const messages: ChatMessage[] = [
     {
       role: "system",
@@ -171,6 +182,7 @@ export async function runAgentTurn(conversationId: string): Promise<void> {
         stages,
         agenda,
         offeredSlots,
+        citaActual,
         inventario,
       }),
     },
@@ -202,7 +214,11 @@ export async function runAgentTurn(conversationId: string): Promise<void> {
 
   // 015 — Agenda. Un fallo del motor degrada el turno (el agente responde sin
   // agendar), nunca lo tumba: quedarse callado es peor que no agendar.
-  if (action.action === "offer_slots" || action.action === "book_slot") {
+  if (
+    action.action === "offer_slots" ||
+    action.action === "book_slot" ||
+    action.action === "move_slot"
+  ) {
     if (!agenda) {
       action = degradeAction(action);
     } else {
@@ -214,12 +230,19 @@ export async function runAgentTurn(conversationId: string): Promise<void> {
                 conversationId,
                 intro: action.reply,
               })
-            : await bookSlot({
-                organizationId,
-                conversationId,
-                startUtc: action.startUtc,
-                confirmation: action.reply,
-              });
+            : action.action === "move_slot"
+              ? await moveSlot({
+                  organizationId,
+                  conversationId,
+                  startUtc: action.startUtc,
+                  confirmation: action.reply,
+                })
+              : await bookSlot({
+                  organizationId,
+                  conversationId,
+                  startUtc: action.startUtc,
+                  confirmation: action.reply,
+                });
         await deliverReply(conversation, turn.text);
         if (turn.ok) {
           publish(organizationId, {
