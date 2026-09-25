@@ -629,6 +629,26 @@ igual o inventaría uno.
   «no hay disponibilidad», «ocupado» ni «lleno». Volver a `perDay: 3` pone en
   rojo `tests/unit/agenda-catalogo.test.ts` y ese check del arnés.
 
+### Un modelo distinto solo para elegir horario
+
+Elegir horario premia obediencia literal —copiar un ISO exacto de una lista—
+más que conversar, y un modelo barato que basta para charlar puede no bastar
+ahí. Poner el modelo bueno en TODOS los turnos multiplica el costo de cada
+conversación del negocio (la instancia de pruebas corre `z-ai/glm-5.3-flash`),
+así que se paga solo en la ventana en la que se decide una cita.
+
+- **FR-030**: Con `AGENDA_MODEL` definida, los turnos en los que la
+  conversación tiene horarios ofrecidos registrados MUST conducirse con ese
+  modelo, y el resto —incluido el turno de ENTRADA, donde solo hay que
+  reconocer la intención— con `OPENROUTER_MODEL`. Sin la variable, nada cambia.
+  El ai-mock MUST registrar el modelo de cada turno y el arnés MUST comprobar
+  la ventana con ese registro: la promesa es de costo y de otro modo solo se
+  verificaría en la factura del proveedor.
+
+- **SC-011**: En el arnés con `AGENDA_MODEL` puesta, el turno de entrada usa el
+  modelo base y el de elegir horario usa el de agenda; sin ella, los dos usan
+  el base.
+
 ### Google: «Probar» y el scope (segundo hallazgo del 2026-09-17)
 
 Al preparar la conexión de LanCo con Google Calendar se cotejó el conector

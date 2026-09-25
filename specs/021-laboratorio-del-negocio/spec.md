@@ -436,3 +436,33 @@ Todo verificado en `f13fd19`, no de memoria.
 - Las tres instancias de la flota están **sin datos de demo y sin corridas del
   Laboratorio**, confirmado por el dueño el 2026-09-09. No hace falta limpieza
   de datos: esta feature evita que se ensucien, no las limpia.
+
+## Ajuste 2026-09-23 — el juez forma parte de la rúbrica (extensión)
+
+**Hallazgo al planear un cambio de modelo del juez**: `sonComparables` solo
+mira el conjunto de escenarios y la versión del criterio (`r2`). El MODELO del
+juez no entra en ninguno de los dos, así que cambiar `OPENROUTER_JUDGE_MODEL`
+producía un delta sin significado y **sin un solo aviso** — exactamente el
+fallo que la Entrega 2 documentó ("la corrida de LanCo": de 42 a 75 sin que el
+agente cambiara). El criterio escrito es la mitad de la rúbrica; la otra mitad
+es el modelo que lo interpreta.
+
+### Functional Requirements (extensión)
+
+- **FR-632**: Cada corrida MUST registrar con qué modelo se juzgó, y dos
+  corridas juzgadas por modelos distintos MUST reportarse como NO comparables,
+  con su motivo propio (`juez`) distinguible de un cambio de criterio.
+- **FR-633**: El registro MUST guardarse dentro de `rubric_version` (el juez es
+  parte de la rúbrica) para no obligar a una migración — el Principio X exige
+  ensayar contra un respaldo real todo cambio de `drizzle/`, y aquí el dato es
+  del mismo tipo y la columna ya existe.
+- **FR-634**: La frontera del registro MUST tratarse con la verdad: si una
+  corrida lo tiene y la otra no, `sin_registro`; si ninguna lo tiene (ambas
+  anteriores a esto), se comparan como hasta hoy — no se le invalida al dueño
+  el histórico entero por un dato que nunca se guardó.
+
+### Success Criteria (extensión)
+
+- **SC-632**: Cambiar `OPENROUTER_JUDGE_MODEL` y volver a correr enseña el
+  delta tachado con «otro juez»; dos corridas con el mismo juez siguen
+  comparándose limpiamente.

@@ -115,3 +115,15 @@ había disponibilidad — el catálogo solo registraba tres huecos por día.
 3. La cita queda en **esa** hora, no en una del menú.
 4. La respuesta **no** contiene «no hay disponibilidad», «ocupado» ni «lleno»:
    el agente no puede saberlo, así que tiene prohibido afirmarlo.
+
+## Un modelo distinto solo para elegir horario (AGENDA_MODEL, FR-030)
+
+1. Con `AGENDA_MODEL` definido, el turno de ENTRADA («quiero agendar») lo
+   conduce el modelo de siempre: ahí solo hay que reconocer la intención.
+2. El turno de ELEGIR horario («mejor a las 14:30») lo conduce `AGENDA_MODEL`:
+   es donde se decide la cita.
+3. Sin la variable, todos los turnos usan `OPENROUTER_MODEL`.
+
+Se comprueba con el modelo que el ai-mock recibió en cada turno
+(`GET /api/dev/ai-mock/_state`), no de palabra: la promesa es de COSTO y de
+otro modo solo se podría verificar mirando la factura del proveedor.
