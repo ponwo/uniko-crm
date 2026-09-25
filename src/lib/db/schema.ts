@@ -665,7 +665,7 @@ export const agentTestRun = pgTable(
     organizationId: text("organization_id")
       .notNull()
       .references(() => organization.id, { onDelete: "cascade" }),
-    status: text("status", { enum: ["running", "done", "failed"] })
+    status: text("status", { enum: ["running", "done", "failed", "incompleto"] })
       .notNull()
       .default("running"),
     score: integer("score"),

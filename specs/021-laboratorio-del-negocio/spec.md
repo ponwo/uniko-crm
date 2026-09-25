@@ -466,3 +466,35 @@ es el modelo que lo interpreta.
 - **SC-632**: Cambiar `OPENROUTER_JUDGE_MODEL` y volver a correr enseña el
   delta tachado con «otro juez»; dos corridas con el mismo juez siguen
   comparándose limpiamente.
+
+## Ajuste 2026-09-25 — una corrida no muere por crecer (extensión)
+
+**Hallazgo en la instancia de pruebas**: al añadir el catorceavo escenario, la
+corrida murió con `timeout de 10 minutos superado`, `score: null` y once casos
+ya juzgados —y pagados al proveedor— a la basura. El tope era **fijo** mientras
+el examen crece hasta catorce (seis del producto + ocho propios). Y la
+estimación de coste (FR-631) había dicho 590 s, por debajo del tope, así que la
+pantalla no podía advertir nada.
+
+Al arreglarlo apareció un segundo fallo, latente desde siempre: el
+`Promise.race` **no cancelaba nada**. Marcaba la corrida `failed` y el bucle
+seguía vivo por detrás; al terminar escribía `done` encima. Una corrida
+fallida se rehabilitaba sola minutos después, con el error de timeout pegado.
+
+### Functional Requirements (extensión)
+
+- **FR-635**: El presupuesto de una corrida MUST escalar con el número de
+  escenarios (90 s por caso, suelo de 10 minutos), no ser una constante.
+- **FR-636**: El presupuesto MUST comprobarse **dentro** del bucle, antes de
+  empezar cada caso, y no con una carrera que deja trabajo corriendo: al
+  cortar, nada más puede escribir en esa corrida.
+- **FR-637**: Una corrida que se queda sin tiempo MUST conservar lo ya juzgado
+  con estado `incompleto` y su score parcial visible, y ese score MUST NOT
+  participar en ninguna comparación del histórico (un score sobre menos casos
+  es otro examen). El estado es texto en la BD: no hace falta migración.
+
+### Success Criteria (extensión)
+
+- **SC-635**: El examen de catorce escenarios que mató la corrida ahora cabe
+  (21 min de presupuesto), y una corrida cortada enseña «Score N · parcial» sin
+  delta en vez de perderse entera.
