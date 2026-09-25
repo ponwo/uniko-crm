@@ -1,4 +1,5 @@
 import { and, asc, eq } from "drizzle-orm";
+import { judgeModelName } from "@/lib/ai";
 import { getDb, schema } from "@/lib/db";
 import { newId } from "@/lib/db/ids";
 import { publish } from "@/server/events/bus";
@@ -9,7 +10,7 @@ import { agendaEnabled } from "@/server/agenda/flag";
 import { computeScore, judgeCase } from "@/server/lab/judge";
 import { type Persona } from "@/server/lab/personas";
 import { escenariosDe } from "@/server/lab/escenarios";
-import { selloDeConjunto, VERSION_RUBRICA } from "@/server/lab/conjunto";
+import { selloDeConjunto, selloDeRubrica } from "@/server/lab/conjunto";
 
 /**
  * Runner del Laboratorio (FR-030/FR-034): corrida en segundo plano DENTRO del
@@ -46,7 +47,7 @@ export async function startRun(organizationId: string): Promise<string> {
         organizationId,
         status: "running",
         scenarioSet: sello,
-        rubricVersion: VERSION_RUBRICA,
+        rubricVersion: selloDeRubrica(judgeModelName()),
       })
       .returning();
     runId = inserted[0]!.id;

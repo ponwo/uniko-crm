@@ -18,7 +18,7 @@ import {
 import { matchesHandoffIntent } from "@/server/ai/handoff";
 import { avisarDeEscalacion } from "@/server/push/avisar";
 import { buildAgentSystemPrompt } from "@/server/ai/prompts";
-import { agendaEnabled } from "@/server/agenda/flag";
+import { agendaEnabled, modelForTurn } from "@/server/agenda/flag";
 import { bookSlot, offerSlots, offeredSlotsFor } from "@/server/agenda/agent";
 import { inventarioEnabled } from "@/server/inventario/flag";
 import { checkStockTurn, type StockMessage } from "@/server/inventario/agent";
@@ -182,7 +182,14 @@ export async function runAgentTurn(conversationId: string): Promise<void> {
       })),
   ];
 
-  const result = await chatJson(agentActionSchema({ agenda, inventario }), messages);
+  // 015 (ajuste 2026-09-23) — Con `AGENDA_MODEL` definido, los turnos en los
+  // que el cliente está eligiendo horario los conduce ese modelo; el resto de
+  // la conversación sigue con el de siempre. Sin la variable, nada cambia.
+  const result = await chatJson(
+    agentActionSchema({ agenda, inventario }),
+    messages,
+    { model: modelForTurn({ agenda, ofrecidos: offeredSlots.length }) }
+  );
   if (!result.ok) {
     if (result.error === "not_configured") return;
     // Fallo persistente del proveedor o salida imposible → escalar (FR-022).

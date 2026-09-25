@@ -23,13 +23,13 @@ export type AvisoDeComparacion = {
   /** El delta, si hay uno distinto de cero que valga la pena enseñar. */
   numero: number | null;
   /** Por qué no son comparables, o null si lo son (o no hay con qué comparar). */
-  motivo: "examen" | "rubrica" | "sin_registro" | null;
+  motivo: "examen" | "rubrica" | "juez" | "sin_registro" | null;
 };
 
 export function avisoDeComparacion(run: {
   delta: number | null;
   comparable: boolean | null;
-  motivoNoComparable: "examen" | "rubrica" | "sin_registro" | null;
+  motivoNoComparable: "examen" | "rubrica" | "juez" | "sin_registro" | null;
 }): AvisoDeComparacion {
   return {
     numero: run.delta !== null && run.delta !== 0 ? run.delta : null,

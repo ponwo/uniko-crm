@@ -63,6 +63,37 @@ export function selloDeConjunto(escenarios: ParaSellar[]): string {
 export const VERSION_RUBRICA = "r2";
 
 /**
+ * 021 (ajuste 2026-09-23) — La rúbrica incluye QUIÉN la aplica.
+ *
+ * El criterio escrito es la mitad; la otra es el modelo que lo interpreta. Dos
+ * corridas con la misma rúbrica y jueces distintos NO son comparables, y hasta
+ * hoy el histórico las comparaba igual: el sello solo cubría los escenarios y
+ * la versión del criterio. Cambiar `OPENROUTER_JUDGE_MODEL` producía un delta
+ * que no significaba nada, sin un solo aviso — exactamente el fallo que la
+ * Entrega 2 documentó (de 42 a 75 sin que el agente cambiara).
+ *
+ * Se guarda dentro de `rubric_version` en vez de una columna nueva a
+ * propósito: una migración obliga al ensayo con respaldo real del Principio X,
+ * y aquí no hace falta — el dato es del mismo tipo y la columna ya existe. Las
+ * corridas viejas conservan su `r2` y siguen siendo legibles.
+ */
+export function selloDeRubrica(judgeModel: string | null | undefined): string {
+  const juez = (judgeModel ?? "").trim();
+  return juez.length > 0 ? `${VERSION_RUBRICA}|juez=${juez}` : VERSION_RUBRICA;
+}
+
+/** Lo contrario: separa criterio y juez. Un valor viejo (`r2`) no tiene juez. */
+export function parseRubrica(sello: string): {
+  version: string;
+  juez: string | null;
+} {
+  const i = sello.indexOf("|juez=");
+  if (i < 0) return { version: sello, juez: null };
+  const juez = sello.slice(i + "|juez=".length).trim();
+  return { version: sello.slice(0, i), juez: juez.length > 0 ? juez : null };
+}
+
+/**
  * ¿Se pueden comparar estas dos corridas?
  *
  * `null` en cualquiera de los dos campos significa "de esa corrida no se sabe"
@@ -72,7 +103,10 @@ export const VERSION_RUBRICA = "r2";
 export function sonComparables(
   a: { scenarioSet: string | null; rubricVersion: string | null },
   b: { scenarioSet: string | null; rubricVersion: string | null }
-): { comparables: boolean; motivo: "examen" | "rubrica" | "sin_registro" | null } {
+): {
+  comparables: boolean;
+  motivo: "examen" | "rubrica" | "juez" | "sin_registro" | null;
+} {
   if (
     a.scenarioSet === null ||
     b.scenarioSet === null ||
@@ -84,10 +118,34 @@ export function sonComparables(
   if (a.scenarioSet !== b.scenarioSet) {
     return { comparables: false, motivo: "examen" };
   }
-  if (a.rubricVersion !== b.rubricVersion) {
+  const ra = parseRubrica(a.rubricVersion);
+  const rb = parseRubrica(b.rubricVersion);
+  if (ra.version !== rb.version) {
     return { comparables: false, motivo: "rubrica" };
   }
-  return { comparables: true, motivo: null };
+  /*
+   * El juez. Tres casos, y el del medio es el que importa:
+   *
+   * - Las DOS lo tienen: se comparan. Distinto juez ⇒ no comparables, y se
+   *   dice cuál fue el motivo.
+   * - Solo UNA lo tiene: es la frontera entre "antes no se registraba" y
+   *   "ahora sí", y lo más habitual es que ese registro aparezca justo cuando
+   *   alguien tocó la configuración. Ahí no consta, y no consta NO es "el
+   *   mismo juez".
+   * - NINGUNA lo tiene: las dos son anteriores a que esto se registrara. No se
+   *   inventa información nueva sobre lo viejo: se mantiene lo que el dueño ha
+   *   estado viendo hasta hoy, en vez de invalidarle el histórico entero de
+   *   golpe.
+   */
+  if (ra.juez !== null && rb.juez !== null) {
+    return ra.juez === rb.juez
+      ? { comparables: true, motivo: null }
+      : { comparables: false, motivo: "juez" };
+  }
+  if (ra.juez === null && rb.juez === null) {
+    return { comparables: true, motivo: null };
+  }
+  return { comparables: false, motivo: "sin_registro" };
 }
 
 /**

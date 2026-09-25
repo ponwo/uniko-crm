@@ -34,6 +34,12 @@ const envSchema = z.object({
   // 015: motor de agenda. Apagado por defecto — sin el, toda la superficie de
   // agenda responde 404 y la UI no la menciona. Ej.: AGENDA=on
   AGENDA: z.string().optional(),
+  // 015 (ajuste 2026-09-23): modelo SOLO para los turnos en los que el cliente
+  // esta eligiendo horario (hay horarios ofrecidos en esa conversacion). Sin
+  // ella se usa OPENROUTER_MODEL en todos los turnos. Existe para pagar un
+  // modelo mejor donde se decide una cita sin multiplicar el costo de toda la
+  // conversacion. Ej.: AGENDA_MODEL=openai/gpt-6-luna
+  AGENDA_MODEL: z.string().optional(),
   // 020: notificaciones push cuando el agente escala. Apagadas por defecto
   // (ADR-003): Web Push se entrega por FCM/APNs, que es un tercero en runtime,
   // y el Principio II solo lo permite como conector opcional. Sin esta

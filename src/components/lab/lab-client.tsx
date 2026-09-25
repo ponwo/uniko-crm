@@ -34,7 +34,7 @@ type Run = {
   delta: number | null;
   /** null si no hay con que comparar; si no, si el delta significa algo. */
   comparable: boolean | null;
-  motivoNoComparable: "examen" | "rubrica" | "sin_registro" | null;
+  motivoNoComparable: "examen" | "rubrica" | "juez" | "sin_registro" | null;
 };
 
 /** 021 Entrega 3 (FR-631) — lo que va a costar la proxima corrida. */
@@ -327,7 +327,9 @@ function Delta({ run }: { run: Run }) {
         ? "otros escenarios"
         : aviso.motivo === "rubrica"
           ? "otra rúbrica"
-          : "sin registro";
+          : aviso.motivo === "juez"
+            ? "otro juez"
+            : "sin registro";
     return (
       <span
         className="flex items-center gap-1 text-xs text-text-3"

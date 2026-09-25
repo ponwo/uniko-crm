@@ -1,5 +1,11 @@
 import { describe, expect, it } from "vitest";
-import { selloDeConjunto, sonComparables } from "@/server/lab/conjunto";
+import {
+  parseRubrica,
+  selloDeConjunto,
+  selloDeRubrica,
+  sonComparables,
+  VERSION_RUBRICA,
+} from "@/server/lab/conjunto";
 import { avisoDeComparacion, hayAlgoQueAvisar } from "@/lib/lab-comparacion";
 
 /**
@@ -155,5 +161,86 @@ describe("qué se enseña junto a una corrida del histórico", () => {
       motivoNoComparable: null,
     });
     expect(hayAlgoQueAvisar(a)).toBe(false);
+  });
+});
+
+/**
+ * 021 (ajuste 2026-09-23) — La rúbrica incluye QUIÉN la aplica.
+ *
+ * Hasta hoy el histórico comparaba alegremente dos corridas juzgadas por
+ * modelos distintos: el sello cubre los escenarios y la versión del criterio,
+ * pero no el modelo del juez. Cambiar `OPENROUTER_JUDGE_MODEL` producía un
+ * delta sin significado y sin un solo aviso — el mismo fallo que la Entrega 2
+ * documentó (de 42 a 75 sin que el agente cambiara).
+ */
+describe("021 — el juez forma parte de la rúbrica", () => {
+  const SET = "sha256:abc";
+
+  it("el sello lleva el juez, y sin juez conocido queda como antes", () => {
+    expect(selloDeRubrica("openai/gpt-5.6-luna")).toBe(`${VERSION_RUBRICA}|juez=openai/gpt-5.6-luna`);
+    expect(selloDeRubrica(undefined)).toBe(VERSION_RUBRICA);
+    expect(selloDeRubrica("   ")).toBe(VERSION_RUBRICA);
+  });
+
+  it("parseRubrica separa criterio y juez, y lee los valores viejos", () => {
+    expect(parseRubrica("r2|juez=openai/gpt-5.6-luna")).toEqual({
+      version: "r2",
+      juez: "openai/gpt-5.6-luna",
+    });
+    expect(parseRubrica("r2")).toEqual({ version: "r2", juez: null });
+  });
+
+  it("mismo criterio y MISMO juez → comparables", () => {
+    const sello = selloDeRubrica("openai/gpt-5.6-luna");
+    expect(
+      sonComparables(
+        { scenarioSet: SET, rubricVersion: sello },
+        { scenarioSet: SET, rubricVersion: sello }
+      )
+    ).toEqual({ comparables: true, motivo: null });
+  });
+
+  it("mismo criterio y OTRO juez → NO comparables, y lo dice", () => {
+    expect(
+      sonComparables(
+        { scenarioSet: SET, rubricVersion: selloDeRubrica("openai/gpt-5.6-sol") },
+        { scenarioSet: SET, rubricVersion: selloDeRubrica("openai/gpt-5.6-luna") }
+      )
+    ).toEqual({ comparables: false, motivo: "juez" });
+  });
+
+  it("una corrida vieja (sin juez registrado) no se da por igual: sin_registro", () => {
+    expect(
+      sonComparables(
+        { scenarioSet: SET, rubricVersion: selloDeRubrica("openai/gpt-5.6-luna") },
+        { scenarioSet: SET, rubricVersion: "r2" }
+      ).motivo
+    ).toBe("sin_registro");
+  });
+
+  it("el criterio manda sobre el juez: otra rúbrica se reporta como rúbrica", () => {
+    expect(
+      sonComparables(
+        { scenarioSet: SET, rubricVersion: "r1|juez=a" },
+        { scenarioSet: SET, rubricVersion: "r2|juez=b" }
+      ).motivo
+    ).toBe("rubrica");
+  });
+});
+
+/**
+ * La frontera del registro. Dos corridas viejas se siguen comparando como
+ * siempre —no se le invalida el histórico entero al dueño por un dato que
+ * nunca se guardó—, pero en cuanto una lo tiene y la otra no, no consta.
+ */
+describe("021 — la frontera entre 'no se registraba' y 'sí se registra'", () => {
+  const SET = "sha256:abc";
+  it("dos corridas viejas se siguen comparando", () => {
+    expect(
+      sonComparables(
+        { scenarioSet: SET, rubricVersion: "r2" },
+        { scenarioSet: SET, rubricVersion: "r2" }
+      )
+    ).toEqual({ comparables: true, motivo: null });
   });
 });

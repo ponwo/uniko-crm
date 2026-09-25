@@ -20,6 +20,17 @@ export type ChatJsonResult<T> =
 const MAX_ATTEMPTS = 3;
 const RETRY_DELAY_MS = 500;
 
+/**
+ * El modelo que juzga de verdad: el del juez si está configurado, y si no, el
+ * principal (021). Se exporta porque el Laboratorio tiene que GUARDARLO con
+ * cada corrida: dos corridas juzgadas por modelos distintos no son
+ * comparables, y sin este dato el histórico no puede saberlo.
+ */
+export function judgeModelName(): string | undefined {
+  const env = getEnv();
+  return env.OPENROUTER_JUDGE_MODEL ?? env.OPENROUTER_MODEL;
+}
+
 export async function chatJson<T>(
   schema: z.ZodType<T>,
   messages: ChatMessage[],
@@ -33,11 +44,7 @@ export async function chatJson<T>(
     };
   }
   const env = getEnv();
-  const model =
-    opts?.model ??
-    (opts?.judge
-      ? (env.OPENROUTER_JUDGE_MODEL ?? env.OPENROUTER_MODEL)
-      : env.OPENROUTER_MODEL);
+  const model = opts?.model ?? (opts?.judge ? judgeModelName() : env.OPENROUTER_MODEL);
   if (!model?.trim()) {
     return {
       ok: false,
