@@ -120,3 +120,40 @@ export function catalogByDay(
   }
   return out;
 }
+
+/**
+ * 015 (ajuste 2026-09-26) — La franja del día que pidió el cliente.
+ *
+ * Medido en el Laboratorio de LanCo, con dos modelos distintos y el mismo
+ * resultado: ante «¿me la cambias a la tarde del lunes?» el agente contestaba
+ * «horarios disponibles el lunes POR LA TARDE» y enseñaba 09:00, 09:30 y
+ * 10:00. El menú siempre daba los primeros del catálogo, y el modelo narraba
+ * esa lista como si fuera lo pedido — una afirmación falsa, de la misma
+ * familia que el «no hay disponibilidad» que arreglamos el 23.
+ *
+ * Se tolera la forma en que venga (`tarde`, `por la tarde`, `pm`…) en vez de
+ * exigir un literal: la salida del modelo es impredecible y un acento de más
+ * no puede costar el turno.
+ *
+ * OJO con «mañana»: en español es la franja Y el día siguiente. Quien decide
+ * cuál es el modelo, que tiene el contexto; aquí solo se traduce lo que mande.
+ */
+export type Franja = "am" | "pm";
+
+export function parseFranja(raw: string | null | undefined): Franja | undefined {
+  const v = (raw ?? "")
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[̀-ͯ]/g, "")
+    .trim();
+  if (!v) return undefined;
+  if (/\b(tarde|pm)\b/.test(v)) return "pm";
+  if (/\b(manana|temprano|am|matutin\w*)\b/.test(v)) return "am";
+  return undefined;
+}
+
+/** Antes del mediodía es mañana; de las 12:00 en adelante, tarde. */
+export function enFranja(slot: { time: string }, franja: Franja): boolean {
+  const hora = Number(slot.time.slice(0, 2));
+  return franja === "am" ? hora < 12 : hora >= 12;
+}

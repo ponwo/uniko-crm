@@ -229,6 +229,7 @@ export async function runAgentTurn(conversationId: string): Promise<void> {
                 organizationId,
                 conversationId,
                 intro: action.reply,
+                franja: action.franja,
               })
             : action.action === "move_slot"
               ? await moveSlot({

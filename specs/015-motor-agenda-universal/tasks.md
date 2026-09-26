@@ -455,9 +455,18 @@ había disponibilidad. Ver "Ajuste 2026-09-23" del spec.
       sobre `rescheduleForConversation`, y la CITA ACTUAL en el prompt para que
       no reserve una segunda — `tests/unit/agenda-prompt.test.ts`,
       `ai-mock-agenda.test.ts`, tramo nuevo del arnés (211/211)
-- [ ] T076 `offer_slots` con preferencia («el lunes», «por la tarde»): hoy
-      siempre enseña los tres primeros del catálogo, ignorando lo que pidió el
-      cliente. No es urgente —puede nombrar su hora y se agenda— pero se nota
+- [X] T076 `offer_slots` con franja (FR-033..FR-036): filtra lo que ENSEÑA, no
+      lo que registra; menú de cuatro; si no hay nada en esa franja lo dice; y
+      «mañana» como día no cuenta como franja — `tests/unit/agenda-franja.test.ts`,
+      `ai-mock-agenda.test.ts`, arnés 212/212
+- [X] T070 Etapa 2 COMPLETA (medición del 2026-09-25/26 sobre `8f7f389`, mismo
+      examen y mismo juez, ambas corridas comparables): con `AGENDA_MODEL`
+      (`gpt-6-luna`) **68**, sin ella **57**. Pero caso por caso, los DOS casos
+      de agenda salieron idénticos en las dos (fácil verde, difícil amarillo,
+      mismo hallazgo): el delta viene de casos sin horarios ofrecidos, que
+      corren con el modelo barato en ambas — varianza del modelo general, no
+      efecto del de agenda. **Conclusión: `AGENDA_MODEL` no se paga**; lo que
+      rompía el caso difícil era la franja (T076). Variable retirada de LanCo
 - [ ] T070 Etapa 2, segunda mitad (acordada con el dueño): escenarios duros de agenda en el
       Laboratorio de LanCo —hora fuera del menú, hora fuera de horario,
       lenguaje vago ("temprano", "después de comer"), cambio de opinión a media

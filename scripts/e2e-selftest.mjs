@@ -1691,6 +1691,50 @@ async function agendaChecks() {
         JSON.stringify({ pedido, citaD })
       );
 
+      /* -- La franja que pidió el cliente (ajuste 2026-09-26) -- */
+      //
+      // Medido en el Laboratorio de LanCo con DOS modelos distintos: ante «¿me
+      // la cambias a la tarde?» el agente decía «horarios de la tarde» y
+      // enseñaba 09:00, 09:30 y 10:00. No era del modelo — el menú siempre
+      // daba los primeros del catálogo y no había otra cosa que enseñar.
+      const LEAD_T = "5214627015005";
+      async function decirT(texto, n) {
+        const antes = (await outboxDe(LEAD_T)).length;
+        await api("/api/dev/wa-mock/inbound", {
+          method: "POST",
+          body: JSON.stringify({
+            phoneNumberId: PN,
+            from: LEAD_T,
+            name: "Lead franja",
+            text: texto,
+            waMessageId: `wamid.e2e.015.franja.${n}`,
+          }),
+        });
+        const hasta = Date.now() + ventana;
+        while (Date.now() < hasta) {
+          const ahora = await outboxDe(LEAD_T);
+          if (ahora.length > antes) return textoDe(ahora[ahora.length - 1]);
+          await sleep(400);
+        }
+        return null;
+      }
+      const menuTarde = await decirT("Hola, quiero una cita por la tarde", "1");
+      const horasOfrecidas = (menuTarde ?? "")
+        .split("\n")
+        .map((l) => l.match(/a las (\d{2}):(\d{2})/))
+        .filter(Boolean)
+        .map((m) => Number(m[1]));
+      ok(
+        "pedir «por la tarde» enseña SOLO horarios de la tarde",
+        horasOfrecidas.length > 0 && horasOfrecidas.every((h) => h >= 12),
+        JSON.stringify({ horasOfrecidas, menuTarde })
+      );
+      ok(
+        "el menú enseña CUATRO opciones, no tres",
+        horasOfrecidas.length === 4,
+        JSON.stringify({ cuantas: horasOfrecidas.length, menuTarde })
+      );
+
       /* -- Cambiar de opinión: mover la cita (ajuste 2026-09-25) -- */
       //
       // Medido en el Laboratorio de LanCo con el LLM real: ante «uy, a esa

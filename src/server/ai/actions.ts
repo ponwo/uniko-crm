@@ -39,6 +39,13 @@ const agendaActions = [
   z.object({
     action: z.literal("offer_slots"),
     reply: z.string().optional(),
+    /*
+     * La parte del día que pidió el cliente (ajuste 2026-09-26). Se acepta
+     * como texto libre y lo normaliza el motor: exigir un literal exacto haría
+     * que un acento de más costara el turno, y la salida del modelo es
+     * impredecible por definición.
+     */
+    franja: z.string().optional(),
   }),
   z.object({
     action: z.literal("book_slot"),

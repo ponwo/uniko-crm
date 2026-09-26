@@ -180,3 +180,31 @@ describe("015 — ai-mock: la hora del ISO no se confunde con la pedida", () => 
     );
   });
 });
+
+/**
+ * Ajuste 2026-09-26 — La franja viaja SOLO si el cliente habló de la parte del
+ * día. «mañana» a secas queda fuera a propósito: en español es también el día
+ * siguiente, y mandarla como franja filtraría el menú por error.
+ */
+describe("015 — ai-mock y la franja del día", () => {
+  it("«¿algo por la tarde?» pide la tarde", () => {
+    const r = run(ACCIONES, "¿Tienen algo por la tarde?");
+    expect(r.action).toBe("offer_slots");
+    expect(r.franja).toBe("tarde");
+  });
+
+  it("«temprano» y «por la mañana» piden la mañana", () => {
+    expect(run(ACCIONES, "¿Algo temprano?").franja).toBe("mañana");
+    expect(run(ACCIONES, "Mejor por la mañana, ¿hay cita?").franja).toBe("mañana");
+  });
+
+  it("«¿hay algo mañana?» NO manda franja: ahí mañana es el día", () => {
+    const r = run(ACCIONES, "¿Hay algo mañana para una cita?");
+    expect(r.action).toBe("offer_slots");
+    expect(r.franja).toBeUndefined();
+  });
+
+  it("sin franja pedida, se ofrece sin filtrar", () => {
+    expect(run(ACCIONES, "Quiero agendar una cita").franja).toBeUndefined();
+  });
+});

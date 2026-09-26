@@ -237,10 +237,21 @@ export function aiMockCompletion(messages: InMessage[]): string {
         reply: "¡Perfecto, queda agendado!",
       });
     }
-    if (/\b(agendar|cita|horarios?)\b/i.test(lastUser)) {
+    if (/\b(agendar|cita|horarios?)\b/i.test(lastUser) || /\b(tarde|temprano)\b/i.test(lastUser)) {
+      /*
+       * La franja solo viaja si el cliente habló de la PARTE del día. «mañana»
+       * a secas se deja fuera a propósito: en español es también el día
+       * siguiente, y mandarla como franja filtraría el menú por error.
+       */
+      const franja = /\bpor la tarde|de la tarde|\btarde\b/i.test(lastUser)
+        ? "tarde"
+        : /\bpor la ma[ñn]ana|de la ma[ñn]ana|\btemprano\b/i.test(lastUser)
+          ? "mañana"
+          : undefined;
       return JSON.stringify({
         action: "offer_slots",
         reply: "Claro, tengo estos horarios:",
+        ...(franja ? { franja } : {}),
       });
     }
   }
