@@ -538,3 +538,8 @@ códigos HTTP se comparan EXACTOS (201/200/404/409/422), nunca `res.ok`.
 - Commit por task o grupo lógico, en la rama `015-motor-agenda-universal`.
 - Evitar: tasks vagas, dos tasks [P] sobre el mismo archivo, dependencias
   cruzadas que rompan la independencia de las historias.
+- [X] T077 La cita actual caduca (FR-037/FR-038): solo cuenta la próxima, sin
+      `realizada`, y el corte por fecha en JS para que sea testeable —
+      `tests/unit/agenda-cita-actual.test.ts`. Bug encontrado por el dueño en
+      un WhatsApp real (2026-09-25 21:32): «ya tienes una cita para mañana
+      jueves 24» dicho un viernes 25

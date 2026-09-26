@@ -1,4 +1,4 @@
-import { and, eq, inArray } from "drizzle-orm";
+import { and, asc, eq } from "drizzle-orm";
 import { getDb, schema } from "@/lib/db";
 import { scoped } from "@/lib/db/tenant";
 import { labelInTz } from "@/lib/time/slots";
@@ -65,13 +65,31 @@ export async function offeredSlotsFor(input: {
 }
 
 /**
- * La cita activa que nació en una conversación, como HECHO para el juez del
- * Laboratorio (FR-024): «quedó agendada para jue 18 sep, 09:00» o nada. Las
- * de prueba cuentan igual — son justo las que el Laboratorio produce.
+ * La cita **próxima** que nació en una conversación, como HECHO para el juez
+ * del Laboratorio (FR-024) y para el agente (FR-032). Las de prueba cuentan
+ * igual — son justo las que el Laboratorio produce.
+ *
+ * SOLO cuenta si todavía no ha pasado. Encontrado en producción por el dueño
+ * (2026-09-25, 21:32): un cliente escribió «quisiera agendar una cita» y el
+ * agente contestó «ya tienes una cita agendada para mañana jueves 24 a las
+ * 10:00» — esa cita había sido el día ANTERIOR. Sin filtro de fecha, cualquier
+ * cita vieja convertía a un cliente que vuelve en un cliente al que se le
+ * niega una cita nueva.
+ *
+ * Y era, además, una contradicción interna: `rescheduleForConversation` —la
+ * que movería esa cita— sí filtra por fecha, así que el agente ofrecía mover
+ * algo que el motor iba a rechazar con «no hay cita activa que mover». Las dos
+ * consultas tienen que ver lo mismo.
+ *
+ * El corte por fecha se hace en JS y no en SQL a propósito: así se puede
+ * probar. El mock de la base de los tests ignora el `where`, de modo que un
+ * filtro en SQL sería invisible para cualquier prueba — que es exactamente
+ * cómo este fallo llegó a producción.
  */
 export async function bookedInConversation(input: {
   organizationId: string;
   conversationId: string;
+  now?: Date;
 }): Promise<string | null> {
   const db = getDb();
   const rows = await db
@@ -83,15 +101,19 @@ export async function bookedInConversation(input: {
         input.organizationId,
         and(
           eq(schema.booking.conversationId, input.conversationId),
-          inArray(schema.booking.status, ["agendada", "realizada"])
+          // `realizada` queda fuera por definición: ya ocurrió.
+          eq(schema.booking.status, "agendada")
         )
       )
     )
-    .limit(1);
-  const row = rows[0];
-  if (!row) return null;
+    .orderBy(asc(schema.booking.scheduledAt))
+    .limit(20);
+
+  const now = input.now ?? new Date();
+  const proxima = rows.find((r) => r.scheduledAt.getTime() >= now.getTime());
+  if (!proxima) return null;
   const settings = await getSettings(input.organizationId);
-  return labelInTz(row.scheduledAt.toISOString(), settings.timezone);
+  return labelInTz(proxima.scheduledAt.toISOString(), settings.timezone);
 }
 
 export async function offerSlots(input: {
