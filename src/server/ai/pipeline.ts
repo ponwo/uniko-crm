@@ -19,6 +19,9 @@ import { matchesHandoffIntent } from "@/server/ai/handoff";
 import { avisarDeEscalacion } from "@/server/push/avisar";
 import { buildAgentSystemPrompt } from "@/server/ai/prompts";
 import { agendaEnabled, modelForTurn } from "@/server/agenda/flag";
+import { getSettings } from "@/server/agenda/settings";
+import { nowLabelInTz } from "@/lib/time/slots";
+import { withDayMarkers } from "@/server/ai/history";
 import {
   bookedInConversation,
   bookSlot,
@@ -173,6 +176,23 @@ export async function runAgentTurn(conversationId: string): Promise<void> {
   const citaActual = agenda
     ? await bookedInConversation({ organizationId, conversationId })
     : null;
+  /*
+   * 015 (ajuste 2026-09-26) — En qué día vive el agente.
+   *
+   * Encontrado en producción: una conversación retomada dos días después
+   * arrastraba «tu cita quedó agendada para mañana jueves», y el agente lo
+   * repitió como vigente. En el hilo que ve el modelo no hay ninguna marca de
+   * tiempo, y en su prompt tampoco había fecha: el «mañana» de hace dos días
+   * seguía pareciendo mañana.
+   *
+   * La zona horaria es la de la agenda, así que esto solo se hace con la
+   * bandera encendida. Si alguna vez hace falta sin agenda, lo que toca no es
+   * leer aquí la tabla del módulo: es darle a la organización una zona horaria
+   * propia.
+   */
+  const ahoraDate = new Date();
+  const tz = agenda ? (await getSettings(organizationId)).timezone : null;
+  const ahora = tz ? nowLabelInTz(ahoraDate, tz) : null;
   const messages: ChatMessage[] = [
     {
       role: "system",
@@ -183,15 +203,24 @@ export async function runAgentTurn(conversationId: string): Promise<void> {
         agenda,
         offeredSlots,
         citaActual,
+        ahora,
         inventario,
       }),
     },
-    ...history
-      .filter((m) => m.text)
-      .map((m) => ({
-        role: m.direction === "in" ? ("user" as const) : ("assistant" as const),
-        content: m.text!,
-      })),
+    ...(() => {
+      const hilo = history
+        .filter((m) => m.text)
+        .map((m) => ({
+          role: m.direction === "in" ? ("user" as const) : ("assistant" as const),
+          content: m.text!,
+          at: m.createdAt,
+        }));
+      // Con la agenda apagada no hay zona horaria del negocio de dónde tirar,
+      // así que el hilo va tal cual, como siempre.
+      return tz
+        ? withDayMarkers(hilo, { timezone: tz, now: ahoraDate })
+        : hilo.map((m) => ({ role: m.role, content: m.content }));
+    })(),
   ];
 
   // 015 (ajuste 2026-09-23) — Con `AGENDA_MODEL` definido, los turnos en los

@@ -543,3 +543,9 @@ códigos HTTP se comparan EXACTOS (201/200/404/409/422), nunca `res.ok`.
       `tests/unit/agenda-cita-actual.test.ts`. Bug encontrado por el dueño en
       un WhatsApp real (2026-09-25 21:32): «ya tienes una cita para mañana
       jueves 24» dicho un viernes 25
+- [X] T078 El agente sabe en qué día vive (FR-039..FR-041): `AHORA ES` en el
+      prompt con el año, marcas `system` de cambio de día en el hilo, y la
+      prohibición de repetir citas del historial — `tests/unit/agenda-hoy.test.ts`.
+      Bug encontrado por el dueño en WhatsApp real, dos veces (2026-09-25)
+- [ ] T079 Verificación en vivo de T077/T078 por el dueño: retomar la
+      conversación vieja y comprobar que ya NO menciona la cita del jueves 24

@@ -54,6 +54,15 @@ export function buildAgentSystemPrompt(input: {
    */
   citaActual?: string | null;
   /**
+   * 015 (ajuste 2026-09-26) — En qué día y a qué hora vive el agente.
+   *
+   * Sin esto, el modelo no puede saber si un «mañana jueves» del historial ya
+   * pasó. Encontrado en producción dos veces: una conversación retomada dos
+   * días después hizo que el agente repitiera como vigente una cita del día
+   * anterior. Nada en su prompt le decía qué día era hoy.
+   */
+  ahora?: string | null;
+  /**
    * 026 — ¿esta instancia tiene el conector de inventario? Apagado, el prompt
    * no menciona existencias ni precios consultables: aquí no hay inventario.
    */
@@ -76,6 +85,9 @@ export function buildAgentSystemPrompt(input: {
           ...offered.map((s, i) => `${i + 1}. ${s.label} → startUtc "${s.startUtc}"`),
         ].join("\n")
       : "HORARIOS OFRECIDOS EN ESTA CONVERSACIÓN: ninguno todavía. Para agendar, primero offer_slots."
+    : null;
+  const ahoraBlock = input.ahora
+    ? `AHORA ES: ${input.ahora} (hora del negocio). Úsalo para entender «hoy», «mañana», «el lunes» — y para saber qué fechas del historial YA PASARON.`
     : null;
   const citaBlock =
     input.agenda && input.citaActual
@@ -101,6 +113,7 @@ export function buildAgentSystemPrompt(input: {
         "- book_slot solo acepta un horario de la lista HORARIOS OFRECIDOS: copia su startUtc TAL CUAL (nunca lo calcules ni lo conviertas). «El primero» es el 1 de esa lista. Si la lista está vacía o el cliente pide otro día, vuelve a ofrecer con offer_slots.",
         "- Si el cliente pide una hora o un día CONCRETOS, búscalos en HORARIOS OFRECIDOS y reserva ese: la lista trae muchos más de los tres que se le enseñaron.",
         "- Si lo que pide NO está en la lista, NUNCA afirmes que está ocupado, lleno o que no hay disponibilidad —no lo sabes—: di que lo confirmas y usa offer_slots.",
+        "- El historial puede traer mensajes de días ANTERIORES: un «mañana a las 10» dicho hace dos días ya pasó. NUNCA repitas una cita que viste en el historial como si siguiera en pie; lo vigente es lo que digan CITA ACTUAL y HORARIOS OFRECIDOS, que el sistema recalcula en cada turno.",
         "- Si el cliente quiere CAMBIAR o mover su cita a otra hora, es trabajo TUYO: usa move_slot (si no sabe a cuál, primero offer_slots). No lo mandes con una persona por esto.",
         "- Si el cliente quiere CANCELAR una cita → handoff: esa decisión no es tuya. Cancelar y mover no son lo mismo.",
       ]
@@ -115,6 +128,7 @@ export function buildAgentSystemPrompt(input: {
     profile.greeting ? `Saludo sugerido para conversaciones nuevas: ${profile.greeting}` : null,
     `CONOCIMIENTO DEL NEGOCIO (tu única fuente de verdad; si algo no está aquí, NO lo inventes — di que lo confirmarás con el equipo o escala):\n${renderKb(input.kb)}`,
     `Etapas del pipeline disponibles: ${stageNames}`,
+    ahoraBlock,
     citaBlock,
     offeredBlock,
     [
