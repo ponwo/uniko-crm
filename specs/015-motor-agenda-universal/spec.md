@@ -797,3 +797,44 @@ guardar). El google-mock no lo delataba: no exigía scopes.
 - **La enmienda constitucional (1.4.0) fue ratificada y aplicada el
   2026-08-26**; el plan B de recorte (bandera + motor + `enlace-fijo`) quedó
   sin efecto.
+
+## Ajuste 2026-09-26 (bis) — la cita actual caduca (extensión)
+
+**Encontrado en producción por el dueño**, en un WhatsApp real del 2026-09-25 a
+las 21:32:
+
+```
+CLIENTE: hola quisiera agendar una cita
+AGENTE:  ¡Hola! Oye, ya tienes una cita agendada para mañana jueves 24 a las
+         10:00 am 😄 ¿Quieres conservarla o prefieres que la movamos?
+```
+
+Era **viernes 25**: esa cita había sido el día anterior. `bookedInConversation`
+(FR-032) no filtraba por fecha y además contaba las `realizada`, que por
+definición ya ocurrieron. Cualquier cita vieja convertía a un cliente que
+vuelve en un cliente al que se le niega una cita nueva.
+
+Y era una contradicción interna: `rescheduleForConversation` —la que movería
+esa cita— **sí** filtra por fecha, así que el agente ofrecía mover algo que el
+motor iba a rechazar con «no hay cita activa que mover».
+
+Cómo se coló: el filtro habría vivido en SQL, y el mock de la base de los tests
+ignora el `where`. Ninguna prueba podía verlo.
+
+### Functional Requirements (extensión)
+
+- **FR-037**: La «cita actual» del cliente (FR-032, y el hecho del juez FR-024)
+  MUST contar solo si **no ha pasado**, y MUST excluir las `realizada`. Cuando
+  hay varias, es la más próxima. La consulta MUST ver lo mismo que
+  `rescheduleForConversation`: si el agente dice que hay cita, el motor tiene
+  que poder moverla.
+- **FR-038**: Ese corte por fecha MUST decidirse en el código, no en la
+  cláusula SQL, para que sea verificable: el mock de base de los tests ignora
+  el `where`, y un filtro invisible para las pruebas es como llegó este fallo a
+  producción.
+
+### Success Criteria (extensión)
+
+- **SC-014**: Con una cita del día anterior, el cliente que escribe «quiero
+  agendar una cita» recibe horarios, no «ya tienes una cita». Quitar el corte
+  por fecha pone en rojo `tests/unit/agenda-cita-actual.test.ts`.
