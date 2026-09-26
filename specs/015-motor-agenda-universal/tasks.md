@@ -458,7 +458,13 @@ había disponibilidad. Ver "Ajuste 2026-09-23" del spec.
 - [X] T076 `offer_slots` con franja (FR-033..FR-036): filtra lo que ENSEÑA, no
       lo que registra; menú de cuatro; si no hay nada en esa franja lo dice; y
       «mañana» como día no cuenta como franja — `tests/unit/agenda-franja.test.ts`,
-      `ai-mock-agenda.test.ts`, arnés 212/212
+      `ai-mock-agenda.test.ts`, arnés 212/212.
+      **Verificada en vivo 2026-09-26** en `uniko-lanco` con `45f162d` desplegado
+      (corrida `run_e0bfshugof31fozvijx6`, LLM real): ante «¿me la cambias a la
+      tarde del lunes?» el agente contestó «Lo movemos a la tarde… • 12:00
+      • 12:30 • 13:00 • 13:30» — tarde de verdad y cuatro opciones. El caso
+      «Agenda difícil» pasó de amarillo a VERDE, y los dos casos de agenda
+      quedan verdes por primera vez (SC-013)
 - [X] T070 Etapa 2 COMPLETA (medición del 2026-09-25/26 sobre `8f7f389`, mismo
       examen y mismo juez, ambas corridas comparables): con `AGENDA_MODEL`
       (`gpt-6-luna`) **68**, sin ella **57**. Pero caso por caso, los DOS casos

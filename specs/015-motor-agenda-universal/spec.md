@@ -669,7 +669,23 @@ menú pase de tres opciones a cuatro.
 ### Success Criteria (extensión)
 
 - **SC-013**: En el arnés, «quiero una cita por la tarde» enseña **solo**
-  horarios de las 12:00 en adelante, y son **cuatro**.
+  horarios de las 12:00 en adelante, y son **cuatro**. Verificado además en
+  vivo (2026-09-26, `45f162d`): el caso «Agenda difícil» del Laboratorio pasó
+  de amarillo a verde y el agente ofreció 12:00–13:30 al pedirle la tarde.
+
+### Lo que esta feature NO puede medir con el score del Laboratorio
+
+Tres corridas seguidas del mismo examen, con el mismo juez: **68 → 57 → 50**, y
+los mismos casos bailando en las dos direcciones sin que cambiara el código que
+los afecta («Pide un humano» verde→verde→amarillo, «Comprador decidido»
+amarillo→amarillo→verde, «Pide cosas fuera de catálogo» verde→rojo→rojo). Los
+ÚNICOS estables entre las tres son los dos de agenda.
+
+El agregado ya indujo a error dos veces: dijo que `AGENDA_MODEL` valía +11 y
+que la franja costaba −7; ninguna de las dos era cierta. **Un cambio de la
+agenda se juzga por su caso y su transcript, no por el score.** La varianza
+viene de las conversaciones donde el agente improvisa porque el conocimiento no
+cubre el tema; taparlas subiría el score Y volvería usable el instrumento.
 
 ## Ajuste 2026-09-25 — mover la cita es trabajo del agente (extensión)
 
