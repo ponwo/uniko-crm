@@ -146,3 +146,19 @@ mover, y cambiar de hora es lo más común que pasa de verdad.
 
 Camino infeliz cubierto por el mock: sin `CITA ACTUAL` en el prompt, elegir una
 hora reserva una SEGUNDA cita — que es justo lo que el arnés detectó.
+
+## El menú atiende la franja que piden (ajuste 2026-09-26, FR-033/FR-035)
+
+Medido en el Laboratorio de LanCo con DOS modelos distintos, idéntico en ambos:
+ante «¿me la cambias a la tarde?» el agente decía «horarios del lunes por la
+tarde» y enseñaba 09:00, 09:30 y 10:00. No era del modelo — el menú daba
+siempre los primeros del catálogo y no había otra cosa que enseñar.
+
+1. Un lead escribe «quiero una cita **por la tarde**» → el menú enseña **solo**
+   horarios de las 12:00 en adelante.
+2. Son **cuatro** opciones, no tres.
+3. Lo reservable **no** se filtra: si después pide una hora de la mañana, se
+   agenda igual (el catálogo sigue ancho).
+4. Si en esa franja no queda nada, el motor lo dice —«por la tarde no me queda
+   nada; estos son los que sí tengo»— en vez de enseñar la mañana como si fuera
+   la tarde.

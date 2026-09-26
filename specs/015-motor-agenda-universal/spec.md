@@ -629,6 +629,48 @@ igual o inventaría uno.
   «no hay disponibilidad», «ocupado» ni «lleno». Volver a `perDay: 3` pone en
   rojo `tests/unit/agenda-catalogo.test.ts` y ese check del arnés.
 
+## Ajuste 2026-09-26 — el menú atiende la franja que piden (extensión)
+
+**Hallazgo en el Laboratorio de LanCo, con DOS modelos distintos** (`gpt-6-luna`
+como `AGENDA_MODEL` y `glm-5.3-flash` sin ella), idéntico en ambos:
+
+```
+CLIENTE: ¿Me la cambias a la tarde del lunes?
+AGENTE:  Estos son los horarios disponibles el lunes POR LA TARDE:
+         • lunes 28 a las 09:00 • 09:30 • 10:00
+```
+
+El menú siempre daba los primeros del catálogo, y el modelo narraba esa lista
+como si fuera lo pedido. Que pasara igual con los dos modelos es la prueba de
+que **no era del modelo**: no se le daba otra cosa que enseñar. Es una
+afirmación falsa sobre la disponibilidad, de la misma familia que el «no hay
+disponibilidad» del ajuste del 23.
+
+Decisión del dueño (2026-09-26): que ofrecer decida primero la franja, y que el
+menú pase de tres opciones a cuatro.
+
+### Functional Requirements (extensión)
+
+- **FR-033**: `offer_slots` MUST aceptar la franja del día que pidió el cliente
+  y filtrar con ella **lo que se enseña**, NUNCA lo que se registra como
+  reservable: el catálogo sigue ancho porque el cliente puede acabar aceptando
+  otra hora. La franja se acepta como venga (`tarde`, `por la tarde`, `pm`) y
+  la normaliza el motor. El mediodía parte el día.
+- **FR-034**: Si no queda NADA en la franja pedida, el motor MUST decirlo y
+  enseñar lo que sí tiene, en vez de presentar otra cosa como si fuera lo
+  pedido. El prompt MUST prohibir describir la lista como de una franja que no
+  se pidió.
+- **FR-035**: El menú MUST enseñar **cuatro** opciones (antes tres): con tres,
+  pedir una franja dejaba un menú demasiado pobre para elegir dentro de ella.
+- **FR-036**: «mañana» es franja Y día siguiente en español. El prompt MUST
+  advertirlo y el ai-mock MUST NOT mandar franja cuando significa el día — si
+  no, «¿hay algo mañana?» filtraría el menú a la mañana por error.
+
+### Success Criteria (extensión)
+
+- **SC-013**: En el arnés, «quiero una cita por la tarde» enseña **solo**
+  horarios de las 12:00 en adelante, y son **cuatro**.
+
 ## Ajuste 2026-09-25 — mover la cita es trabajo del agente (extensión)
 
 **Hallazgo en el Laboratorio de LanCo**, con el LLM real y un escenario que

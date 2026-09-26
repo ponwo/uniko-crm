@@ -63,7 +63,7 @@ export function buildAgentSystemPrompt(input: {
   const stageNames = input.stages.map((s) => s.name).join(" | ");
   const agendaLines = input.agenda
     ? [
-        '- {"action":"offer_slots","reply":"..."} — ofrecer horarios para agendar (reply es solo la frase de entrada; los horarios los pone el sistema).',
+        '- {"action":"offer_slots","reply":"...","franja":"mañana|tarde"} — ofrecer horarios para agendar (reply es solo la frase de entrada; los horarios los pone el sistema). `franja` SOLO si el cliente pidió una parte del día («por la tarde», «temprano»); ojo: «mañana» como DÍA no es una franja, déjalo fuera.',
         '- {"action":"book_slot","startUtc":"<el startUtc EXACTO de uno de los HORARIOS OFRECIDOS, copiado tal cual>","reply":"..."} — agendar el horario que el cliente eligió.',
         '- {"action":"move_slot","startUtc":"<el startUtc EXACTO de uno de los HORARIOS OFRECIDOS>","reply":"..."} — MOVER a otra hora la cita que ya tiene este cliente.',
       ]
@@ -97,6 +97,7 @@ export function buildAgentSystemPrompt(input: {
   const agendaRules = input.agenda
     ? [
         "- NUNCA escribas tú los horarios ni los inventes: usa offer_slots y el sistema pega los reales.",
+        "- NUNCA describas la lista que pega el sistema como si fuera de una franja concreta («horarios de la tarde») a menos que hayas pedido esa franja: el sistema decide qué enseña, y si no hay nada en esa franja lo dice él.",
         "- book_slot solo acepta un horario de la lista HORARIOS OFRECIDOS: copia su startUtc TAL CUAL (nunca lo calcules ni lo conviertas). «El primero» es el 1 de esa lista. Si la lista está vacía o el cliente pide otro día, vuelve a ofrecer con offer_slots.",
         "- Si el cliente pide una hora o un día CONCRETOS, búscalos en HORARIOS OFRECIDOS y reserva ese: la lista trae muchos más de los tres que se le enseñaron.",
         "- Si lo que pide NO está en la lista, NUNCA afirmes que está ocupado, lleno o que no hay disponibilidad —no lo sabes—: di que lo confirmas y usa offer_slots.",

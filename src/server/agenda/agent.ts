@@ -4,7 +4,7 @@ import { scoped } from "@/lib/db/tenant";
 import { labelInTz } from "@/lib/time/slots";
 import { computeAvailability } from "@/server/agenda/availability";
 import { getSettings } from "@/server/agenda/settings";
-import { catalogByDay } from "@/server/agenda/spread";
+import { catalogByDay, enFranja, parseFranja } from "@/server/agenda/spread";
 import { getOffers, replaceOffers, type OfferedSlot } from "@/server/agenda/offers";
 import {
   BookingError,
@@ -24,8 +24,13 @@ import {
  * algo que el cliente no eligió.
  */
 
-/** Cuántos huecos se le enseñan al cliente en un mensaje. */
-const SHOWN = 3;
+/**
+ * Cuántos huecos se le enseñan al cliente en un mensaje.
+ *
+ * Cuatro desde el 2026-09-26 (decisión del dueño): con tres, pedir una franja
+ * dejaba un menú demasiado pobre para elegir dentro de ella.
+ */
+const SHOWN = 4;
 /**
  * El CATÁLOGO reservable (lo que el modelo puede aceptar) es mucho más ancho
  * que el menú: denso en los días próximos, ralo después. Ver `catalogByDay` —
@@ -93,6 +98,13 @@ export async function offerSlots(input: {
   organizationId: string;
   conversationId: string;
   intro?: string;
+  /**
+   * La parte del día que pidió el cliente («por la tarde», «temprano»), si
+   * dijo alguna. Filtra lo que se ENSEÑA, nunca lo que se registra: el
+   * catálogo reservable sigue ancho, porque el cliente puede acabar
+   * aceptando otra hora.
+   */
+  franja?: string;
 }): Promise<AgendaTurn> {
   const settings = await getSettings(input.organizationId);
   const now = new Date();
@@ -126,16 +138,33 @@ export async function offerSlots(input: {
     spread.map((s) => ({ startUtc: s.startUtc, label: s.label }))
   );
 
-  const shown = spread.slice(0, SHOWN);
+  /*
+   * El MENÚ se filtra por la franja pedida; el catálogo de arriba no. Antes el
+   * menú eran siempre los primeros del catálogo, y el modelo los narraba como
+   * si fueran lo pedido: «horarios del lunes por la tarde» seguido de 09:00,
+   * 09:30 y 10:00. Medido con dos modelos distintos, así que no era del
+   * modelo: era que no se le daba otra cosa que enseñar.
+   */
+  const franja = parseFranja(input.franja);
+  const deLaFranja = franja ? spread.filter((s) => enFranja(s, franja)) : [];
+  const sinHuecosEnLaFranja = Boolean(franja) && deLaFranja.length === 0;
+  const fuente = deLaFranja.length > 0 ? deLaFranja : spread;
+
+  const shown = fuente.slice(0, SHOWN);
   const lista = shown.map((s) => `• ${s.dayLabel} a las ${s.time}`).join("\n");
   const intro = input.intro?.trim() || "Tengo estos horarios disponibles:";
-  // El menú son tres, el catálogo son decenas: si el cliente no lo sabe, cree
-  // que esas tres son toda la agenda y se va. Decírselo cuesta una línea.
+  // Pidió una franja y no hay NADA en ella: se dice, en vez de enseñar otra
+  // cosa como si fuera lo pedido. Es la mentira que esto viene a arreglar.
+  const aclaracion = sinHuecosEnLaFranja
+    ? `\n(Por ${franja === "pm" ? "la tarde" : "la mañana"} no me queda nada; estos son los que sí tengo.)`
+    : "";
+  // El menú son cuatro, el catálogo son decenas: si el cliente no lo sabe,
+  // cree que eso es toda la agenda y se va. Decírselo cuesta una línea.
   const masOpciones =
     spread.length > shown.length
       ? "\nSi te acomoda mejor otra hora o algún otro día, dímelo y lo reviso."
       : "";
-  return { ok: true, text: `${intro}\n${lista}${masOpciones}` };
+  return { ok: true, text: `${intro}${aclaracion}\n${lista}${masOpciones}` };
 }
 
 export async function bookSlot(input: {
