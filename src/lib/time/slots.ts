@@ -287,3 +287,30 @@ export function partsInTz(
     weekday: fmt({ weekday: "long" }),
   };
 }
+
+/**
+ * 015 (ajuste 2026-09-26) — En qué día y a qué hora vive el agente.
+ *
+ * Con el AÑO dentro, a propósito: sin él, «jueves 24» es ambiguo entre años y
+ * el modelo no puede decidir si una fecha del historial ya pasó. Encontrado en
+ * producción: un mensaje de dos días antes decía «tu cita quedó agendada para
+ * mañana jueves» y el agente lo repitió como vigente, porque nada en su prompt
+ * le decía qué día era hoy.
+ */
+export function nowLabelInTz(now: Date, tz: string): string {
+  if (Number.isNaN(now.getTime())) return "";
+  const fecha = new Intl.DateTimeFormat("es-MX", {
+    timeZone: tz,
+    weekday: "long",
+    day: "numeric",
+    month: "long",
+    year: "numeric",
+  }).format(now);
+  const hora = new Intl.DateTimeFormat("es-MX", {
+    timeZone: tz,
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: false,
+  }).format(now);
+  return `${fecha}, ${hora}`;
+}

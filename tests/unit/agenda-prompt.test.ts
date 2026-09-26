@@ -153,7 +153,7 @@ describe("015 — la cita actual viaja al prompt (ajuste 2026-09-25)", () => {
 
   it("sin cita, o sin agenda, no aparece el bloque", () => {
     const sinCita = prompt({ agenda: true, offeredSlots: ofrecidos });
-    expect(sinCita).not.toContain("CITA ACTUAL");
+    expect(sinCita).not.toContain("CITA ACTUAL DE ESTE CLIENTE");
     const sinAgenda = buildAgentSystemPrompt({
       profile,
       kb: [],
@@ -161,6 +161,6 @@ describe("015 — la cita actual viaja al prompt (ajuste 2026-09-25)", () => {
       agenda: false,
       citaActual: "sáb 26 sep, 10:30",
     });
-    expect(sinAgenda).not.toContain("CITA ACTUAL");
+    expect(sinAgenda).not.toContain("CITA ACTUAL DE ESTE CLIENTE");
   });
 });

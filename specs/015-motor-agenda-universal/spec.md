@@ -838,3 +838,58 @@ ignora el `where`. Ninguna prueba podía verlo.
 - **SC-014**: Con una cita del día anterior, el cliente que escribe «quiero
   agendar una cita» recibe horarios, no «ya tienes una cita». Quitar el corte
   por fecha pone en rojo `tests/unit/agenda-cita-actual.test.ts`.
+
+## Ajuste 2026-09-26 (ter) — el agente no sabía en qué día vivía (extensión)
+
+**Encontrado en producción por el dueño, dos veces seguidas** (2026-09-25,
+21:32 y 21:56), la segunda ya con el arreglo de FR-037 desplegado:
+
+```
+CLIENTE: hola quisiera agendar una cita
+AGENTE:  ¡Hola! Veo que ya tienes una cita agendada para mañana jueves 24
+         a las 10:00 am 😄 ¿Quieres conservarla o prefieres que la movamos?
+```
+
+FR-037 había hecho su trabajo: esa cita del 24 ya NO entraba como «cita
+actual». El agente la sacaba del **historial**, donde seguía vivo un mensaje
+suyo del 23 de septiembre: «Tu cita quedó agendada para *mañana jueves* a las
+10:00 am 🎉».
+
+Dos agujeros a la vez, y ninguno es del modelo:
+
+1. **El prompt nunca decía qué día era hoy.** Sin eso, no hay forma de saber si
+   un «mañana jueves» del historial ya pasó.
+2. **El hilo no lleva marcas de tiempo.** Los veinte mensajes de contexto van
+   seguidos, sin fecha, como si fueran de la misma tarde. Una conversación
+   retomada dos días después se lee como continua.
+
+### Functional Requirements (extensión)
+
+- **FR-039**: Con la agenda encendida, el prompt MUST incluir la fecha y hora
+  actuales en la zona del negocio, **con el año**: sin él «jueves 24» es
+  ambiguo entre años. MUST decir para qué sirve (entender «hoy», «mañana», «el
+  lunes», y saber qué fechas del historial ya pasaron).
+- **FR-040**: Cuando el historial abarca días anteriores, MUST marcarse dónde
+  acaba lo viejo y empieza lo de hoy. Las marcas MUST ir como mensajes
+  `system`, NO como prefijos dentro del texto: un prefijo se imita y el agente
+  acabaría escribiéndole «(23 sep)» al cliente. Si todo el hilo es de hoy, MUST
+  NOT marcarse nada.
+- **FR-041**: El prompt MUST prohibir repetir como vigente una cita vista en el
+  historial: lo vigente es lo que digan CITA ACTUAL y HORARIOS OFRECIDOS, que
+  el sistema recalcula en cada turno.
+
+### Límite conocido
+
+La zona horaria vive en la configuración de la agenda, así que esto solo aplica
+con la bandera encendida. Si alguna vez hace falta sin agenda, lo que toca NO es
+leer desde el núcleo la tabla del módulo: es darle a la organización una zona
+horaria propia.
+
+### Cómo se verifica
+
+**No lo cubre el arnés, y no puede**: el fallo necesita que pase el tiempo de
+verdad —una conversación de hace dos días—, y los mocks no envejecen. Lo cubren
+`tests/unit/agenda-hoy.test.ts` (el prompt, el formato con año y las marcas del
+hilo) y la observación en vivo del dueño. Es el segundo fallo de esta feature
+que encuentra un cliente real y no la suite; los dos tenían la misma forma:
+**datos que solo existen con el tiempo corriendo**.
