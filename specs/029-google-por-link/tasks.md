@@ -60,7 +60,7 @@ agencia, "Probar" pasa, conector `google`, una cita crea su evento.
 - [X] T021 [US1] Sección del link (generar, copiar, vencimiento, pendiente, revocar, deshabilitada sin `canManage`) en `src/components/settings/google-link-section.tsx`
 - [X] T022 [US1] Integrar la sección arriba de los campos manuales de Google y mostrar el nombre del calendario en "Probar" en `src/components/settings/connector-credentials.tsx`
 - [X] T023 [P] [US1] Unitarios del flujo feliz y de la firma (`state` válido, `ret` = origen, URL de Google con los parámetros de D6, forma del link con y sin página de aterrizaje, calendario destino previo conservado) en `tests/unit/google-oauth.test.ts`
-- [ ] T024 [US1] Bloque "029" del arnés, camino feliz de punta a punta (incluida la cita que crea su evento) con estas aserciones: ninguna respuesta contiene el secreto de la agencia ni el refresh token (FR-1403, SC-002); ningún `Location` lleva el nombre del calendario (FR-1421); crear la cita no incrementa el contador del mock del relevo (SC-004); `/conectar-google?estado=<script>` muestra el genérico sin eco (FR-1420) en `scripts/e2e-selftest.mjs`
+- [X] T024 [US1] Bloque "029" del arnés, camino feliz de punta a punta (incluida la cita que crea su evento) con estas aserciones: ninguna respuesta contiene el secreto de la agencia ni el refresh token (FR-1403, SC-002); ningún `Location` lleva el nombre del calendario (FR-1421); crear la cita no incrementa el contador del mock del relevo (SC-004); `/conectar-google?estado=<script>` muestra el genérico sin eco (FR-1420) en `scripts/e2e-selftest.mjs`
 
 **Checkpoint**: MVP — un link conecta Google de punta a punta contra los mocks.
 
@@ -75,7 +75,7 @@ termina en su `estado` y la conexión previa sigue intacta.
 
 - [X] T025 [US2] Completar las ramas infelices de `completeGoogleOAuth` —`otro_navegador`, `link_invalido`, `cancelado`, `politica_empresa`, `google_rechazo`, `link_usado`, `google_no_respondio`, `permiso_incompleto`, `prueba_fallida`— y la red de seguridad de excepciones en `src/server/agenda/connectors/google-oauth.ts`
 - [X] T026 [P] [US2] Unitarios: un caso por motivo, y en ninguno se llama a guardar; `state` manipulado, vencido (reloj falso a +16 min) y sin cookie en `tests/unit/google-oauth.test.ts`
-- [ ] T027 [US2] Arnés: cancelar (y el link sigue sirviendo), permiso incompleto, política de empresa, canje caído, sin refresh token, sin cookie, `state` manipulado, link reusado — con la conexión previa intacta tras cada uno — en `scripts/e2e-selftest.mjs`
+- [X] T027 [US2] Arnés: cancelar (y el link sigue sirviendo), permiso incompleto, política de empresa, canje caído, sin refresh token, sin cookie, `state` manipulado, link reusado — con la conexión previa intacta tras cada uno — en `scripts/e2e-selftest.mjs`
 
 ---
 
@@ -87,8 +87,8 @@ termina en su `estado` y la conexión previa sigue intacta.
 revocar funciona; un miembro recibe 403.
 
 - [X] T028 [US3] `DELETE` del link (solo `owner`) en `src/app/api/settings/google/link/route.ts`
-- [ ] T029 [US3] Arnés: regenerar invalida el anterior (`link_invalido`), revocar a mano, pendiente sin la llave en el `GET`, y un miembro no dueño recibe 403 en `scripts/e2e-selftest.mjs`
-- [ ] T030 [US3] Arnés: un link usado sigue `link_usado` después de desconectar Google (FR-1409) en `scripts/e2e-selftest.mjs`
+- [X] T029 [US3] Arnés: regenerar invalida el anterior (`link_invalido`), revocar a mano, pendiente sin la llave en el `GET`, y un miembro no dueño recibe 403 en `scripts/e2e-selftest.mjs`
+- [X] T030 [US3] Arnés: un link usado sigue `link_usado` después de desconectar Google (FR-1409) en `scripts/e2e-selftest.mjs`
 
 ---
 
@@ -107,7 +107,7 @@ arnés prueba que el relevo de pruebas se niega a reenviar fuera de su lista.
 - [ ] T035 [US4] Rutas `/google-calendar` y `/google-calendar/callback` fuera del layout en `lanco-ws: App.tsx`
 - [ ] T036 [P] [US4] Sección "Datos de Google (LanCo Agenda)" con la declaración de uso limitado en la política de privacidad en `lanco-ws: data/legalData.ts`
 - [ ] T037 [P] [US4] Rutas nuevas en `lanco-ws: README.md`
-- [ ] T038 [US4] Arnés: el mock del relevo se niega (no redirige) ante un `ret` fuera de la lista, `http:` o con ruta en `scripts/e2e-selftest.mjs`
+- [X] T038 [US4] Arnés: el mock del relevo se niega (no redirige) ante un `ret` fuera de la lista, `http:` o con ruta en `scripts/e2e-selftest.mjs`
 
 ---
 
@@ -119,7 +119,7 @@ arnés prueba que el relevo de pruebas se niega a reenviar fuera de su lista.
 `GOOGLE_OAUTH_*` → las cuatro superficies en 404.
 
 - [X] T039 [P] [US5] Unitarios del entorno: apagada no exige nada; con `AGENDA` encendida una o dos de tres impiden arrancar nombrando la que falta; redirección `http:` no local rechazada; completas arrancan en `tests/unit/google-env.test.ts`
-- [ ] T040 [US5] Arnés: sin app de agencia (o sin agenda), `GET/POST /api/settings/google/link`, `/api/google/oauth/start`, `/api/google/oauth/callback` y `/conectar-google` responden 404; el `PUT` manual sigue igual en `scripts/e2e-selftest.mjs`
+- [X] T040 [US5] Arnés: sin app de agencia (o sin agenda), `GET/POST /api/settings/google/link`, `/api/google/oauth/start`, `/api/google/oauth/callback` y `/conectar-google` responden 404; el `PUT` manual sigue igual en `scripts/e2e-selftest.mjs`
 
 ---
 

@@ -116,14 +116,16 @@ export function GoogleLinkSection({
       {generated && (
         <div className="space-y-1.5">
           <div className="flex gap-2">
+            {/* min-w-0: sin él, el ancho intrínseco del input empuja el botón
+                fuera de la tarjeta en un teléfono. */}
             <Input
               readOnly
               value={generated.url}
               aria-label="Link de conexión"
               onFocus={(e) => e.currentTarget.select()}
-              className="font-mono text-xs"
+              className="min-w-0 font-mono text-xs"
             />
-            <Button variant="outline" onClick={copy} disabled={busy}>
+            <Button variant="outline" onClick={copy} disabled={busy} className="shrink-0">
               Copiar
             </Button>
           </div>

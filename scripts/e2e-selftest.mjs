@@ -1063,6 +1063,8 @@ async function agendaChecks() {
     );
     const page = await fetch(`${BASE}/bookings`, { headers: { cookie } });
     ok("la pantalla /bookings no existe", page.status === 404, `status=${page.status}`);
+    // 029: sin agenda, la conexión por link tampoco existe (FR-1401).
+    await googleLinkSurfacesAre404("con la agenda apagada");
     console.log("  (agenda apagada: el resto de los checks de 015 no aplican)");
     return;
   }
@@ -1495,6 +1497,9 @@ async function agendaChecks() {
     await api("/api/settings/google", { method: "DELETE" });
   }
 
+  // 029 — Conexión de Google por link (modelo agencia).
+  await googleLinkChecks(convB);
+
   /* ---------- El agente INCLUIDO ofrece y agenda solo (FR-023, FR-025) ---------- */
   //
   // Hasta aquí la agenda se ejercitaba solo por /api/bot/* (cerebro externo, que
@@ -1801,6 +1806,444 @@ main().catch((err) => {
   console.error("ERROR FATAL:", err);
   process.exit(1);
 });
+
+/* ============================================================
+ * 029 — Conexión de Google por link (tests/e2e/us-google-por-link.md)
+ *
+ * Un "navegador" SIN sesión —su propio tarro de cookies, redirecciones a
+ * mano— recorre el link como el titular del calendario: inicio → Google
+ * (mock) → relevo de lanco.cloud (mock) → retorno → página de resultado. Los
+ * caminos infelices se eligen con `mock_decision` en la URL de Google. La app
+ * tiene que correr con las tres GOOGLE_OAUTH_* apuntando a los mocks
+ * (specs/029-google-por-link/quickstart.md §1); sin ellas, el bloque solo
+ * comprueba que la superficie no existe.
+ * ============================================================ */
+
+const GL_CLIENT = process.env.GOOGLE_OAUTH_CLIENT_ID ?? "";
+const GL_SECRET = process.env.GOOGLE_OAUTH_CLIENT_SECRET ?? "";
+const GL_REDIRECT = process.env.GOOGLE_OAUTH_REDIRECT_URI ?? "";
+const SCOPE_CALENDARIO = "https://www.googleapis.com/auth/calendar.events";
+
+async function googleLinkSurfacesAre404(etiqueta) {
+  const superficies = [
+    ["GET /api/settings/google/link", () => api("/api/settings/google/link")],
+    ["POST /api/settings/google/link", () => api("/api/settings/google/link", { method: "POST" })],
+    ["GET /api/google/oauth/start", () => api(`/api/google/oauth/start?t=${"x".repeat(43)}`)],
+    ["GET /api/google/oauth/callback", () => api("/api/google/oauth/callback?state=x&code=y")],
+    ["GET /conectar-google", () => api("/conectar-google?estado=ok")],
+  ];
+  for (const [nombre, llamar] of superficies) {
+    const { res } = await llamar();
+    ok(`029: ${nombre} → 404 ${etiqueta}`, res.status === 404, `status=${res.status}`);
+  }
+}
+
+/** Tarro de cookies por "navegador": nombre → { value, path }. */
+function nuevoTarro() {
+  return new Map();
+}
+
+function cookiesPara(tarro, ruta) {
+  return [...tarro.entries()]
+    .filter(([, c]) => ruta.startsWith(c.path))
+    .map(([nombre, c]) => `${nombre}=${c.value}`)
+    .join("; ");
+}
+
+function guardarCookies(tarro, res) {
+  for (const raw of res.headers.getSetCookie?.() ?? []) {
+    const [par, ...attrs] = raw.split(";");
+    const i = par.indexOf("=");
+    const nombre = par.slice(0, i).trim();
+    const valor = par.slice(i + 1).trim();
+    const a = Object.fromEntries(
+      attrs.map((x) => {
+        const [k, v = ""] = x.trim().split("=");
+        return [k.toLowerCase(), v];
+      })
+    );
+    if (a["max-age"] === "0" || valor === "") tarro.delete(nombre);
+    else tarro.set(nombre, { value: valor, path: a.path || "/" });
+  }
+}
+
+async function navegar(url, tarro) {
+  const res = await fetch(url, {
+    redirect: "manual",
+    headers: { cookie: cookiesPara(tarro, new URL(url).pathname) },
+  });
+  guardarCookies(tarro, res);
+  const location = res.headers.get("location");
+  const text = await res.text().catch(() => "");
+  return {
+    status: res.status,
+    location: location ? new URL(location, url).toString() : null,
+    text,
+  };
+}
+
+/** Con página de aterrizaje el link trae `i` y `t`: se entra por donde entraría su botón. */
+function inicioDesde(linkUrl) {
+  const u = new URL(linkUrl);
+  const i = u.searchParams.get("i");
+  const t = u.searchParams.get("t");
+  if (i && t) {
+    return `${new URL(BASE).protocol}//${i}/api/google/oauth/start?t=${encodeURIComponent(t)}`;
+  }
+  return linkUrl;
+}
+
+function estadoDe(location) {
+  if (!location) return null;
+  const u = new URL(location);
+  return u.pathname === "/conectar-google" ? u.searchParams.get("estado") : null;
+}
+
+/**
+ * El recorrido del titular. `decision` elige lo que "hace" en Google;
+ * `sinCookie` termina en otro navegador; `stateManipulado` rompe la firma.
+ */
+async function recorrerLink(linkUrl, { decision, sinCookie, stateManipulado } = {}) {
+  const tarro = nuevoTarro();
+  const locations = [];
+  const cuerpos = [];
+  const paso = async (url) => {
+    const r = await navegar(url, tarro);
+    if (r.location) locations.push(r.location);
+    cuerpos.push(r.text);
+    return r;
+  };
+  const fin = (estado, pagina = "") => ({ estado, locations, cuerpos, pagina });
+
+  const inicio = await paso(inicioDesde(linkUrl));
+  if (inicio.status !== 302 || !inicio.location) return fin(`inicio:${inicio.status}`);
+  const temprano = estadoDe(inicio.location);
+  if (temprano) return fin(temprano);
+
+  const autorizacion = new URL(inicio.location);
+  if (decision) autorizacion.searchParams.set("mock_decision", decision);
+  const google = await paso(autorizacion.toString());
+  if (google.status !== 302 || !google.location) return fin(`google:${google.status}`);
+
+  let retorno = new URL(google.location);
+  if (stateManipulado) {
+    const [h, p] = (retorno.searchParams.get("state") ?? "").split(".");
+    retorno.searchParams.set("state", `${h}.${p}.firma-inventada`);
+  }
+  // Con el relevo en medio (la flota), un salto más; sin él, Google vuelve directo.
+  if (retorno.pathname.startsWith("/api/dev/lanco-relay-mock")) {
+    const relevo = await paso(retorno.toString());
+    if (relevo.status !== 302 || !relevo.location) return fin(`relevo:${relevo.status}`);
+    retorno = new URL(relevo.location);
+  }
+
+  if (sinCookie) tarro.clear();
+  const callback = await paso(retorno.toString());
+  const estado = estadoDe(callback.location) ?? `callback:${callback.status}`;
+  const pagina = callback.location ? (await paso(callback.location)).text : "";
+  return fin(estado, pagina);
+}
+
+/** Una sesión de un miembro que NO es dueño, con su propia cookie. */
+async function sesionDeMiembro() {
+  const email = "miembro-029@uniko.test";
+  const password = "password-miembro-029";
+  await api("/api/settings/team", {
+    method: "POST",
+    body: JSON.stringify({ name: "Miembro 029", email, password }),
+  }); // 201, o 409 en una re-corrida
+  const login = await fetch(`${BASE}/api/auth/sign-in/email`, {
+    method: "POST",
+    headers: { "content-type": "application/json", origin: BASE },
+    body: JSON.stringify({ email, password }),
+  });
+  const suCookie = (login.headers.getSetCookie?.() ?? []).map((c) => c.split(";")[0]).join("; ");
+  return async (path, opts = {}) => {
+    const res = await fetch(`${BASE}${path}`, {
+      ...opts,
+      headers: { "content-type": "application/json", origin: BASE, cookie: suCookie },
+    });
+    let json = null;
+    try {
+      json = await res.clone().json();
+    } catch {}
+    return { res, json };
+  };
+}
+
+function jwtCon(payload) {
+  const b64 = (o) => Buffer.from(JSON.stringify(o)).toString("base64url");
+  return `${b64({ alg: "HS256", typ: "JWT" })}.${b64(payload)}.firma`;
+}
+
+async function estadoRelevo() {
+  return (await fetch(`${BASE}/api/dev/lanco-relay-mock/_state`)).json();
+}
+
+async function googleLinkChecks(convB) {
+  console.log("\n== 029: conexión de Google por link ==");
+  const disponible = await api("/api/settings/google/link");
+  if (disponible.res.status === 404) {
+    console.log("  (sin la app de agencia configurada: la superficie del link no existe)");
+    await googleLinkSurfacesAre404("sin la app de agencia");
+    return;
+  }
+  ok(
+    "029: con la app de agencia, la superficie del link existe",
+    disponible.res.ok,
+    `status=${disponible.res.status}`
+  );
+  const conRelevo = GL_REDIRECT.includes("/api/dev/lanco-relay-mock");
+
+  await fetch(`${BASE}/api/dev/google-mock/_reset`, { method: "POST" });
+  await fetch(`${BASE}/api/dev/lanco-relay-mock/_reset`, { method: "POST" });
+  await api("/api/settings/google", { method: "DELETE" });
+  await api("/api/calendar/settings", {
+    method: "PUT",
+    body: JSON.stringify({ connector: "enlace-fijo" }),
+  });
+
+  /* ---------- US1: el dueño genera ---------- */
+  const antes = Date.now();
+  const generado = await api("/api/settings/google/link", { method: "POST" });
+  const linkUrl = generado.json?.url ?? "";
+  const llave = linkUrl ? new URL(linkUrl).searchParams.get("t") ?? "" : "";
+  ok(
+    "029: el dueño genera un link (201) con una llave opaca de 43 caracteres",
+    generado.res.status === 201 && /^[A-Za-z0-9_-]{43}$/.test(llave),
+    JSON.stringify(generado.json)
+  );
+  const vence = Date.parse(generado.json?.expiresAt ?? "");
+  ok(
+    "029: el link vence a las 72 horas",
+    Math.abs(vence - antes - 72 * 3_600_000) < 5 * 60_000,
+    generado.json?.expiresAt
+  );
+  const pendiente = await api("/api/settings/google/link");
+  ok(
+    "029: la pantalla ve el link pendiente y su vencimiento, nunca la llave",
+    pendiente.json?.canManage === true &&
+      pendiente.json?.pending?.expiresAt === generado.json?.expiresAt &&
+      !JSON.stringify(pendiente.json).includes(llave),
+    JSON.stringify(pendiente.json)
+  );
+
+  /* ---------- US3: un miembro que no es dueño ---------- */
+  const comoMiembro = await sesionDeMiembro();
+  const verMiembro = await comoMiembro("/api/settings/google/link");
+  ok(
+    "029: un miembro ve la sección pero sin poder manejarla",
+    verMiembro.res.ok && verMiembro.json?.canManage === false,
+    JSON.stringify(verMiembro.json)
+  );
+  const generarMiembro = await comoMiembro("/api/settings/google/link", { method: "POST" });
+  const revocarMiembro = await comoMiembro("/api/settings/google/link", { method: "DELETE" });
+  ok(
+    "029: un miembro no puede generar ni revocar (403)",
+    generarMiembro.res.status === 403 && revocarMiembro.res.status === 403,
+    `POST=${generarMiembro.res.status} DELETE=${revocarMiembro.res.status}`
+  );
+
+  /* ---------- US1: el recorrido del titular ---------- */
+  const feliz = await recorrerLink(linkUrl);
+  ok(
+    "029: recorrido completo SIN sesión → conectado",
+    feliz.estado === "ok",
+    `estado=${feliz.estado} :: ${feliz.locations.join(" → ")}`
+  );
+  const mock = await (await fetch(`${BASE}/api/dev/google-mock/_state`)).json();
+  const pedido = mock.lastAuthorization ?? {};
+  ok(
+    "029: a Google se le pide un solo permiso, de larga duración y con consentimiento",
+    pedido.scope === SCOPE_CALENDARIO &&
+      pedido.access_type === "offline" &&
+      pedido.prompt === "consent" &&
+      pedido.client_id === GL_CLIENT &&
+      pedido.redirect_uri === GL_REDIRECT,
+    JSON.stringify(pedido)
+  );
+  if (conRelevo) {
+    const relevo = await estadoRelevo();
+    ok("029: la respuesta de Google pasó por el relevo", relevo.relays >= 1, JSON.stringify(relevo));
+  }
+  ok(
+    "029: ninguna redirección lleva el nombre del calendario (FR-1421)",
+    !feliz.locations.some((l) => l.includes("Calendario")),
+    feliz.locations.join(" | ")
+  );
+  ok(
+    "029: la página de resultado dice que quedó conectado y qué calendario",
+    /quedó conectado/.test(feliz.pagina) && feliz.pagina.includes("Calendario de prueba"),
+    feliz.pagina.slice(0, 200)
+  );
+
+  const conexion = await api("/api/settings/google");
+  ok(
+    "029: la conexión quedó guardada con el cliente de la agencia",
+    conexion.json?.connection?.status === "connected" &&
+      conexion.json.connection.fields?.clientId === GL_CLIENT,
+    JSON.stringify(conexion.json)
+  );
+  const todoLoVisto = JSON.stringify([
+    generado.json,
+    pendiente.json,
+    conexion.json,
+    feliz.cuerpos,
+    feliz.pagina,
+  ]);
+  ok(
+    "029: ninguna respuesta lleva el secreto de la agencia ni el refresh token (FR-1403)",
+    GL_SECRET.length > 4 &&
+      !todoLoVisto.includes(GL_SECRET) &&
+      !todoLoVisto.includes("ref-oauth-") &&
+      conexion.json?.connection?.secretLast4 === GL_SECRET.slice(-4),
+    `secretLast4=${conexion.json?.connection?.secretLast4}`
+  );
+  const probar = await api("/api/settings/google/test", { method: "POST", body: "{}" });
+  ok(
+    "029: «Probar» pasa con lo guardado y nombra el calendario",
+    probar.res.ok && probar.json?.detail === "Calendario de prueba",
+    JSON.stringify(probar.json)
+  );
+  const ajustes = await api("/api/calendar/settings");
+  ok(
+    "029: la agenda quedó entregando por Google Calendar (FR-1418)",
+    ajustes.json?.settings?.connector === "google",
+    JSON.stringify(ajustes.json?.settings?.connector)
+  );
+
+  // SC-004: una vez conectada, la instancia habla con Google directo.
+  const relevosAntes = conRelevo ? (await estadoRelevo()).relays : 0;
+  const oferta = await bot(
+    `/api/bot/availability?conversationId=${convB.id}&limit=12&perDay=3&days=5`
+  );
+  const hueco = (oferta.json?.slots ?? [])[0];
+  ok("029: hay hueco para la cita de prueba", Boolean(hueco), JSON.stringify(oferta.json));
+  if (hueco) {
+    const cita = await bot("/api/bot/bookings", {
+      method: "POST",
+      body: JSON.stringify({ conversationId: convB.id, startUtc: hueco.startUtc }),
+    });
+    ok(
+      "029: con la conexión por link, una cita crea su evento con Meet",
+      cita.res.status === 201 && String(cita.json?.meetingLink ?? "").includes("meet.google.mock"),
+      JSON.stringify(cita.json)
+    );
+    if (conRelevo) {
+      ok(
+        "029: la cita no pasó por el relevo (SC-004)",
+        (await estadoRelevo()).relays === relevosAntes,
+        `antes=${relevosAntes}`
+      );
+    }
+    if (cita.json?.bookingId) {
+      await api(`/api/bookings/${cita.json.bookingId}`, {
+        method: "PATCH",
+        body: JSON.stringify({ action: "cancel" }),
+      });
+    }
+  }
+
+  const otraVez = await recorrerLink(linkUrl);
+  ok("029: el mismo link otra vez → «ya se usó»", otraVez.estado === "link_usado", `estado=${otraVez.estado}`);
+  const sinPendiente = await api("/api/settings/google/link");
+  ok("029: tras usarse, no queda link pendiente", sinPendiente.json?.pending === null, JSON.stringify(sinPendiente.json));
+
+  const eco = await api(`/conectar-google?estado=${encodeURIComponent("<script>alert(1)</script>")}`);
+  const ecoHtml = await eco.res.text();
+  ok(
+    "029: un estado desconocido muestra el genérico y no se refleja (FR-1420)",
+    eco.res.status === 200 &&
+      ecoHtml.includes("No pudimos completar la conexión") &&
+      !ecoHtml.includes("<script>alert(1)"),
+    `status=${eco.res.status}`
+  );
+
+  /* ---------- US2: caminos infelices, con una conexión previa intacta ---------- */
+  const PREVIO = "manual-previo.apps.googleusercontent.com";
+  const previa = await api("/api/settings/google", {
+    method: "PUT",
+    body: JSON.stringify({ clientId: PREVIO, clientSecret: "secreto-manual", refreshToken: "ref-manual" }),
+  });
+  ok("029: (preparación) una conexión manual previa", previa.res.ok, JSON.stringify(previa.json));
+  const link2 = (await api("/api/settings/google/link", { method: "POST" })).json?.url ?? "";
+  const infelices = [
+    ["cancelar en Google", { decision: "deny" }, "cancelado"],
+    ["desmarcar el permiso de calendario", { decision: "partial" }, "permiso_incompleto"],
+    ["la política de su empresa", { decision: "policy" }, "politica_empresa"],
+    ["Google caído en el canje", { decision: "exchange_down" }, "google_no_respondio"],
+    ["Google sin refresh token", { decision: "no_refresh" }, "prueba_fallida"],
+    ["terminar en otro navegador", { sinCookie: true }, "otro_navegador"],
+    ["state manipulado", { stateManipulado: true }, "link_invalido"],
+  ];
+  for (const [nombre, opciones, esperado] of infelices) {
+    const r = await recorrerLink(link2, opciones);
+    const c = (await api("/api/settings/google")).json?.connection;
+    ok(
+      `029: ${nombre} → ${esperado}, y la conexión previa intacta`,
+      r.estado === esperado && c?.fields?.clientId === PREVIO,
+      `estado=${r.estado} clientId=${c?.fields?.clientId}`
+    );
+  }
+  const siguePendiente = await api("/api/settings/google/link");
+  ok(
+    "029: tras los fallos, el mismo link sigue pendiente",
+    Boolean(siguePendiente.json?.pending),
+    JSON.stringify(siguePendiente.json)
+  );
+  const alFinal = await recorrerLink(link2);
+  const reemplazada = (await api("/api/settings/google")).json?.connection;
+  ok(
+    "029: …y todavía sirve: conecta y reemplaza la conexión previa",
+    alFinal.estado === "ok" && reemplazada?.fields?.clientId === GL_CLIENT,
+    `estado=${alFinal.estado} clientId=${reemplazada?.fields?.clientId}`
+  );
+
+  /* ---------- US3: regenerar, revocar y desconectar ---------- */
+  const link3 = (await api("/api/settings/google/link", { method: "POST" })).json?.url ?? "";
+  const link4 = (await api("/api/settings/google/link", { method: "POST" })).json?.url ?? "";
+  ok(
+    "029: generar otro invalida el anterior",
+    (await recorrerLink(link3)).estado === "link_invalido"
+  );
+  const revocado = await api("/api/settings/google/link", { method: "DELETE" });
+  ok(
+    "029: el dueño revoca el pendiente",
+    revocado.res.ok && revocado.json?.revoked === 1,
+    JSON.stringify(revocado.json)
+  );
+  ok("029: un link revocado ya no es válido", (await recorrerLink(link4)).estado === "link_invalido");
+  await api("/api/settings/google", { method: "DELETE" });
+  ok(
+    "029: desconectar Google no revive un link usado (FR-1409)",
+    (await recorrerLink(linkUrl)).estado === "link_usado"
+  );
+
+  /* ---------- US4: el relevo se niega fuera de la flota ---------- */
+  if (conRelevo) {
+    for (const [nombre, ret] of [
+      ["a un origen fuera de la flota", "https://atacante.test"],
+      ["a una ruta colada en el origen", `${BASE}/phishing`],
+    ]) {
+      const r = await fetch(`${BASE}/api/dev/lanco-relay-mock?code=c&state=${jwtCon({ ret })}`, {
+        redirect: "manual",
+      });
+      ok(
+        `029: el relevo no reenvía ${nombre}`,
+        r.status === 400 && !r.headers.get("location"),
+        `status=${r.status}`
+      );
+    }
+  }
+
+  // Limpieza: la instancia queda como la encontró.
+  await api("/api/settings/google/link", { method: "DELETE" });
+  await api("/api/settings/google", { method: "DELETE" });
+  await api("/api/calendar/settings", {
+    method: "PUT",
+    body: JSON.stringify({ connector: "enlace-fijo" }),
+  });
+}
 
 /* ============================================================
  * 026 — Conector INVENTARIO (tests/e2e/us-inventario.md)

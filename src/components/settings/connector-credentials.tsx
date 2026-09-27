@@ -175,13 +175,20 @@ export function ConnectorCredentials({
     <Card>
       <CardHeader>
         <CardTitle>Conectar {meta.label}</CardTitle>
-        <CardDescription>{help.title}.</CardDescription>
+        <CardDescription>
+          {connector === "google" && linkAvailable
+            ? "Con un link para quien tiene el calendario, o con tu propia app de Google Cloud."
+            : `${help.title}.`}
+        </CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
         {connector === "google" && <GoogleLinkSection onAvailable={setLinkAvailable} />}
 
         {connector === "google" && linkAvailable && (
-          <h4 className="text-sm font-semibold">¿Usas tu propia app de Google Cloud?</h4>
+          <div className="space-y-1">
+            <h4 className="text-sm font-semibold">¿Usas tu propia app de Google Cloud?</h4>
+            <p className="text-xs text-text-2">{help.title}.</p>
+          </div>
         )}
         <ul className="list-disc space-y-1 pl-5 text-xs text-text-2">
           {help.items.map((item, i) => (
