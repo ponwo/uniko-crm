@@ -338,7 +338,8 @@ redirect") en realidad también para el modo BYO.
 - **FR-1420**: La página de resultado MUST decir en lenguaje llano qué pasó y qué hacer,
   para cada motivo: conectado (con el nombre del calendario), link no válido, vencido,
   ya usado, autorización cancelada, permiso incompleto, otro navegador o tiempo
-  agotado, Google no respondió, Google no autorizó, y prueba fallida. La página MUST
+  agotado, Google no respondió, bloqueado por la política de la empresa (cuentas de
+  Workspace), Google no autorizó por otro motivo, y prueba fallida. La página MUST
   NOT reflejar texto arbitrario venido de la dirección.
 - **FR-1421**: Ningún dato personal (correo, nombre del calendario) MUST viajar en la
   dirección de ninguna página del recorrido.
