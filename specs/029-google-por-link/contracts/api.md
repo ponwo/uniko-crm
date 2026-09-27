@@ -66,7 +66,8 @@ SameSite=Lax; Path=/conectar-google; Max-Age=120`.
 | `cancelado` | `error=access_denied`. |
 | `politica_empresa` | `error=admin_policy_enforced`. |
 | `google_rechazo` | Cualquier otro `error` de Google. |
-| `link_usado` | El link ya se usó o se revocó mientras tanto (incluida la carrera de dos pestañas). |
+| `link_usado` | El link ya se usó mientras tanto (incluida la carrera de dos pestañas). |
+| `link_invalido` (tardío) | El link se revocó durante la ida y vuelta: si consumir falla, se relee la fila para distinguir usado de revocado — un revocado es `link_invalido` en todas partes. |
 | `google_no_respondio` | El canje falló por red, 5xx o `invalid_grant` (código vencido o reutilizado). |
 | `permiso_incompleto` | El `scope` concedido no incluye `calendar.events`. |
 | `prueba_fallida` | Sin `refresh_token`, o la prueba de conexión contra el calendario falló. |
