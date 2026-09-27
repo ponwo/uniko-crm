@@ -58,8 +58,27 @@ El bloque **"029: conexión de Google por link"** debe salir entero en OK:
 - `callback` sin la cookie → `otro_navegador`; `state` manipulado → `link_invalido`;
 - el relevo se niega a reenviar a un origen fuera de su lista.
 
-Con la agenda encendida **sin** la app de agencia, el bloque verifica las cuatro
-superficies en 404 y termina. Con la agenda apagada, las cuatro en 404.
+Con la agenda encendida **sin** la app de agencia, el bloque verifica las cinco
+superficies en 404 y termina. Con la agenda apagada, las cinco en 404.
+
+**Registro (2026-09-27, local, `next dev`, base desechable por corrida)**:
+
+| Configuración | Arnés completo | Bloque 029 |
+|---|---|---|
+| `AGENDA=on` + app de agencia contra los mocks | **249/249** | 37/37: feliz, siete infelices con la conexión previa intacta, controles del dueño, relevo |
+| `AGENDA=on` sin `GOOGLE_OAUTH_*` | **217/217** | 5/5 superficies en 404; el conector manual de la 015 sigue verde |
+| sin `AGENDA` | **169/169** | 5/5 superficies en 404 |
+
+Recorrido en el navegador de vista previa (Principio IX), con la primera
+configuración: *Ajustes → Agenda → Google → Generar link* muestra el link con
+«Copiar», el vencimiento y «sirve una sola vez», más «Generar otro» y «Revocar»,
+sobre la alternativa manual. Abrir el link en el navegador recorrió inicio →
+Google (mock) → relevo (mock) → retorno y aterrizó en «Listo: tu calendario
+quedó conectado — Calendario de prueba». Reabrirlo: «Este link ya se usó».
+Después, la tarjeta de Google aparece sola (el conector quedó en Google) y
+«Probar» dice «Conexión correcta — calendario «Calendario de prueba»». Sin
+errores de consola. En móvil (375 px) la tarjeta se lee bien; el campo del link
+recibió `min-w-0` para no empujar el botón fuera de la tarjeta.
 
 ## 4. Ensayo del Principio X (toca `drizzle/`)
 
@@ -97,6 +116,21 @@ npm install && npm run dev   # http://localhost:3000
   `https://<host>/api/google/oauth/callback?state=…&code=x`; con `ret` fuera de la
   lista, o `http:`, o con ruta → error y ninguna redirección.
 - `npm run build` en verde.
+
+**Registro (2026-09-27, rama `feat/google-calendar-onboarding`, `f1fc59a`)**:
+`tsc --noEmit` limpio y `npm run build` en verde. En el navegador (Vite en
+3001): la página de la app sin parámetros, con enlaces a privacidad y términos;
+el aterrizaje con `i=uniko.ilovetheuniverse.mx` nombra a «I Love The Universe»
+(de `data/flota.ts`), su botón apunta a
+`https://uniko.ilovetheuniverse.mx/api/google/oauth/start?t=…` y la página lleva
+`noindex` y `no-referrer`; un host ajeno da «Este link no es de LanCo» y una
+llave corta «El link está incompleto», los dos sin botón; el relevo con un `ret`
+ajeno se queda en «No pudimos continuar» sin redirigir. El caso positivo del
+relevo (que llevaría el navegador a una instancia de producción) se probó con el
+módulo real empaquetado en Node: consulta completa reenviada, cinco negativos y
+la detección de navegadores de apps (Instagram, Facebook, WebView de Android sí;
+Chrome y Safari no). La política de privacidad muestra la sección 9 con la
+declaración de uso limitado.
 
 ## 6. En vivo en uniko-lanco (con el dueño)
 

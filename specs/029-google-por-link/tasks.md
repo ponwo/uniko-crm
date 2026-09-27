@@ -100,13 +100,13 @@ cláusula de privacidad para la verificación.
 **Independent Test**: `npm run build` + recorrido en navegador (quickstart §5); el
 arnés prueba que el relevo de pruebas se niega a reenviar fuera de su lista.
 
-- [ ] T031 [P] [US4] Lista de la flota (`uniko.lanco.cloud`, `uniko.ilovetheuniverse.mx`, `uniko.nuriaandrea.com` con su nombre visible) en `lanco-ws: data/flota.ts`
-- [ ] T032 [P] [US4] Funciones puras: leer `i`/`t`, decodificar `ret` del `state`, validar origen (https, origen pelado, en la lista), construir URLs de inicio y de retorno, detectar navegador embebido en `lanco-ws: modules/googleCalendar.ts`
-- [ ] T033 [US4] Aterrizaje y página de la app «LanCo Agenda» (sin parámetros), aviso de app sin verificar, navegador embebido con copiar, `noindex` y `no-referrer` en `lanco-ws: pages/GoogleCalendar.tsx`
-- [ ] T034 [US4] Relevo: `location.replace` al retorno de la instancia o error sin redirigir, `noindex` y `no-referrer` en `lanco-ws: pages/GoogleCalendarCallback.tsx`
-- [ ] T035 [US4] Rutas `/google-calendar` y `/google-calendar/callback` fuera del layout en `lanco-ws: App.tsx`
-- [ ] T036 [P] [US4] Sección "Datos de Google (LanCo Agenda)" con la declaración de uso limitado en la política de privacidad en `lanco-ws: data/legalData.ts`
-- [ ] T037 [P] [US4] Rutas nuevas en `lanco-ws: README.md`
+- [X] T031 [P] [US4] Lista de la flota (`uniko.lanco.cloud`, `uniko.ilovetheuniverse.mx`, `uniko.nuriaandrea.com` con su nombre visible) en `lanco-ws: data/flota.ts`
+- [X] T032 [P] [US4] Funciones puras: leer `i`/`t`, decodificar `ret` del `state`, validar origen (https, origen pelado, en la lista), construir URLs de inicio y de retorno, detectar navegador embebido en `lanco-ws: modules/googleCalendar.ts`
+- [X] T033 [US4] Aterrizaje y página de la app «LanCo Agenda» (sin parámetros), aviso de app sin verificar, navegador embebido con copiar, `noindex` y `no-referrer` en `lanco-ws: pages/GoogleCalendar.tsx`
+- [X] T034 [US4] Relevo: `location.replace` al retorno de la instancia o error sin redirigir, `noindex` y `no-referrer` en `lanco-ws: pages/GoogleCalendarCallback.tsx`
+- [X] T035 [US4] Rutas `/google-calendar` y `/google-calendar/callback` fuera del layout en `lanco-ws: App.tsx`
+- [X] T036 [P] [US4] Sección "Datos de Google (LanCo Agenda)" con la declaración de uso limitado en la política de privacidad en `lanco-ws: data/legalData.ts`
+- [X] T037 [P] [US4] Rutas nuevas en `lanco-ws: README.md`
 - [X] T038 [US4] Arnés: el mock del relevo se niega (no redirige) ante un `ret` fuera de la lista, `http:` o con ruta en `scripts/e2e-selftest.mjs`
 
 ---
@@ -131,20 +131,20 @@ arnés prueba que el relevo de pruebas se niega a reenviar fuera de su lista.
 `callback` es el mismo código.
 
 - [X] T041 [US6] Unitario: sin `GOOGLE_ONBOARDING_URL` el link es `{APP_BASE_URL}/api/google/oauth/start?t=…` y el retorno directo se acepta igual en `tests/unit/google-oauth.test.ts`
-- [ ] T042 [US6] Sección "Self-hoster: tu propia app con el mismo link" en `docs/agenda-conectores.md`
+- [X] T042 [US6] Sección "Self-hoster: tu propia app con el mismo link" en `docs/agenda-conectores.md`
 
 ---
 
 ## Phase 9: Polish & Cross-Cutting
 
-- [ ] T043 [P] Guía del operador: preparación única del proyecto (renombrar, URLs, dominio, publicar sin logo), alta por negocio, verificación (Search Console por DNS en Cloudflare, video con consentimiento en inglés, justificación), rotación, baja y diagnóstico en `docs/google-agencia.md`
-- [ ] T044 [P] Sección "Conexión por link (modelo agencia)" y recuadro de condiciones remitiendo a la 4 enmendada en `docs/agenda-conectores.md`
-- [ ] T045 [P] Guion E2E de la historia en `tests/e2e/us-google-por-link.md`
-- [ ] T046 Aplicar la enmienda 1.8.0 (II.3.4 + Sync Impact Report + versión) en `.specify/memory/constitution.md`
-- [ ] T047 [P] Mapa (fila de la conexión por link) y resumen del Principio II con el modelo agencia en `CLAUDE.md`
-- [ ] T048 [P] Fila de la 029 en `specs/README.md`
-- [ ] T049 Gate técnico completo (`pnpm typecheck && pnpm lint && pnpm build && pnpm test`) desde `C:\G\gApps\LanCo\Uniko-CRM`
-- [ ] T050 Arnés completo en base desechable con los mocks (quickstart §1–§3) y en la configuración sin app de agencia, más el recorrido en el navegador de vista previa de la sección de Ajustes (generar, copiar, revocar) y de la página de resultado (FR-1422, Principio IX); registrar resultados en `specs/029-google-por-link/quickstart.md`
+- [X] T043 [P] Guía del operador: preparación única del proyecto (renombrar, URLs, dominio, publicar sin logo), alta por negocio, verificación (Search Console por DNS en Cloudflare, video con consentimiento en inglés, justificación), rotación, baja y diagnóstico en `docs/google-agencia.md`
+- [X] T044 [P] Sección "Conexión por link (modelo agencia)" y recuadro de condiciones remitiendo a la 4 enmendada en `docs/agenda-conectores.md`
+- [X] T045 [P] Guion E2E de la historia en `tests/e2e/us-google-por-link.md`
+- [X] T046 Aplicar la enmienda 1.8.0 (II.3.4 + Sync Impact Report + versión) en `.specify/memory/constitution.md`
+- [X] T047 [P] Mapa (fila de la conexión por link) y resumen del Principio II con el modelo agencia en `CLAUDE.md`
+- [X] T048 [P] Fila de la 029 en `specs/README.md`
+- [X] T049 Gate técnico completo (`pnpm typecheck && pnpm lint && pnpm build && pnpm test`) desde `C:\G\gApps\LanCo\Uniko-CRM`
+- [X] T050 Arnés completo en base desechable con los mocks (quickstart §1–§3) y en la configuración sin app de agencia, más el recorrido en el navegador de vista previa de la sección de Ajustes (generar, copiar, revocar) y de la página de resultado (FR-1422, Principio IX); registrar resultados en `specs/029-google-por-link/quickstart.md`
 - [ ] T051 `lanco-ws`: `npm run build` y recorrido en navegador (quickstart §5); rama y PR en `github.com/ponwo/lanco-ws`
 - [ ] T052 Ensayo del Principio X contra un respaldo real restaurado (quickstart §4) y registro en `specs/029-google-por-link/quickstart.md`
 - [ ] T053 PR de Uniko con plan de reversión, enmienda a ratificar y checklist de verificación en vivo (quickstart §6)

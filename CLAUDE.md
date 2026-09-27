@@ -39,6 +39,7 @@ externas: el trabajo en segundo plano (agente, Laboratorio) es in-process.
 | Conectar TU propio bot en vez del agente | `src/app/api/bot/*` + `src/server/bot/auth.ts` (X-API-Key) |
 | La agenda (horarios, huecos, citas) | `src/server/agenda/` — detrás de la bandera `AGENDA` (`flag.ts`) |
 | Cómo se entrega la reunión (Zoom, Meet…) | `src/server/agenda/connectors/` + catálogo en `src/lib/agenda-connectors.ts` · guía: [docs/agenda-conectores.md](docs/agenda-conectores.md) |
+| La conexión de Google por link (modelo agencia, 029) | `src/server/agenda/connectors/google-oauth.ts` (disponibilidad, `state`, orquestación con motivos) · `google-link.ts` (registro de links de un solo uso, tabla `google_link`) · rutas públicas `src/app/api/google/oauth/*` y `src/app/conectar-google/` — detrás de `AGENDA` + las tres `GOOGLE_OAUTH_*`; el relevo de `lanco.cloud` vive en el repo `lanco-ws` con el contrato en `specs/029-google-por-link/contracts/` · guía del operador: [docs/google-agencia.md](docs/google-agencia.md) |
 | La atribución de anuncios y el reporte a Meta | `src/server/attribution/` — detrás de la bandera `ATRIBUCION` (`flag.ts`) + `src/lib/meta/capi.ts` · guía: [docs/atribucion-capi.md](docs/atribucion-capi.md) |
 | El inventario (botón a MS-Stock y `check_stock` del agente) | `src/server/inventario/` — detrás de la bandera `INVENTARIO` (`flag.ts`); `client.ts` es el ÚNICO que conoce HTTP de MS-Stock; `agent.ts` redacta el turno (lista de mensajes: con varios modelos solo los con existencia, una foto por producto, tope 5 — 028) y `deliverReplies` en `src/server/ai/pipeline.ts` los entrega en serie; el contrato vive en el repo MS-Stock (`specs/003-sso-uniko/contracts/`) · guía: [docs/inventario-conector.md](docs/inventario-conector.md) |
 | UI | `src/components/` + `src/app/(app)/` |
@@ -73,7 +74,11 @@ Ver [.specify/memory/constitution.md](.specify/memory/constitution.md).
   ADR-001), aislado tras adaptador con contrato público, con camino sin
   dependencia externa y degradación definida (su fallo jamás bloquea la
   operación core), credenciales del negocio cifradas, y CI que lo prueba
-  apagado y encendido. Auth y BD self-hosted.
+  apagado y encendido. Auth y BD self-hosted. Desde la **1.8.0**, la app de
+  un conector puede ser del operador de la flota (**modelo agencia**,
+  [ADR-004](docs/adr-004-google-app-de-agencia.md)) solo con un cliente por
+  negocio, el permiso únicamente en su instancia, nada central en runtime y el
+  camino propio (BYO) siempre disponible.
 - **Seguridad (I)**: secretos cifrados en reposo (AES-256-GCM, `lib/crypto`);
   jamás al cliente ni a logs. El token de WhatsApp solo muestra sus últimos 4.
 - **Multi-tenancy (III)**: `organization_id` NOT NULL en toda tabla de dominio;

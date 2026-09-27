@@ -10,8 +10,12 @@ tu fork sea escribir un archivo y una tabla — no pelearte con el motor.
 > Los conectores que hablan con un servicio externo existen bajo cinco
 > condiciones constitucionales (Principio II, v1.4.0): apagados por defecto,
 > aislados tras su adaptador, con un camino sin dependencia que funcione igual,
-> credenciales cifradas del propio negocio, y probados en CI encendidos y
-> apagados. Un conector que no las cumpla no entra al core.
+> credenciales cifradas del negocio, y probados en CI encendidos y apagados. Un
+> conector que no las cumpla no entra al core. Desde la 1.8.0, la condición de
+> las credenciales admite la **app del operador de la flota** (modelo agencia,
+> [ADR-004](adr-004-google-app-de-agencia.md)) solo con un cliente por negocio,
+> el permiso únicamente en la instancia, nada central en runtime y el camino
+> propio siempre disponible — es lo que usa la conexión de Google por link.
 
 ## Los que vienen incluidos
 
@@ -51,7 +55,16 @@ user:read:user            leer tu usuario
 Cada cita crea un evento en tu calendario con su enlace de Meet. Su
 diferencial: la cita aparece donde ya miras tu día.
 
-**Qué necesitas**: un proyecto en Google Cloud **del propio negocio** con la
+Hay dos formas de conectarlo, y el conector es el mismo en las dos:
+
+- **Por link** (029) — si la instancia tiene configurada una app de Google (la
+  del operador de la flota o la tuya): el dueño genera un link en Ajustes →
+  Agenda, el titular del calendario lo abre, autoriza con su cuenta y queda
+  conectado. Nadie copia tokens. Ver [Conexión por link](#conexión-por-link-029).
+- **A mano, con tu propia app** — lo de abajo: los tres datos pegados en la
+  pantalla. Es el camino que siempre existe, con o sin link.
+
+**Qué necesitas (a mano)**: un proyecto en Google Cloud **del propio negocio** con la
 API de Calendar activada, y de ahí *Client ID*, *Client Secret* y un *refresh
 token* con el permiso `calendar.events`. El calendario destino es `primary`
 salvo que pongas otro.
@@ -75,9 +88,9 @@ recibirá las citas; ~20 minutos, una sola vez):
    ⚙️ → *Use your own OAuth credentials* (pega ID y secreto) → en el paso 1
    escribe el scope `https://www.googleapis.com/auth/calendar.events` →
    *Authorize APIs* (con la cuenta del calendario) → *Exchange authorization
-   code for tokens* → copia el **Refresh token**. Uniko no trae un botón
-   "Conectar con Google" con redirect: quedó como mejora futura explícita
-   (research D6 de la 015).
+   code for tokens* → copia el **Refresh token**. (La 015 dejó un botón
+   "Conectar con Google" con redirect como mejora futura, research D6; la 029 lo
+   hizo realidad como la conexión por link de abajo.)
 6. Uniko → *Ajustes → Agenda* → **Google Calendar + Meet** → pega los tres
    datos (y el ID del calendario si no es el principal) → **Probar** →
    **Conectar**. Se valida contra Google antes de guardar.
@@ -97,6 +110,52 @@ respuesta de crear el evento puede venir sin enlace), así que el conector
 re-lee el evento; y si aun así no llegó, la cita se entrega con el evento
 creado y el enlace pendiente — reintentarlo **re-lee ese mismo evento**, nunca
 crea uno duplicado en tu calendario.
+
+### Conexión por link (029)
+
+Con tres variables de despliegue, la instancia puede conseguir el permiso ella
+misma, sin que nadie pegue un refresh token:
+
+```bash
+GOOGLE_OAUTH_CLIENT_ID=…            # un cliente OAuth "Aplicación web"
+GOOGLE_OAUTH_CLIENT_SECRET=…
+GOOGLE_OAUTH_REDIRECT_URI=…         # el ÚNICO URI de redirección de ese cliente
+GOOGLE_ONBOARDING_URL=…             # opcional: página que explica al titular qué autoriza
+```
+
+Van las tres o ninguna (con `AGENDA=on`, una o dos impiden arrancar), y sin
+ellas la superficie del link no existe (404). Con ellas, *Ajustes → Agenda →
+Google* muestra **Conectar por link**: el dueño genera un link de **un solo uso
+que vence a las 72 horas**, se lo manda al titular del calendario, y este
+autoriza con su cuenta de Google **sin sesión en Uniko**. La instancia canjea el
+permiso con su propio cliente, comprueba que se concedió `calendar.events`,
+prueba la conexión y solo entonces la guarda — cifrada, en la misma fila que la
+conexión manual — y deja la agenda entregando por Google. Si algo falla (el
+titular cancela, desmarca el permiso, cambia de navegador, Google no
+responde…), la página de resultado dice qué hacer y **ninguna conexión previa
+se toca**.
+
+**Modelo agencia (la flota de LanCo)**: el cliente OAuth es del proyecto de
+LanCo —uno por negocio— y el URI de redirección es el relevo de `lanco.cloud`,
+que devuelve la respuesta de Google a la instancia sin guardar nada. Guía
+completa del operador, con la verificación de Google:
+[google-agencia.md](google-agencia.md).
+
+#### Self-hoster: tu propia app con el mismo link
+
+No necesitas `lanco.cloud` ni ninguna página de aterrizaje. En **tu** proyecto de
+Google Cloud, crea un cliente *Aplicación web* con URI de redirección
+`https://<tu-dominio>/api/google/oauth/callback` y configura:
+
+```bash
+GOOGLE_OAUTH_CLIENT_ID=<tu cliente>
+GOOGLE_OAUTH_CLIENT_SECRET=<su secreto>
+GOOGLE_OAUTH_REDIRECT_URI=https://<tu-dominio>/api/google/oauth/callback
+```
+
+Sin `GOOGLE_ONBOARDING_URL`, el link lleva directo a tu instancia, y Google
+vuelve directo a ella. Es el mismo código; el relevo es solo la forma de que un
+proyecto sirva a muchos dominios sin verificarlos todos.
 
 ## Qué pasa cuando el proveedor falla
 

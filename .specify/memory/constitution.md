@@ -1,64 +1,52 @@
 <!--
 SYNC IMPACT REPORT
 ==================
-Versión: 1.6.0 → 1.7.0
-
-(La 1.6.0 —la banda de numeración de requisitos— entra en este mismo PR, en el
-commit anterior. Su propio informe está en ese commit; este documenta sólo lo
-que añade la 1.7.0.)
+Versión: 1.7.0 → 1.8.0
 
 Cambios:
-  - Principio VII, "Reglas" → REGLA NUEVA: cómo se marca un requisito derogado
-    por una feature posterior. Dos anotaciones obligatorias —en la spec que
-    deroga y JUNTO AL REQUISITO en la spec derogada—, con la forma concreta
-    (texto tachado + bloque DEROGADO con referencia y rationale), la propagación
-    a todos los artefactos de la spec derogada, y la regla de que ambas viajan
-    en el mismo PR que la derogación.
-  - Ningún otro principio se toca. Principios I, II, III, IV, V, VI, VIII, IX y
-    X: íntegros.
+  - Principio II, conectores opcionales, condición 4 → EXPANDIDA. Antes:
+    "cada instancia habla con SU cuenta del proveedor; jamás credenciales de
+    una plataforma central". Ahora la prohibición es de credenciales centrales
+    COMPARTIDAS ENTRE NEGOCIOS, y se admite el "modelo agencia" (ADR-004): la
+    identidad de la app puede ser del operador de la flota solo si (1) cada
+    negocio tiene su propio cliente y secreto, (2) el permiso vive solo en su
+    instancia, cifrado, (3) nada central participa en runtime —a lo sumo en el
+    alta, sin guardar nada— y (4) el camino con credenciales propias (BYO)
+    sigue disponible.
+  - Ningún otro principio se toca. Principios I, III a X: íntegros. Las otras
+    cuatro condiciones de los conectores y la lista cerrada del núcleo: sin
+    cambio.
   - Encabezado, "Restricciones de Plataforma y Seguridad", "Flujo de Desarrollo y
     Puertas de Calidad" y Governance: sin cambio.
 
-Bump: MINOR (1.6.0 → 1.7.0) — se AÑADE una regla que antes no existía. Mismo
-criterio que la 1.6.0: no es PATCH porque a partir de aquí una spec puede
-incumplir algo que antes no podía incumplir, al no estar escrito; y no es MAJOR
-porque no elimina ni redefine ningún principio, y ninguna spec existente queda
-inválida.
+Bump: MINOR (1.7.0 → 1.8.0) — expansión material de una condición, con
+condiciones propias. No es MAJOR: no elimina ni redefine de forma incompatible
+ningún principio; una instancia default sigue necesitando exactamente lo mismo,
+y ningún conector ni spec existente deja de cumplir.
 
-Motivación:
-  [NOTA añadida el 2026-09-10, sin reescribir lo de abajo: la feature que
-  acabó derogando FR-075 fue la **023**, no la 022. La 022 se cerró sin
-  mergear —se decidió sacar el seed demo de producción en vez de blindarlo—
-  y la 023 hizo el trabajo, incluida esta derogación, que es el primer uso
-  real de esta regla. El texto original se conserva porque era cierto cuando
-  se escribió y está citado en el PR #15.]
-  La 022 elimina el botón "Cargar datos de demostración", y con él deroga en
-  parte FR-075 de 001-uniko-core, que dice que la UI MUST ofrecerlo. Registrarlo
-  sólo en la spec que deroga no basta: a una spec vieja se llega buscando un FR
-  concreto, no leyéndola entera, así que quien abra la 001 dentro de un año
-  encontraría un MUST vigente que el producto incumple y ninguna pista de que
-  fue deliberado.
-  La forma no se inventa aquí: es la que ya usó el repositorio hermano
-  kosmo-CRM al retirar su propia siembra demo (commit 16d3f7c, FR-075 tachado
-  con bloque DEROGADO y rationale, propagado a plan, research, tasks, quickstart
-  y contracts). Allí se hizo por criterio, sin regla escrita que lo exigiera —
-  que es exactamente el motivo de escribirla aquí.
+Motivación (propuesta completa: specs/029-google-por-link/enmienda-constitucional.md):
+  La 029 conecta Google Calendar por un link de lanco.cloud con la app de Google
+  de LanCo: el camino BYO de la 015 (cada negocio su proyecto de Google Cloud)
+  no lo recorre ningún cliente de la flota. El mismo patrón ya existe en el
+  canal core (el alta de WhatsApp con la app de LanCo como proveedor
+  tecnológico). Las cuatro sub-condiciones conservan lo que el principio
+  protege: el dato del cliente en su servidor, ningún punto central de fallo en
+  runtime, una fuga = un negocio, y BYO para quien opere fuera de LanCo.
+
+Ratificación: la enmienda viaja en la PR de la 029; aprobarla es ratificarla
+(Governance). Fecha de enmienda = fecha de la propuesta.
 
 Plantillas dependientes:
   - .specify/templates/plan-template.md — ✅ compatible (sin cambios).
+  - .specify/templates/spec-template.md — ✅ compatible (sin cambios).
   - .specify/templates/tasks-template.md — ✅ compatible (sin cambios).
-  - .specify/templates/spec-template.md — ✅ compatible (sin cambios): la
-    plantilla describe requisitos nuevos, no derogaciones.
   - .specify/templates/constitution-template.md — ✅ compatible (sin cambios).
-  - CLAUDE.md — ✅ compatible (sin cambios): su resumen no entra en la mecánica
-    de las specs.
-  - specs/README.md — ✅ compatible (sin cambios).
+  - CLAUDE.md — ✅ actualizado: el resumen del Principio II menciona el modelo
+    agencia y ADR-004.
+  - docs/agenda-conectores.md — ✅ actualizado: el recuadro de las cinco
+    condiciones remite a la 4 enmendada.
 
-TODOs diferidos:
-  - No se hace una pasada retroactiva buscando requisitos ya derogados sin marca
-    en specs anteriores. Si aparece uno, se marca cuando aparezca: una revisión
-    completa del histórico costaría más de lo que rinde y esta regla existe para
-    lo que venga.
+TODOs diferidos: ninguno.
 -->
 
 # Uniko CRM Constitution
@@ -112,9 +100,20 @@ dependencias externas en runtime es CERRADA:
         `enlace-fijo` de la agenda), y el fallo del proveedor degrada de forma
         definida — NUNCA bloquea ni pierde la operación core (la cita se crea
         con link pendiente; el mensaje se responde; el dato se guarda).
-     4. **Credenciales del propio negocio, cifradas en reposo** (Principio I):
-        cada instancia habla con SU cuenta del proveedor; jamás credenciales de
-        una plataforma central.
+     4. **Credenciales del negocio, cifradas en reposo** (Principio I): cada
+        instancia habla con SU cuenta del proveedor; jamás credenciales de una
+        plataforma central **compartidas entre negocios**. La identidad de la
+        app puede ser del operador de la flota —el **modelo agencia** de
+        ADR-004— únicamente si se cumplen TODAS:
+        1. cada negocio tiene su **propio** cliente y secreto dentro de esa
+           app; ningún secreto se comparte entre instancias;
+        2. el **permiso** (token) es del negocio, se obtiene con su
+           consentimiento explícito y vive **solo** en su instancia, cifrado;
+        3. ningún servicio central participa en **runtime**: a lo sumo en el
+           alta, sin guardar nada, y su caída solo detiene altas nuevas — nunca
+           la operación de las instancias ya conectadas;
+        4. el camino con credenciales propias del negocio (**BYO**) sigue
+           disponible en la misma instancia.
      5. **Verificables apagados y encendidos**: la CI ejercita ambas
         configuraciones y cada conector externo tiene mock con camino infeliz.
 - **PROHIBIDO como dependencia del núcleo** (todo lo que el producto necesite
@@ -474,4 +473,4 @@ práctica, convención o preferencia; ante un conflicto, gana la constitución.
 - **Propagación**: al enmendar la constitución se revisan y, si procede, se actualizan
   las plantillas dependientes (plan, spec, tasks).
 
-**Version**: 1.7.0 | **Ratified**: 2026-07-09 | **Last Amended**: 2026-09-09
+**Version**: 1.8.0 | **Ratified**: 2026-07-09 | **Last Amended**: 2026-09-27
