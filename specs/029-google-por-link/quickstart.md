@@ -65,7 +65,7 @@ superficies en 404 y termina. Con la agenda apagada, las cinco en 404.
 
 | Configuración | Arnés completo | Bloque 029 |
 |---|---|---|
-| `AGENDA=on` + app de agencia contra los mocks | **249/249** | 37/37: feliz, siete infelices con la conexión previa intacta, controles del dueño, relevo |
+| `AGENDA=on` + app de agencia contra los mocks | **251/251** | 39/39: feliz, siete infelices con la conexión previa intacta, controles del dueño, dos links generados a la vez (tras la revisión de código), relevo |
 | `AGENDA=on` sin `GOOGLE_OAUTH_*` | **217/217** | 5/5 superficies en 404; el conector manual de la 015 sigue verde |
 | sin `AGENDA` | **169/169** | 5/5 superficies en 404 |
 

@@ -51,7 +51,7 @@ permiso, no qué se guarda.
 | **Revocar** | El mismo `UPDATE` sin el `INSERT` | — |
 | **Pendiente** (pantalla) | El más reciente de la organización con `used_at` y `revoked_at` nulos; vigente si `expires_at > ahora` (en código) | — |
 | **Validar** (al abrir el link) | Buscar por `token_hash`; comprobar organización, usado, revocado y vencimiento (en código) | — |
-| **Consumir** (al conectar) | `UPDATE … SET used_at = ahora WHERE id = ? AND used_at IS NULL AND revoked_at IS NULL RETURNING id` + guardar credenciales | **Una transacción**: sin fila devuelta ⇒ link ya usado o revocado ⇒ no se guarda nada (FR-1416, FR-1419). |
+| **Consumir** (al conectar) | `UPDATE … SET used_at = ahora WHERE id = ? AND used_at IS NULL AND revoked_at IS NULL RETURNING id` + revocar cualquier otro pendiente de la organización + guardar credenciales | **Una transacción**: sin fila devuelta ⇒ link ya usado o revocado ⇒ no se guarda nada (FR-1416, FR-1419). Revocar a las hermanas cierra la carrera de dos "Generar link" simultáneos, que en READ COMMITTED no ven el insert del otro y pueden dejar dos pendientes (hallazgo de la revisión, 2026-09-27). |
 
 ## Migración `0016_google_link`
 

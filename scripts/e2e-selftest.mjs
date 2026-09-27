@@ -2213,6 +2213,29 @@ async function googleLinkChecks(convB) {
     JSON.stringify(revocado.json)
   );
   ok("029: un link revocado ya no es válido", (await recorrerLink(link4)).estado === "link_invalido");
+
+  // Dos "Generar link" a la vez: haya carrera o no, después de conectar con
+  // uno no queda ninguna otra llave usable (consumir revoca a las hermanas).
+  const [genA, genB] = await Promise.all([
+    api("/api/settings/google/link", { method: "POST" }),
+    api("/api/settings/google/link", { method: "POST" }),
+  ]);
+  let conectaUno = await recorrerLink(genA.json?.url ?? "");
+  let elOtro = genB.json?.url ?? "";
+  if (conectaUno.estado === "link_invalido") {
+    conectaUno = await recorrerLink(genB.json?.url ?? "");
+    elOtro = genA.json?.url ?? "";
+  }
+  ok(
+    "029: de dos links generados a la vez, uno conecta…",
+    conectaUno.estado === "ok",
+    `estado=${conectaUno.estado}`
+  );
+  ok(
+    "029: …y el otro ya no sirve",
+    (await recorrerLink(elOtro)).estado === "link_invalido"
+  );
+
   await api("/api/settings/google", { method: "DELETE" });
   ok(
     "029: desconectar Google no revive un link usado (FR-1409)",

@@ -1,5 +1,5 @@
 import { createHash, randomBytes } from "node:crypto";
-import { desc, eq, isNull } from "drizzle-orm";
+import { desc, eq, isNull, ne } from "drizzle-orm";
 import { getDb, schema } from "@/lib/db";
 import { newId } from "@/lib/db/ids";
 import { scoped } from "@/lib/db/tenant";
@@ -234,6 +234,23 @@ export async function consumeLinkAndSaveCredentials(input: {
       )
       .returning({ id: schema.googleLink.id });
     if (rows.length === 0) return false;
+
+    // Conectado, no queda ninguna otra llave usable. Normalmente no hay otra
+    // (generar revoca las anteriores), pero dos "Generar link" simultáneos,
+    // en READ COMMITTED, no ven el insert del otro y dejan dos pendientes: sin
+    // esto, el segundo seguiría sirviendo 72 h para reconectar OTRO calendario.
+    await tx
+      .update(schema.googleLink)
+      .set({ revokedAt: input.now })
+      .where(
+        scoped(
+          schema.googleLink.organizationId,
+          input.organizationId,
+          ne(schema.googleLink.id, input.linkId),
+          isNull(schema.googleLink.usedAt),
+          isNull(schema.googleLink.revokedAt)
+        )
+      );
 
     const values = googleCredentialValues(input.creds);
     await tx
