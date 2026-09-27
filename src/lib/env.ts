@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { parseAgendaFlag } from "@/server/agenda/flag";
 import { parseInventarioFlag } from "@/server/inventario/flag";
 
 /**
@@ -84,6 +85,34 @@ const envSchema = z.object({
     .url()
     .default("https://www.googleapis.com/calendar/v3"),
   GOOGLE_OAUTH_BASE_URL: z.string().url().default("https://oauth2.googleapis.com"),
+  // 029: la app de Google de la AGENCIA (ADR-004) — el cliente OAuth de ESTE
+  // negocio dentro del proyecto del operador de la flota. Con las tres, el dueño
+  // puede generar en Ajustes → Agenda un link para que el titular del
+  // calendario autorice con su cuenta de Google, sin copiar tokens. Sin ellas,
+  // la conexión de Google es solo la manual (app propia) y la superficie del
+  // link responde 404. Con AGENDA encendida van las tres o ninguna (ver el
+  // superRefine de abajo). El secreto solo lo usa el servidor.
+  GOOGLE_OAUTH_CLIENT_ID: z.string().optional(),
+  GOOGLE_OAUTH_CLIENT_SECRET: z.string().optional(),
+  // El ÚNICO URI de redirección registrado en ese cliente OAuth. Flota de
+  // LanCo: https://lanco.cloud/google-calendar/callback (el relevo reenvía a
+  // la instancia). Self-hoster sin relevo:
+  // https://<tu-instancia>/api/google/oauth/callback.
+  GOOGLE_OAUTH_REDIRECT_URI: z.string().url().optional(),
+  // Opcional: la página de aterrizaje que explica al titular qué autoriza
+  // (flota de LanCo: https://lanco.cloud/google-calendar). Sin ella, el link va
+  // directo a la instancia.
+  GOOGLE_ONBOARDING_URL: z
+    .string()
+    .url()
+    .transform((v) => v.replace(/\/+$/, ""))
+    .optional(),
+  // Endpoint de autorización de Google. Solo se sobreescribe para apuntar al
+  // mock en el self-test.
+  GOOGLE_AUTH_URL: z
+    .string()
+    .url()
+    .default("https://accounts.google.com/o/oauth2/v2/auth"),
   ALLOW_SIGNUP: z.string().optional(),
   AGENT_COALESCE_MS: z.coerce.number().int().min(0).default(6000),
   WA_MOCK_ENABLED: z.string().optional(),
@@ -102,7 +131,57 @@ const envSchema = z.object({
  */
 const INVENTARIO_REQUIRED = ["STOCK_BASE_URL", "STOCK_API_KEY", "STOCK_SSO_SECRET"] as const;
 
+/**
+ * 029 — La app de agencia va entera o no va (con la agenda encendida). Una o
+ * dos de las tres es un error de despliegue: mejor que lo diga el healthcheck
+ * nombrando la variable que el titular frente a un "link no disponible".
+ */
+const GOOGLE_AGENCIA_REQUIRED = [
+  "GOOGLE_OAUTH_CLIENT_ID",
+  "GOOGLE_OAUTH_CLIENT_SECRET",
+  "GOOGLE_OAUTH_REDIRECT_URI",
+] as const;
+
+/** `https:` siempre, salvo el propio equipo (self-test contra los mocks). */
+function isAcceptableRedirect(uri: string): boolean {
+  try {
+    const url = new URL(uri);
+    if (url.protocol === "https:") return true;
+    return (
+      url.protocol === "http:" &&
+      (url.hostname === "localhost" || url.hostname === "127.0.0.1")
+    );
+  } catch {
+    return false;
+  }
+}
+
+function checkGoogleAgencia(env: z.infer<typeof envSchema>, ctx: z.RefinementCtx) {
+  if (!parseAgendaFlag(env.AGENDA)) return;
+  const present = GOOGLE_AGENCIA_REQUIRED.filter((key) => Boolean(env[key]));
+  if (present.length === 0) return;
+  for (const key of GOOGLE_AGENCIA_REQUIRED) {
+    if (!env[key]) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: [key],
+        message:
+          "la app de Google de la agencia va completa: faltan datos (ver .env.example)",
+      });
+    }
+  }
+  const redirect = env.GOOGLE_OAUTH_REDIRECT_URI;
+  if (redirect && !isAcceptableRedirect(redirect)) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: ["GOOGLE_OAUTH_REDIRECT_URI"],
+      message: "debe ser https (solo localhost puede ir por http)",
+    });
+  }
+}
+
 const envSchemaChecked = envSchema.superRefine((env, ctx) => {
+  checkGoogleAgencia(env, ctx);
   if (!parseInventarioFlag(env.INVENTARIO)) return;
   for (const key of INVENTARIO_REQUIRED) {
     const value = env[key];

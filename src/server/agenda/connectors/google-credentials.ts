@@ -46,17 +46,38 @@ export async function getGoogleCredentials(
   };
 }
 
-export async function saveGoogleCredentials(input: {
-  organizationId: string;
+/**
+ * Solo el calendario destino de la conexión actual, sin descifrar nada. La
+ * conexión por link (029) lo conserva al reconectar (FR-1417).
+ */
+export async function getGoogleCalendarId(
+  organizationId: string
+): Promise<string | null> {
+  const db = getDb();
+  const rows = await db
+    .select({ calendarId: schema.googleCredentials.calendarId })
+    .from(schema.googleCredentials)
+    .where(scoped(schema.googleCredentials.organizationId, organizationId))
+    .limit(1);
+  return rows[0]?.calendarId ?? null;
+}
+
+export type GoogleCredentialsInput = {
   clientId: string;
   clientSecret: string;
   refreshToken: string;
   calendarId?: string | null;
-}): Promise<void> {
-  const db = getDb();
+};
+
+/**
+ * Los valores de la fila, ya cifrados. Aparte para que la conexión por link
+ * (029) haga el mismo upsert DENTRO de la transacción que consume el link, sin
+ * copiar cómo se cifra.
+ */
+export function googleCredentialValues(input: GoogleCredentialsInput) {
   const secret = encryptSecret(input.clientSecret);
   const refresh = encryptSecret(input.refreshToken);
-  const values = {
+  return {
     clientId: input.clientId,
     clientSecretCipher: secret.cipher,
     clientSecretIv: secret.iv,
@@ -67,6 +88,13 @@ export async function saveGoogleCredentials(input: {
     calendarId: input.calendarId?.trim() || "primary",
     status: "connected" as const,
   };
+}
+
+export async function saveGoogleCredentials(
+  input: GoogleCredentialsInput & { organizationId: string }
+): Promise<void> {
+  const db = getDb();
+  const values = googleCredentialValues(input);
   await db
     .insert(schema.googleCredentials)
     .values({

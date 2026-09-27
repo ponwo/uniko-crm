@@ -5,6 +5,11 @@
  * NO viene en la respuesta de crear el evento. Aquí el primer `GET` del evento
  * todavía la da como pendiente y el siguiente ya trae el enlace — así el
  * self-test ejercita el camino real, no uno cómodo.
+ *
+ * 029 — Y la autorización de la conexión por link: códigos de UN solo uso,
+ * atados al `client_id` y al `redirect_uri` con los que se pidieron (como
+ * Google), con una decisión determinista por código para los caminos
+ * infelices.
  */
 
 export type MockEvent = {
@@ -18,12 +23,51 @@ export type MockEvent = {
   updates: number;
 };
 
+/**
+ * Lo que "hace" el titular en la pantalla de Google, elegido por el arnés con
+ * `mock_decision` en la URL de autorización:
+ * - `approve`: acepta — código que da refresh token y el permiso completo.
+ * - `deny` / `policy`: vuelve con `error=access_denied` / `admin_policy_enforced`.
+ * - `partial`: acepta sin el permiso de calendario.
+ * - `no_refresh`: Google no devuelve refresh token.
+ * - `exchange_down`: el canje responde 503.
+ */
+export type MockDecision =
+  | "approve"
+  | "deny"
+  | "policy"
+  | "partial"
+  | "no_refresh"
+  | "exchange_down";
+
+export const MOCK_DECISIONS: readonly MockDecision[] = [
+  "approve",
+  "deny",
+  "policy",
+  "partial",
+  "no_refresh",
+  "exchange_down",
+];
+
+export type MockAuthCode = {
+  clientId: string;
+  redirectUri: string;
+  decision: MockDecision;
+  used: boolean;
+};
+
 type MockState = {
   events: Map<string, MockEvent>;
   deleted: string[];
   nextId: number;
   /** Lecturas que tarda la conferencia en estar lista. */
   conferenceDelayReads: number;
+  authCodes: Map<string, MockAuthCode>;
+  nextCode: number;
+  authorizations: number;
+  exchanges: number;
+  /** Lo último que pidió la instancia al autorizar, para comprobar sus parámetros. */
+  lastAuthorization: Record<string, string> | null;
 };
 
 const globalForMock = globalThis as unknown as { __googleMock?: MockState };
@@ -35,6 +79,11 @@ export function googleMockState(): MockState {
       deleted: [],
       nextId: 1,
       conferenceDelayReads: 1,
+      authCodes: new Map(),
+      nextCode: 1,
+      authorizations: 0,
+      exchanges: 0,
+      lastAuthorization: null,
     };
   }
   return globalForMock.__googleMock;
@@ -46,6 +95,11 @@ export function resetGoogleMock(): void {
   s.deleted.length = 0;
   s.nextId = 1;
   s.conferenceDelayReads = 1;
+  s.authCodes.clear();
+  s.nextCode = 1;
+  s.authorizations = 0;
+  s.exchanges = 0;
+  s.lastAuthorization = null;
 }
 
 export function googleMockSnapshot() {
@@ -53,6 +107,9 @@ export function googleMockSnapshot() {
   return {
     events: [...s.events.values()],
     deleted: [...s.deleted],
+    authorizations: s.authorizations,
+    exchanges: s.exchanges,
+    lastAuthorization: s.lastAuthorization,
   };
 }
 
@@ -63,4 +120,16 @@ export function googleMockSnapshot() {
  */
 export function mockRefreshTokenIsBad(body: string): boolean {
   return new URLSearchParams(body).get("refresh_token")?.endsWith("-invalid") ?? true;
+}
+
+/** 029 — Emite un código de autorización de un solo uso. */
+export function issueMockAuthCode(input: {
+  clientId: string;
+  redirectUri: string;
+  decision: MockDecision;
+}): string {
+  const s = googleMockState();
+  const code = `mock-code-${s.nextCode++}`;
+  s.authCodes.set(code, { ...input, used: false });
+  return code;
 }

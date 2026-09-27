@@ -1,3 +1,4 @@
+import { createHash } from "node:crypto";
 import { getEnv } from "@/lib/env";
 import {
   ConnectorError,
@@ -46,8 +47,24 @@ export const GOOGLE_SCOPE = "https://www.googleapis.com/auth/calendar.events";
 const CONFERENCE_POLLS = 3;
 const POLL_DELAY_MS = 400;
 
+/**
+ * La llave de la caché incluye la huella del refresh token (029). Con solo
+ * `clientId:calendarId`, probar un token NUEVO con el mismo cliente —reconectar
+ * por link a otra cuenta, o pegar un token revocado en "Probar"— reutilizaba el
+ * acceso en caché del token ANTERIOR: la prueba pasaba sin haber tocado el
+ * token nuevo. El caso es normal en el modelo agencia (un cliente por negocio,
+ * reconexiones con el mismo cliente), así que la llave distingue el permiso.
+ */
+function tokenCacheKey(creds: Pick<GoogleCreds, "clientId" | "calendarId" | "refreshToken">): string {
+  const fingerprint = createHash("sha256")
+    .update(creds.refreshToken)
+    .digest("hex")
+    .slice(0, 16);
+  return `${creds.clientId}:${creds.calendarId}:${fingerprint}`;
+}
+
 async function getAccessToken(creds: GoogleCreds): Promise<string> {
-  const key = `${creds.clientId}:${creds.calendarId}`;
+  const key = tokenCacheKey(creds);
   const cached = getCachedGoogleToken(key);
   if (cached) return cached;
 
@@ -228,10 +245,12 @@ export const googleConnector: AgendaConnector<GoogleCreds> = {
   async testConnection(creds): Promise<TestConnectionResult> {
     try {
       // events.list y no calendars.get: ver el punto 3 de la cabecera. El
-      // `summary` de la lista es el título del calendario.
+      // `summary` de la lista es el título del calendario. `fields=summary`
+      // (029): solo ese título, ni un evento — la prueba no necesita leer la
+      // agenda de nadie, y es lo que la verificación de Google espera ver.
       const cal = (await googleFetch(
         creds,
-        `${eventsPath(creds)}?maxResults=1`
+        `${eventsPath(creds)}?maxResults=1&fields=summary`
       )) as { summary?: string } | null;
       return { ok: true, detail: cal?.summary };
     } catch (err) {
@@ -243,6 +262,78 @@ export const googleConnector: AgendaConnector<GoogleCreds> = {
     }
   },
 };
+
+/**
+ * 029 — Canjea el `code` de la autorización por el permiso de larga duración.
+ *
+ * Vive aquí porque este adaptador es el único que habla HTTP con Google. Lo
+ * llama la conexión por link (modelo agencia) con el cliente OAuth de la
+ * instancia: el `redirectUri` tiene que ser EXACTAMENTE el de la autorización
+ * (el relevo de lanco.cloud o la propia instancia), aunque quien canjea sea
+ * otro sitio — Google compara la cadena, no quién llama.
+ *
+ * `scope` son los permisos CONCEDIDOS; quien llama comprueba que incluyan
+ * `calendar.events`. El access token de la respuesta se deja en la caché con
+ * la llave de ESE refresh token, así la prueba de conexión que sigue lo usa en
+ * vez de renovar otra vez.
+ */
+export async function exchangeAuthorizationCode(input: {
+  clientId: string;
+  clientSecret: string;
+  redirectUri: string;
+  code: string;
+  calendarId: string;
+}): Promise<{ refreshToken: string | null; scope: string }> {
+  let res: Response;
+  try {
+    res = await fetch(`${getEnv().GOOGLE_OAUTH_BASE_URL}/token`, {
+      method: "POST",
+      headers: { "content-type": "application/x-www-form-urlencoded" },
+      body: new URLSearchParams({
+        grant_type: "authorization_code",
+        code: input.code,
+        client_id: input.clientId,
+        client_secret: input.clientSecret,
+        redirect_uri: input.redirectUri,
+      }).toString(),
+    });
+  } catch (err) {
+    throw new ConnectorError("google", `No se pudo contactar a Google: ${err}`);
+  }
+
+  if (!res.ok) {
+    // `invalid_grant` (400) = el código venció o ya se usó. El cuerpo de Google
+    // trae solo el error y su descripción: nada del secreto ni del código.
+    const detail = (await res.text().catch(() => "")).slice(0, 300);
+    // Quien llama decide por `status`: 401 es el cliente OAuth mal configurado
+    // (lo arregla el operador); 400 y 5xx, reintentar el link.
+    throw new ConnectorError(
+      "google",
+      `Google rechazó el canje del código (${res.status}): ${detail}`,
+      { status: res.status }
+    );
+  }
+
+  const data = (await res.json().catch(() => null)) as {
+    access_token?: string;
+    expires_in?: number;
+    refresh_token?: string;
+    scope?: string;
+  } | null;
+  if (!data?.access_token) {
+    throw new ConnectorError("google", "Google no devolvió un token de acceso");
+  }
+
+  const refreshToken = data.refresh_token?.trim() || null;
+  if (refreshToken) {
+    setCachedGoogleToken(
+      tokenCacheKey({ clientId: input.clientId, calendarId: input.calendarId, refreshToken }),
+      data.access_token,
+      data.expires_in ?? 3600
+    );
+  }
+  return { refreshToken, scope: data.scope ?? "" };
+}
 
 function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));

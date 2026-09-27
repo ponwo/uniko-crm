@@ -1,9 +1,13 @@
 import { mockGuard } from "@/lib/dev-guard";
+import { GOOGLE_SCOPE } from "@/server/agenda/connectors/google";
 import {
+  MOCK_DECISIONS,
   googleMockSnapshot,
   googleMockState,
+  issueMockAuthCode,
   mockRefreshTokenIsBad,
   resetGoogleMock,
+  type MockDecision,
 } from "@/server/dev/google-mock-state";
 
 export const dynamic = "force-dynamic";
@@ -15,11 +19,52 @@ export const dynamic = "force-dynamic";
  * Cubre lo que el conector usa: refrescar el token, crear/leer/mover/borrar un
  * evento y leer el calendario. Y reproduce la asincronía de la conferencia:
  * al crear NO hay enlace de Meet, y aparece en una lectura posterior.
+ *
+ * 029 — Y la autorización de la conexión por link: `GET auth` hace de pantalla
+ * de consentimiento (decide `mock_decision`) y `/token` canjea el código.
  */
 
 type Ctx = { params: Promise<{ path: string[] }> };
 
 const TOKEN = "google-token-de-mentira";
+
+function oauthError(status: number, error: string, description: string): Response {
+  return Response.json({ error, error_description: description }, { status });
+}
+
+/**
+ * 029 — Canje de un código de autorización, con las reglas de Google: un solo
+ * uso, y el `client_id` y el `redirect_uri` tienen que ser los de la
+ * autorización.
+ */
+function exchangeCode(params: URLSearchParams): Response {
+  const state = googleMockState();
+  state.exchanges += 1;
+  const code = params.get("code") ?? "";
+  const issued = state.authCodes.get(code);
+  if (!issued || issued.used) {
+    return oauthError(400, "invalid_grant", "Bad Request");
+  }
+  issued.used = true;
+  if (!params.get("client_secret") || params.get("client_id") !== issued.clientId) {
+    return oauthError(401, "invalid_client", "Unauthorized");
+  }
+  if (params.get("redirect_uri") !== issued.redirectUri) {
+    return oauthError(400, "redirect_uri_mismatch", "Bad Request");
+  }
+  if (issued.decision === "exchange_down") {
+    return new Response("Service Unavailable", { status: 503 });
+  }
+  const n = code.replace("mock-code-", "");
+  return Response.json({
+    access_token: TOKEN,
+    expires_in: 3599,
+    token_type: "Bearer",
+    scope: issued.decision === "partial" ? "openid" : GOOGLE_SCOPE,
+    // Termina distinto de `-invalid`: el refresco posterior lo acepta.
+    ...(issued.decision === "no_refresh" ? {} : { refresh_token: `ref-oauth-${n}` }),
+  });
+}
 
 export async function POST(req: Request, ctx: Ctx) {
   const denied = mockGuard();
@@ -29,6 +74,10 @@ export async function POST(req: Request, ctx: Ctx) {
 
   if (route === "token") {
     const body = await req.text();
+    const params = new URLSearchParams(body);
+    if (params.get("grant_type") === "authorization_code") {
+      return exchangeCode(params);
+    }
     if (mockRefreshTokenIsBad(body)) {
       return Response.json(
         { error: "invalid_grant", error_description: "Token has been expired or revoked." },
@@ -76,12 +125,47 @@ export async function POST(req: Request, ctx: Ctx) {
   return new Response(null, { status: 404 });
 }
 
+/**
+ * 029 — La "pantalla de consentimiento". Valida lo que Google exige y responde
+ * al `redirect_uri` como Google: con `code` o con `error`, siempre con el
+ * `state` intacto.
+ */
+function authorize(req: Request): Response {
+  const url = new URL(req.url);
+  const params = Object.fromEntries(url.searchParams.entries());
+  const clientId = params.client_id;
+  const redirectUri = params.redirect_uri;
+  const state = params.state;
+  if (!clientId || !redirectUri || !state || params.response_type !== "code" || !params.scope) {
+    return oauthError(400, "invalid_request", "Faltan parámetros de la autorización");
+  }
+  const mock = googleMockState();
+  mock.authorizations += 1;
+  mock.lastAuthorization = params;
+
+  const raw = params.mock_decision ?? "approve";
+  const decision: MockDecision = (MOCK_DECISIONS as readonly string[]).includes(raw)
+    ? (raw as MockDecision)
+    : "approve";
+
+  const back = new URL(redirectUri);
+  if (decision === "deny" || decision === "policy") {
+    back.searchParams.set("error", decision === "deny" ? "access_denied" : "admin_policy_enforced");
+  } else {
+    back.searchParams.set("code", issueMockAuthCode({ clientId, redirectUri, decision }));
+    back.searchParams.set("scope", decision === "partial" ? "openid" : GOOGLE_SCOPE);
+  }
+  back.searchParams.set("state", state);
+  return Response.redirect(back.toString(), 302);
+}
+
 export async function GET(req: Request, ctx: Ctx) {
   const denied = mockGuard();
   if (denied) return denied;
   const { path } = await ctx.params;
 
   if (path.join("/") === "_state") return Response.json(googleMockSnapshot());
+  if (path.join("/") === "auth") return authorize(req);
 
   const unauthorized = requireToken(req);
   if (unauthorized) return unauthorized;

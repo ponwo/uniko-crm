@@ -27,6 +27,8 @@ const prefixes = {
   offeredSlot: "ofs",
   zoomCredentials: "zcred",
   googleCredentials: "gcred",
+  // 029 — links de conexión de Google (modelo agencia)
+  googleLink: "glink",
   // 016 — atribución de anuncios
   adAttribution: "att",
   conversionEvent: "cve",
