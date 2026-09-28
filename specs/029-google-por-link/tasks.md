@@ -167,7 +167,7 @@ calendario destino conservado que no es de quien autoriza termina en
 - [X] T058 Arnés: el permiso pedido y el caso del calendario ajeno en `scripts/e2e-selftest.mjs`; guion en `tests/e2e/us-google-por-link.md`
 - [X] T059 [P] Texto de `permiso_incompleto` en `src/lib/google-link-motivos.ts`; guía del operador (permiso, logo, contacto, problema frecuente, §5 reescrita con orden, video y justificación) en `docs/google-agencia.md`; `docs/agenda-conectores.md`; research D6/D7, `contracts/api.md`, `plan.md`
 - [X] T060 Gate técnico completo y arnés completo con los mocks; registro en `specs/029-google-por-link/quickstart.md`
-- [ ] T061 PR de Uniko; tras el merge (señal del dueño), verificación en vivo en uniko-lanco (quickstart §6.1): link nuevo, la pantalla de Google con el permiso nuevo, «Probar», y una cita con Meet creada, movida y cancelada
+- [X] T061 PR de Uniko; tras el merge (señal del dueño), verificación en vivo en uniko-lanco (quickstart §6.1): link nuevo, la pantalla de Google con el permiso nuevo, «Probar», y una cita con Meet creada, movida y cancelada — ponwo/uniko-crm#45; verificada el 2026-09-28 (la pantalla de Google queda para el video)
 - [ ] T062 `lanco-ws` (sesión aparte): textos del permiso en `pages/GoogleCalendar.tsx` y sección 9 de la privacidad, junto con la página de la app prerenderizada
 
 ---
