@@ -974,6 +974,41 @@ export const googleCredentials = pgTable(
   (t) => [uniqueIndex("google_credentials_org_uq").on(t.organizationId)]
 );
 
+/**
+ * 029 — Links de conexión de Google (modelo agencia, ADR-004).
+ *
+ * El dueño genera un link de un solo uso para que el titular del calendario
+ * autorice con su cuenta de Google. Aquí vive SOLO su huella (SHA-256): el
+ * link se muestra una vez y no se puede reconstruir desde la base.
+ *
+ * USADO, REVOCADO y VENCIDO son terminales: nada vuelve a poner `used_at` ni
+ * `revoked_at` a nulo, y desconectar Google no toca esta tabla — un link usado
+ * no revive nunca. El vencimiento se compara en código, no en SQL, para que
+ * una prueba pueda leer un link "de hace tres días".
+ */
+export const googleLink = pgTable(
+  "google_link",
+  {
+    id: text("id").primaryKey(),
+    organizationId: text("organization_id")
+      .notNull()
+      .references(() => organization.id, { onDelete: "cascade" }),
+    tokenHash: text("token_hash").notNull(),
+    // Quién lo generó. Se conserva el registro aunque ese usuario se borre.
+    createdBy: text("created_by").references(() => user.id, {
+      onDelete: "set null",
+    }),
+    expiresAt: timestamp("expires_at").notNull(),
+    usedAt: timestamp("used_at"),
+    revokedAt: timestamp("revoked_at"),
+    createdAt: timestamp("created_at").notNull().defaultNow(),
+  },
+  (t) => [
+    uniqueIndex("google_link_token_uq").on(t.tokenHash),
+    index("google_link_org_idx").on(t.organizationId),
+  ]
+);
+
 export const agentTestCase = pgTable(
   "agent_test_case",
   {

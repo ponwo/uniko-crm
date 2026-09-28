@@ -11,6 +11,7 @@ import {
 } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { GoogleLinkSection } from "@/components/settings/google-link-section";
 import { CONNECTOR_META, type ConnectorId } from "@/lib/agenda-connectors";
 
 /**
@@ -93,6 +94,9 @@ export function ConnectorCredentials({
 
   const [connection, setConnection] = useState<Connection | null>(null);
   const [values, setValues] = useState<Record<string, string>>({});
+  // 029 — Con la app de agencia, el link es el camino principal y lo manual
+  // queda como alternativa para quien tenga su propia app.
+  const [linkAvailable, setLinkAvailable] = useState(false);
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState<{
     kind: "ok" | "error";
@@ -139,7 +143,16 @@ export function ConnectorCredentials({
       return;
     }
     if (mode === "test") {
-      setMessage({ kind: "ok", text: "Conexión correcta" });
+      // 029 (FR-1423): en Google, el nombre del calendario — en el principal
+      // es el correo de la cuenta, y es como se nota una cuenta equivocada.
+      const data = (await res.json().catch(() => null)) as { detail?: string | null } | null;
+      setMessage({
+        kind: "ok",
+        text:
+          connector === "google" && data?.detail
+            ? `Conexión correcta — calendario «${data.detail}»`
+            : "Conexión correcta",
+      });
       return;
     }
     const data = (await res.json()) as { connection: Connection };
@@ -162,9 +175,21 @@ export function ConnectorCredentials({
     <Card>
       <CardHeader>
         <CardTitle>Conectar {meta.label}</CardTitle>
-        <CardDescription>{help.title}.</CardDescription>
+        <CardDescription>
+          {connector === "google" && linkAvailable
+            ? "Con un link para quien tiene el calendario, o con tu propia app de Google Cloud."
+            : `${help.title}.`}
+        </CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
+        {connector === "google" && <GoogleLinkSection onAvailable={setLinkAvailable} />}
+
+        {connector === "google" && linkAvailable && (
+          <div className="space-y-1">
+            <h4 className="text-sm font-semibold">¿Usas tu propia app de Google Cloud?</h4>
+            <p className="text-xs text-text-2">{help.title}.</p>
+          </div>
+        )}
         <ul className="list-disc space-y-1 pl-5 text-xs text-text-2">
           {help.items.map((item, i) => (
             <li key={i}>{item}</li>

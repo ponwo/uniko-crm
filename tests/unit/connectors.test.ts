@@ -2,7 +2,10 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { CONNECTOR_META, CONNECTOR_ORDER } from "@/lib/agenda-connectors";
 import { enlaceFijoConnector } from "@/server/agenda/connectors/enlace-fijo";
 import { zoomConnector, ZOOM_SCOPES } from "@/server/agenda/connectors/zoom";
-import { googleConnector } from "@/server/agenda/connectors/google";
+import {
+  exchangeAuthorizationCode,
+  googleConnector,
+} from "@/server/agenda/connectors/google";
 import { ConnectorError } from "@/server/agenda/connectors/types";
 import { clearZoomTokenCache } from "@/server/agenda/connectors/zoom-credentials";
 import { clearGoogleTokenCache } from "@/server/agenda/connectors/google-credentials";
@@ -344,12 +347,95 @@ describe("google", () => {
           { status: 403 }
         );
       }
-      if (/\/calendars\/[^/]+\/events\?maxResults=1$/.test(url)) {
-        return Response.json({ kind: "calendar#events", summary: "Agenda LanCo", items: [] });
+      // 029: `fields=summary` — la prueba pide SOLO el título del calendario,
+      // ni un evento (minimización de datos, y lo que la verificación de
+      // Google espera ver).
+      if (/\/calendars\/[^/]+\/events\?maxResults=1&fields=summary$/.test(url)) {
+        return Response.json({ summary: "Agenda LanCo" });
       }
       return new Response(null, { status: 404 });
     });
     const out = await googleConnector.testConnection(creds);
     expect(out).toEqual({ ok: true, detail: "Agenda LanCo" });
+  });
+
+  /**
+   * 029 — La caché del acceso distingue el refresh token. Con la llave vieja
+   * (`clientId:calendarId`), probar un token NUEVO del mismo cliente reusaba el
+   * acceso del anterior y «Probar» daba correcto sin tocar el token nuevo — el
+   * caso normal al reconectar por link con el cliente OAuth de la agencia.
+   */
+  it("dos refresh tokens del mismo cliente no comparten el acceso en caché", async () => {
+    const refreshes: string[] = [];
+    fetchMock.mockImplementation(async (url: string, init?: RequestInit) => {
+      if (url.endsWith("/token")) {
+        const token = new URLSearchParams(String(init?.body)).get("refresh_token") ?? "";
+        refreshes.push(token);
+        return token === "ref_revocado"
+          ? Response.json({ error: "invalid_grant" }, { status: 400 })
+          : Response.json({ access_token: `tk-${token}`, expires_in: 3600 });
+      }
+      return Response.json({ summary: "Agenda" });
+    });
+    expect(await googleConnector.testConnection(creds)).toEqual({ ok: true, detail: "Agenda" });
+    const otro = await googleConnector.testConnection({ ...creds, refreshToken: "ref_revocado" });
+    expect(refreshes).toEqual(["ref_1", "ref_revocado"]);
+    expect(otro.ok).toBe(false);
+  });
+
+  it("canjea el código con el redirect exacto, devuelve permiso y scope y deja el acceso en caché", async () => {
+    const bodies: URLSearchParams[] = [];
+    fetchMock.mockImplementation(async (url: string, init?: RequestInit) => {
+      if (url.endsWith("/token")) {
+        bodies.push(new URLSearchParams(String(init?.body)));
+        return Response.json({
+          access_token: "tk-canje",
+          expires_in: 3599,
+          refresh_token: "ref-nuevo",
+          scope: "https://www.googleapis.com/auth/calendar.events",
+        });
+      }
+      return Response.json({ summary: "Agenda" });
+    });
+    const out = await exchangeAuthorizationCode({
+      clientId: "cli_1",
+      clientSecret: "sec_1",
+      redirectUri: "https://lanco.cloud/google-calendar/callback",
+      code: "codigo-1",
+      calendarId: "primary",
+    });
+    expect(out).toEqual({
+      refreshToken: "ref-nuevo",
+      scope: "https://www.googleapis.com/auth/calendar.events",
+    });
+    expect(bodies[0]?.get("grant_type")).toBe("authorization_code");
+    expect(bodies[0]?.get("redirect_uri")).toBe("https://lanco.cloud/google-calendar/callback");
+    expect(bodies[0]?.get("code")).toBe("codigo-1");
+
+    // La prueba que sigue usa el acceso del canje: ninguna renovación extra.
+    await googleConnector.testConnection({ ...creds, refreshToken: "ref-nuevo" });
+    expect(bodies).toHaveLength(1);
+  });
+
+  it("un código vencido es ConnectorError con su status, y la red caída también", async () => {
+    fetchMock.mockImplementation(async () =>
+      Response.json({ error: "invalid_grant", error_description: "Bad Request" }, { status: 400 })
+    );
+    const input = {
+      clientId: "cli_1",
+      clientSecret: "sec_1",
+      redirectUri: "https://lanco.cloud/google-calendar/callback",
+      code: "viejo",
+      calendarId: "primary",
+    };
+    await expect(exchangeAuthorizationCode(input)).rejects.toSatisfy(
+      (err: unknown) => err instanceof ConnectorError && err.status === 400
+    );
+    fetchMock.mockImplementation(async () => {
+      throw new TypeError("fetch failed");
+    });
+    await expect(exchangeAuthorizationCode(input)).rejects.toSatisfy(
+      (err: unknown) => err instanceof ConnectorError && err.status === null
+    );
   });
 });

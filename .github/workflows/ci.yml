@@ -79,6 +79,14 @@ jobs:
       STOCK_BASE_URL: ${{ matrix.config.inventario == 'on' && 'http://localhost:3000/api/dev/stock-mock' || '' }}
       STOCK_API_KEY: ${{ matrix.config.inventario == 'on' && 'ci-stock-key-0123456789abcdef0123456789' || '' }}
       STOCK_SSO_SECRET: ${{ matrix.config.inventario == 'on' && 'ci-sso-secret-0123456789abcdef0123456789' || '' }}
+      # 029 — La app de Google de la agencia (conexión por link), encendida en
+      # `completo` contra los mocks: con AGENDA las tres GOOGLE_OAUTH_* van
+      # juntas o ninguna (env.ts), así que esta configuración también prueba
+      # que el esquema las acepta completas.
+      GOOGLE_OAUTH_CLIENT_ID: ${{ matrix.config.agenda == 'on' && 'ci-agencia.apps.googleusercontent.com' || '' }}
+      GOOGLE_OAUTH_CLIENT_SECRET: ${{ matrix.config.agenda == 'on' && 'ci-secreto-de-la-agencia' || '' }}
+      GOOGLE_OAUTH_REDIRECT_URI: ${{ matrix.config.agenda == 'on' && 'http://localhost:3000/api/dev/lanco-relay-mock' || '' }}
+      GOOGLE_AUTH_URL: ${{ matrix.config.agenda == 'on' && 'http://localhost:3000/api/dev/google-mock/auth' || '' }}
 
     steps:
       - uses: actions/checkout@v7
