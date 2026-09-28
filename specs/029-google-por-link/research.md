@@ -53,7 +53,7 @@ ni `lanco.cloud` ni una persona tocan un token.
 ## D2. Un cliente OAuth por negocio, configurado por despliegue
 
 **Decisión**: cada negocio tiene su propio cliente OAuth (tipo *Aplicación web*)
-dentro del proyecto `agendamiento-lanco`, con `https://lanco.cloud/google-calendar/callback`
+dentro del proyecto LanCo Robotics (`lanco-robotics`), con `https://lanco.cloud/google-calendar/callback`
 como único URI de redirección. Su identificador y secreto se configuran en la
 instancia como variables de entorno: `GOOGLE_OAUTH_CLIENT_ID`,
 `GOOGLE_OAUTH_CLIENT_SECRET`, `GOOGLE_OAUTH_REDIRECT_URI`. Al conectar, se copian a

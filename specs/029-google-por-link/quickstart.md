@@ -98,7 +98,13 @@ select count(*) from google_credentials;                -- el mismo que antes
 Y que la app (build de producción, `pnpm start -p 3100`) arranque contra la copia con
 `/api/health` en `{"ok":true}`. Tirar la base y el volcado al terminar.
 
-**Registro**: _(pendiente)_
+**Registro**: **pendiente, y fuera de orden.** La PR #42 se mergeó el
+2026-09-28 (`6aff0d3`) antes del ensayo, que el Principio X pide ANTES de `main`.
+La migración ya corrió en uniko-lanco sin problema: `[migrate] migraciones
+aplicadas` en el log de arranque y `/api/health` 10/10 en `6aff0d3`. Es solo
+aditiva (una tabla nueva, vacía). Aun así, el ensayo con un respaldo real sigue
+siendo **requisito de la puerta de promoción a `production`**: se hace antes de
+llevar la 029 a los clientes, idealmente con el respaldo de uno de ellos.
 
 ## 5. `lanco.cloud` en local (repo `lanco-ws`)
 
@@ -136,7 +142,7 @@ declaración de uso limitado.
 
 Lo que solo puede hacer el dueño va marcado con **(dueño)**.
 
-1. **(dueño)** En la consola de Google (`agendamiento-lanco`): renombrar la app a
+1. **(dueño)** En la consola de Google (proyecto LanCo Robotics): renombrar la app a
    «LanCo Agenda» y crear el cliente OAuth `Uniko · LanCo` (Aplicación web) con URI
    de redirección `https://lanco.cloud/google-calendar/callback`.
 2. **(dueño)** Mergear la PR de `lanco-ws` → `lanco.cloud` se despliega solo; comprobar
