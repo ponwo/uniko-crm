@@ -1,7 +1,8 @@
 # ADR-004 — La agenda admite la app de Google de la agencia: un cliente por negocio y `lanco.cloud` como único retorno
 
-**Estado**: propuesto (se acepta al ratificar la enmienda 1.8.0) · **Fecha**:
-2026-09-27 · **Feature**: [`029-google-por-link`](../specs/029-google-por-link/spec.md)
+**Estado**: aceptado (2026-09-28, con la ratificación de la enmienda 1.8.0 al
+mergear ponwo/uniko-crm#42) · **Fecha**: 2026-09-27 · **Feature**:
+[`029-google-por-link`](../specs/029-google-por-link/spec.md)
 
 ## Contexto
 
