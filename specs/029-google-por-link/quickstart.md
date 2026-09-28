@@ -160,4 +160,38 @@ Lo que solo puede hacer el dueño va marcado con **(dueño)**.
    y una cita real que crea su evento con Meet — y cancelarla para no dejar basura.
 8. Reabrir el mismo link → "ya se usó".
 
-**Registro**: _(pendiente)_
+**Registro (2026-09-28, uniko-lanco en `6aff0d3` y luego en `2fa2947`)**:
+
+1. Consola: la app de **LanCo Robotics** pasó de `agendamiento-lanco` a «LanCo
+   Agenda». El dueño **reutilizó el cliente OAuth que LanCo ya tenía** (el de su
+   conexión manual del 23) y le añadió el redirect de `lanco.cloud`. Encaja con
+   ADR-004 porque es el cliente propio de ese negocio; no hacía falta uno nuevo.
+2. ponwo/lanco-ws#1 mergeada → `lanco.cloud/google-calendar` y la sección 9 de la
+   privacidad en vivo; ponwo/lanco-ws#2 → la página de la app sin `noindex`.
+3. ponwo/uniko-crm#42 mergeada (enmienda 1.8.0 ratificada) → `6aff0d3` 10/10,
+   `[migrate] migraciones aplicadas`. Sin las variables, el inicio, el retorno y
+   `/conectar-google` respondieron **404** desde fuera (comprobado).
+4. Con las cuatro variables en Coolify (revisadas por MCP: runtime, y las dos URLs
+   exactas) y redesplegada, un link falso pasó a `302 →
+   /conectar-google?estado=link_invalido` y la página respondió 200 con «Este link
+   no es válido».
+5. El dueño generó el link en *Ajustes → Agenda*.
+6. **(dueño)** Lo abrió en el teléfono, autorizó y aterrizó en «conectado» con el
+   calendario de LanCo.
+7. Desde la sesión del panel:
+   - `GET /api/settings/google` → `connected`, `primary`, el cliente
+     `559667449083-…` (proyecto LanCo Robotics);
+   - el conector sigue en `google`;
+   - el link ya no está pendiente;
+   - «Probar» contra Google real → ok, calendario **`lanco.dmd@gmail.com`**
+     (`fields=summary` validado contra Google).
+
+   Con uniko-lanco ya estable en `2fa2947` (10/10), una cita **real** con el
+   contacto del dueño, sin mensajes ni invitados:
+   - **crear** (mar 29 sep 09:00) → 201 con Meet real
+     `meet.google.com/svk-kejk-dhg` y sin enlace pendiente;
+   - **mover** a las 10:00 → el mismo enlace;
+   - el dueño la vio en su Google Calendar a las 10:00;
+   - **cancelar** → la cita queda `cancelada` y el log de la instancia sin errores.
+8. Reabrir el link: cubierto por el arnés (`link_usado`). No se repitió en vivo
+   para no gastar un link más.

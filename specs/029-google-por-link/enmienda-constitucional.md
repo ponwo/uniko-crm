@@ -1,11 +1,11 @@
 # Propuesta de enmienda constitucional — La app de la agencia (1.7.0 → 1.8.0)
 
-**Feature**: `029-google-por-link` · **Fecha**: 2026-09-27 · **Estado**: **PROPUESTA**,
-pendiente de ratificación por el responsable del proyecto (Governance: "toda
-enmienda se propone por escrito describiendo el cambio y su motivación, se aprueba
-por el responsable del proyecto"). La PR de la 029 la aplica a
-`.specify/memory/constitution.md` con su Sync Impact Report; **aprobar esa PR es
-ratificarla**. Sin ratificación, la 029 no entra a `main`.
+**Feature**: `029-google-por-link` · **Fecha**: 2026-09-27 · **Estado**: **RATIFICADA**
+por el responsable del proyecto el 2026-09-28, al aprobar y mergear ponwo/uniko-crm#42
+(`6aff0d3`), y **APLICADA**: constitución 1.7.0 → 1.8.0 con su Sync Impact Report,
+propagada a `CLAUDE.md`. (Governance: "toda enmienda se propone por escrito
+describiendo el cambio y su motivación, se aprueba por el responsable del
+proyecto".)
 
 ## Qué se propone cambiar
 
