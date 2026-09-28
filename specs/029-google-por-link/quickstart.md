@@ -192,6 +192,7 @@ Lo que solo puede hacer el dueño va marcado con **(dueño)**.
      `meet.google.com/svk-kejk-dhg` y sin enlace pendiente;
    - **mover** a las 10:00 → el mismo enlace;
    - el dueño la vio en su Google Calendar a las 10:00;
-   - **cancelar** → la cita queda `cancelada` y el log de la instancia sin errores.
+   - **cancelar** → la cita queda `cancelada`, el log de la instancia sin errores,
+     y **el dueño confirmó que el evento desapareció de su Google Calendar**.
 8. Reabrir el link: cubierto por el arnés (`link_usado`). No se repitió en vivo
    para no gastar un link más.
