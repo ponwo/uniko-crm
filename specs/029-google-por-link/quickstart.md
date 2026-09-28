@@ -224,4 +224,32 @@ conector necesita contra Google real.
 5. Una cita real: **crear** con Meet, **mover**, **cancelar** — y el dueño lo ve en
    su Google Calendar.
 
-**Registro**: pendiente.
+**Registro (2026-09-28, uniko-lanco en `423e46a`)**:
+
+1. ponwo/uniko-crm#45 mergeada → uniko-lanco en `423e46a`, `/api/health` 10/10.
+2. El dueño generó el link, autorizó en su teléfono con `lanco.dmd@gmail.com` y
+   aterrizó en «conectado». No leyó el texto de la pantalla de Google; que el
+   permiso concedido es el estrecho se deduce de que la instancia pide solo
+   `calendar.events.owned` (cubierto por unitarios y arnés) y Google no concede
+   más de lo pedido. La pantalla se verá en el video de la verificación.
+3. Desde la sesión del panel:
+   - `GET /api/settings/google` → `connected`, `primary`, el cliente
+     `559667449083-1lt9…`;
+   - el conector sigue en `google`, y el link quedó usado;
+   - «Probar» → ok, calendario **`lanco.dmd@gmail.com`**.
+4. Una cita **real** con el contacto del dueño (manual: sin mensajes ni
+   invitados), toda con la conexión nueva:
+   - **crear** (mié 30 sep 09:00) → 201 con Meet real `meet.google.com/yrs-pogr-cuq`,
+     sin enlace pendiente;
+   - **mover** a las 10:00 → 200, el mismo enlace; **el dueño la vio a las 10:00**
+     en su Google Calendar;
+   - **cancelar** → 200, la cita queda `cancelada`, y **el dueño confirmó que el
+     evento desapareció**.
+5. El log de la instancia, sin advertencias en todo el recorrido.
+6. Para leer a qué dirección de Google manda el inicio del link se generó otro
+   link de prueba; la extensión del navegador no deja leer la llave, así que se
+   revocó enseguida (`revoked: 1`). No queda ninguno pendiente.
+
+La concesión de la mañana (`calendar.events`) sigue viva en Google hasta que se
+quite el acceso de LanCo Agenda en esa cuenta; el guion del video
+([google-agencia.md §5.3](../../docs/google-agencia.md)) empieza quitándolo.
