@@ -49,6 +49,14 @@ export const MOCK_DECISIONS: readonly MockDecision[] = [
   "exchange_down",
 ];
 
+/**
+ * 029 (permiso owned) — Un calendario al que la cuenta tiene acceso pero que NO
+ * es suyo (uno compartido por otra cuenta). Con `calendar.events` se puede
+ * escribir en él; con `calendar.events.owned` —el permiso de la conexión por
+ * link— Google lo rechaza con 403.
+ */
+export const MOCK_FOREIGN_CALENDAR = "compartido@group.calendar.google.com";
+
 export type MockAuthCode = {
   clientId: string;
   redirectUri: string;

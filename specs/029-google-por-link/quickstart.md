@@ -56,6 +56,9 @@ El bloque **"029: conexión de Google por link"** debe salir entero en OK:
   `politica_empresa`; canje caído → `google_no_respondio`; sin refresh token →
   `prueba_fallida` — y en todos la conexión previa intacta;
 - `callback` sin la cookie → `otro_navegador`; `state` manipulado → `link_invalido`;
+- *(desde el 2026-09-28)* a Google se le pide `calendar.events.owned`, y un
+  calendario destino conservado que es de otra cuenta (el compartido del mock) →
+  `prueba_fallida`, con la conexión previa y su calendario intactos;
 - el relevo se niega a reenviar a un origen fuera de su lista.
 
 Con la agenda encendida **sin** la app de agencia, el bloque verifica las cinco
@@ -68,6 +71,13 @@ superficies en 404 y termina. Con la agenda apagada, las cinco en 404.
 | `AGENDA=on` + app de agencia contra los mocks | **251/251** | 39/39: feliz, siete infelices con la conexión previa intacta, controles del dueño, dos links generados a la vez (tras la revisión de código), relevo |
 | `AGENDA=on` sin `GOOGLE_OAUTH_*` | **217/217** | 5/5 superficies en 404; el conector manual de la 015 sigue verde |
 | sin `AGENDA` | **169/169** | 5/5 superficies en 404 |
+| **2026-09-28, permiso `calendar.events.owned`** (research D6): `AGENDA=on` + app de agencia contra los mocks | **253/253** | 41/41: lo anterior, más a Google se le pide `calendar.events.owned` y un calendario destino ajeno termina en `prueba_fallida` con la conexión previa y su calendario intactos |
+
+En la revisión del 2026-09-28 no se repitieron las dos configuraciones sin app de
+agencia: el cambio no toca esas superficies (siguen en 404), y el conector manual
+de la 015, que sí comparte el mock, salió verde en la corrida completa. Gate
+técnico de esa revisión: typecheck, lint, 883/883 unitarios y build en verde. La
+página de resultado con `estado=permiso_incompleto` muestra el texto nuevo.
 
 Recorrido en el navegador de vista previa (Principio IX), con la primera
 configuración: *Ajustes → Agenda → Google → Generar link* muestra el link con
@@ -196,3 +206,22 @@ Lo que solo puede hacer el dueño va marcado con **(dueño)**.
      y **el dueño confirmó que el evento desapareció de su Google Calendar**.
 8. Reabrir el link: cubierto por el arnés (`link_usado`). No se repitió en vivo
    para no gastar un link más.
+
+### 6.1 Permiso `calendar.events.owned` (revisión 2026-09-28, research D6)
+
+La conexión actual de LanCo se hizo con `calendar.events` y sigue funcionando; esto
+comprueba que una conexión NUEVA con el permiso estrecho hace todo lo que el
+conector necesita contra Google real.
+
+1. **(dueño)** Mergear la PR → uniko-lanco se despliega solo. Esperar
+   `/api/health` 10/10 con el commit nuevo.
+2. *Ajustes → Agenda → Google → Generar link* como dueño.
+3. **(dueño)** Abrir el link y autorizar con `lanco.dmd@gmail.com`: la pantalla de
+   Google nombra «LanCo Agenda» y pide **un solo** permiso, el de los eventos de
+   los calendarios **propios**. Aterrizar en «conectado».
+4. `GET /api/settings/google` → `connected`, `primary`; «Probar» → ok con el nombre
+   del calendario.
+5. Una cita real: **crear** con Meet, **mover**, **cancelar** — y el dueño lo ve en
+   su Google Calendar.
+
+**Registro**: pendiente.

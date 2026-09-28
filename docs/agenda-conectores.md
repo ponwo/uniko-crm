@@ -67,7 +67,9 @@ Hay dos formas de conectarlo, y el conector es el mismo en las dos:
 **Qué necesitas (a mano)**: un proyecto en Google Cloud **del propio negocio** con la
 API de Calendar activada, y de ahí *Client ID*, *Client Secret* y un *refresh
 token* con el permiso `calendar.events`. El calendario destino es `primary`
-salvo que pongas otro.
+salvo que pongas otro. (La conexión por link pide `calendar.events.owned`, más
+estrecho; a mano, `calendar.events` deja además apuntar a un calendario que
+otra cuenta compartió contigo.)
 
 **Cómo obtenerlos, paso a paso** (en la cuenta de Google cuyo calendario
 recibirá las citas; ~20 minutos, una sola vez):
@@ -95,9 +97,10 @@ recibirá las citas; ~20 minutos, una sola vez):
    datos (y el ID del calendario si no es el principal) → **Probar** →
    **Conectar**. Se valida contra Google antes de guardar.
 
-> El botón **Probar** usa `events.list`, no `calendars.get`: el scope
-> `calendar.events` no autoriza el segundo, y con él un token perfectamente
-> válido fallaba con 403 justo al conectar (corregido el 2026-09-17).
+> El botón **Probar** usa `events.list`, no `calendars.get`: ningún permiso de
+> eventos (`calendar.events`, ni el `calendar.events.owned` de la conexión por
+> link) autoriza el segundo, y un token perfectamente válido fallaba con 403
+> justo al conectar (corregido el 2026-09-17).
 
 > ⚠️ **Publica tu app OAuth "en producción".** Si la dejas en modo prueba,
 > Google **revoca el refresh token a los 7 días** y tus citas dejarán de generar
@@ -127,13 +130,17 @@ Van las tres o ninguna (con `AGENDA=on`, una o dos impiden arrancar), y sin
 ellas la superficie del link no existe (404). Con ellas, *Ajustes → Agenda →
 Google* muestra **Conectar por link**: el dueño genera un link de **un solo uso
 que vence a las 72 horas**, se lo manda al titular del calendario, y este
-autoriza con su cuenta de Google **sin sesión en Uniko**. La instancia canjea el
-permiso con su propio cliente, comprueba que se concedió `calendar.events`,
+autoriza con su cuenta de Google **sin sesión en Uniko**. La instancia pide el
+permiso `calendar.events.owned` —ver, crear, cambiar y borrar eventos solo en los
+calendarios **propios** de quien autoriza—, lo canjea con su propio cliente,
+comprueba que se concedió (una concesión de `calendar.events` también vale),
 prueba la conexión y solo entonces la guarda — cifrada, en la misma fila que la
 conexión manual — y deja la agenda entregando por Google. Si algo falla (el
 titular cancela, desmarca el permiso, cambia de navegador, Google no
 responde…), la página de resultado dice qué hacer y **ninguna conexión previa
-se toca**.
+se toca**. Al reconectar se conserva el calendario destino que ya había: si es
+de otra cuenta, la prueba falla y hay que autorizar con la cuenta dueña de ese
+calendario (o desconectar para volver a `primary`).
 
 **Modelo agencia (la flota de LanCo)**: el cliente OAuth es del proyecto de
 LanCo —uno por negocio— y el URI de redirección es el relevo de `lanco.cloud`,

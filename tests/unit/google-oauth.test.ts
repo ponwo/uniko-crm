@@ -34,7 +34,8 @@ const CFG = {
   origin: "https://uniko.negocio.test",
   authSecret: "secreto-de-better-auth-de-prueba",
 };
-const SCOPE = "https://www.googleapis.com/auth/calendar.events";
+/** El permiso que pide la conexión por link: solo los calendarios propios. */
+const SCOPE = "https://www.googleapis.com/auth/calendar.events.owned";
 const NOW = new Date("2026-09-27T12:00:00.000Z");
 const NONCE = "nonce-del-navegador";
 
@@ -210,6 +211,16 @@ describe("029 — completar el flujo: camino feliz", () => {
     expect((await completeGoogleOAuth(query({}), CTX, deps)).motivo).toBe("ok");
   });
 
+  it("una concesión de `calendar.events` también alcanza (guía manual y conexiones anteriores)", async () => {
+    const deps = makeDeps({
+      exchange: vi.fn(async () => ({
+        refreshToken: "ref-nuevo",
+        scope: "https://www.googleapis.com/auth/calendar.events",
+      })),
+    });
+    expect((await completeGoogleOAuth(query({}), CTX, deps)).motivo).toBe("ok");
+  });
+
   it("si cambiar el conector falla, la conexión ya es buena: ok, y queda en el log", async () => {
     const deps = makeDeps({
       useGoogleConnector: vi.fn(async () => {
@@ -334,6 +345,19 @@ describe("029 — completar el flujo: caminos infelices, sin guardar nada", () =
       "permiso_incompleto",
     ],
     [
+      // Comparación exacta: el prefijo `calendar.events.owned` no basta.
+      "concedió solo lectura de sus calendarios",
+      {
+        exchange: vi.fn(async () => ({
+          refreshToken: "ref",
+          scope: "https://www.googleapis.com/auth/calendar.events.owned.readonly",
+        })),
+      },
+      {},
+      { cookieNonce: NONCE },
+      "permiso_incompleto",
+    ],
+    [
       "Google no devolvió refresh token",
       { exchange: vi.fn(async () => ({ refreshToken: null, scope: SCOPE })) },
       {},
@@ -363,6 +387,17 @@ describe("029 — completar el flujo: caminos infelices, sin guardar nada", () =
     const deps = makeDeps({ consumeAndSave: vi.fn(async () => "link_usado" as const) });
     expect(await completeGoogleOAuth(query({}), CTX, deps)).toEqual({ motivo: "link_usado" });
     expect(deps.useGoogleConnector).not.toHaveBeenCalled();
+  });
+
+  it("si falla la prueba con un calendario destino ajeno, el log lo explica sin el id", async () => {
+    const deps = makeDeps({
+      currentCalendarId: vi.fn(async () => "equipo@group.calendar.google.com"),
+      testConnection: vi.fn(async () => ({ ok: false as const, error: "Google respondió 403" })),
+    });
+    expect(await completeGoogleOAuth(query({}), CTX, deps)).toEqual({ motivo: "prueba_fallida" });
+    const logged = (deps.log as ReturnType<typeof vi.fn>).mock.calls.flat().join(" ");
+    expect(logged).toContain("calendarios propios");
+    expect(logged).not.toContain("equipo@");
   });
 
   it("un error de Google no se refleja entero en el log", async () => {

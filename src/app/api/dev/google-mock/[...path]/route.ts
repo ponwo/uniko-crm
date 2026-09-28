@@ -2,6 +2,7 @@ import { mockGuard } from "@/lib/dev-guard";
 import { GOOGLE_SCOPE } from "@/server/agenda/connectors/google";
 import {
   MOCK_DECISIONS,
+  MOCK_FOREIGN_CALENDAR,
   googleMockSnapshot,
   googleMockState,
   issueMockAuthCode,
@@ -22,11 +23,21 @@ export const dynamic = "force-dynamic";
  *
  * 029 — Y la autorización de la conexión por link: `GET auth` hace de pantalla
  * de consentimiento (decide `mock_decision`) y `/token` canjea el código.
+ *
+ * Cada acceso lleva su permiso, como en Google: el de la conexión manual es
+ * `calendar.events` (la guía) y el de la conexión por link,
+ * `calendar.events.owned`, que no alcanza calendarios ajenos.
  */
 
 type Ctx = { params: Promise<{ path: string[] }> };
 
+/** Acceso con `calendar.events`: el de la conexión manual. */
 const TOKEN = "google-token-de-mentira";
+/**
+ * Acceso con `calendar.events.owned`: el que sale del canje por link y de
+ * renovar sus refresh tokens (`ref-oauth-*`).
+ */
+const TOKEN_OWNED = "google-token-owned-de-mentira";
 
 function oauthError(status: number, error: string, description: string): Response {
   return Response.json({ error, error_description: description }, { status });
@@ -57,7 +68,7 @@ function exchangeCode(params: URLSearchParams): Response {
   }
   const n = code.replace("mock-code-", "");
   return Response.json({
-    access_token: TOKEN,
+    access_token: TOKEN_OWNED,
     expires_in: 3599,
     token_type: "Bearer",
     scope: issued.decision === "partial" ? "openid" : GOOGLE_SCOPE,
@@ -84,7 +95,9 @@ export async function POST(req: Request, ctx: Ctx) {
         { status: 400 }
       );
     }
-    return Response.json({ access_token: TOKEN, expires_in: 3600 });
+    // El refresh token conserva el permiso con el que se concedió.
+    const deLink = params.get("refresh_token")?.startsWith("ref-oauth-") ?? false;
+    return Response.json({ access_token: deLink ? TOKEN_OWNED : TOKEN, expires_in: 3600 });
   }
 
   if (route === "_reset") {
@@ -96,6 +109,8 @@ export async function POST(req: Request, ctx: Ctx) {
   if (path[0] === "calendars" && path[2] === "events" && path.length === 3) {
     const unauthorized = requireToken(req);
     if (unauthorized) return unauthorized;
+    const ajeno = foreignCalendar(req, path);
+    if (ajeno) return ajeno;
 
     const body = (await req.json().catch(() => ({}))) as {
       summary?: string;
@@ -170,9 +185,10 @@ export async function GET(req: Request, ctx: Ctx) {
   const unauthorized = requireToken(req);
   if (unauthorized) return unauthorized;
 
-  // GET /calendars/{id} — como Google con un token de `calendar.events`: ese
-  // scope NO autoriza calendars.get (403). Fue el fallo real de «Probar» el
-  // 2026-09-17; el mock lo reproduce para que no vuelva.
+  // GET /calendars/{id} — como Google con un permiso de eventos
+  // (`calendar.events` o `.owned`): ninguno autoriza calendars.get (403). Fue
+  // el fallo real de «Probar» el 2026-09-17; el mock lo reproduce para que no
+  // vuelva.
   if (path[0] === "calendars" && path.length === 2) {
     return Response.json(
       {
@@ -186,8 +202,11 @@ export async function GET(req: Request, ctx: Ctx) {
     );
   }
 
+  const ajeno = foreignCalendar(req, path);
+  if (ajeno) return ajeno;
+
   // GET /calendars/{id}/events — la prueba de conexión (events.list, que sí
-  // acepta `calendar.events`); `summary` es el título del calendario.
+  // aceptan los dos permisos de eventos); `summary` es el título del calendario.
   if (path[0] === "calendars" && path[2] === "events" && path.length === 3) {
     return Response.json({
       kind: "calendar#events",
@@ -225,6 +244,8 @@ export async function PATCH(req: Request, ctx: Ctx) {
   if (unauthorized) return unauthorized;
 
   const { path } = await ctx.params;
+  const ajeno = foreignCalendar(req, path);
+  if (ajeno) return ajeno;
   const event = eventFrom(path);
   if (!event) return new Response(null, { status: 404 });
 
@@ -246,6 +267,8 @@ export async function DELETE(req: Request, ctx: Ctx) {
   if (unauthorized) return unauthorized;
 
   const { path } = await ctx.params;
+  const ajeno = foreignCalendar(req, path);
+  if (ajeno) return ajeno;
   const event = eventFrom(path);
   if (!event) return new Response(null, { status: 404 });
 
@@ -261,9 +284,30 @@ function eventFrom(path: string[]) {
 }
 
 function requireToken(req: Request): Response | null {
-  if (req.headers.get("authorization") === `Bearer ${TOKEN}`) return null;
+  const auth = req.headers.get("authorization");
+  if (auth === `Bearer ${TOKEN}` || auth === `Bearer ${TOKEN_OWNED}`) return null;
   return Response.json(
     { error: { code: 401, message: "Invalid Credentials" } },
     { status: 401 }
+  );
+}
+
+/**
+ * 029 (permiso owned) — Con `calendar.events.owned`, los eventos de un
+ * calendario que la cuenta no posee están fuera del permiso: 403, como Google.
+ */
+function foreignCalendar(req: Request, path: string[]): Response | null {
+  if (req.headers.get("authorization") !== `Bearer ${TOKEN_OWNED}`) return null;
+  if (path[0] !== "calendars" || !path[1]) return null;
+  if (decodeURIComponent(path[1]) !== MOCK_FOREIGN_CALENDAR) return null;
+  return Response.json(
+    {
+      error: {
+        code: 403,
+        message: "Request had insufficient authentication scopes.",
+        status: "PERMISSION_DENIED",
+      },
+    },
+    { status: 403 }
   );
 }
