@@ -148,6 +148,29 @@ la detección de navegadores de apps (Instagram, Facebook, WebView de Android s�
 Chrome y Safari no). La política de privacidad muestra la sección 9 con la
 declaración de uso limitado.
 
+**Registro en producción (2026-09-28, `lanco.cloud` en `9a0519a`: feature 004 de
+`lanco-ws`, ponwo/lanco-ws#4)**. Desde la 004, el build prerenderiza las páginas
+que revisa Google y Nginx las sirve con `try_files $uri $uri.html …`.
+
+- **Sin JavaScript:**
+  - `/google-calendar` responde 200 directo, sin redirección, con el título, el `h1`,
+    las cuatro secciones, el permiso `calendar.events.owned`, los enlaces a
+    privacidad y términos y el canonical, sin `noindex`;
+  - `/politica-privacidad` trae en el HTML la sección 9 nueva: el permiso, lo que
+    guarda el CRM de cada cita, el Meet por WhatsApp, lo del entrenamiento de IA
+    (la privacidad de OpenRouter quedó sin entrenamiento) y el uso limitado.
+- **En el navegador, sin tocar botones:**
+  - el aterrizaje con un link válido para uniko.lanco.cloud muestra «Conecta tu
+    Google Calendar con LanCo», con `noindex` y `no-referrer`, y el botón hacia
+    `https://uniko.lanco.cloud/api/google/oauth/start?t=…`;
+  - un host ajeno da «Este link no es de LanCo»;
+  - el relevo con `state` ajeno, `http:`, con ruta o basura se queda en «No
+    pudimos continuar», sin redirigir.
+- El resto del sitio sigue igual (guiones 001 A, 003 A/F/G de `lanco-ws`).
+
+Registro completo en `lanco-ws`: `specs/004-verificacion-lanco-agenda/quickstart.md`
+(ponwo/lanco-ws#5).
+
 ## 6. En vivo en uniko-lanco (con el dueño)
 
 Lo que solo puede hacer el dueño va marcado con **(dueño)**.
