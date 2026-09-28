@@ -1822,7 +1822,9 @@ main().catch((err) => {
 const GL_CLIENT = process.env.GOOGLE_OAUTH_CLIENT_ID ?? "";
 const GL_SECRET = process.env.GOOGLE_OAUTH_CLIENT_SECRET ?? "";
 const GL_REDIRECT = process.env.GOOGLE_OAUTH_REDIRECT_URI ?? "";
-const SCOPE_CALENDARIO = "https://www.googleapis.com/auth/calendar.events";
+const SCOPE_CALENDARIO = "https://www.googleapis.com/auth/calendar.events.owned";
+/** El calendario compartido del mock (MOCK_FOREIGN_CALENDAR): `.owned` no lo alcanza. */
+const CALENDARIO_AJENO = "compartido@group.calendar.google.com";
 
 async function googleLinkSurfacesAre404(etiqueta) {
   const superficies = [
@@ -2191,6 +2193,38 @@ async function googleLinkChecks(convB) {
     Boolean(siguePendiente.json?.pending),
     JSON.stringify(siguePendiente.json)
   );
+
+  // El permiso de la app (`calendar.events.owned`) solo alcanza los calendarios
+  // PROPIOS de quien autoriza. Un destino conservado que es de otra cuenta
+  // —uno compartido, que la conexión manual sí alcanzaba— no pasa la prueba.
+  const conAjeno = await api("/api/settings/google", {
+    method: "PUT",
+    body: JSON.stringify({
+      clientId: PREVIO,
+      clientSecret: "secreto-manual",
+      refreshToken: "ref-manual",
+      calendarId: CALENDARIO_AJENO,
+    }),
+  });
+  ok(
+    "029: (preparación) la conexión manual alcanza un calendario compartido",
+    conAjeno.res.ok && conAjeno.json?.connection?.fields?.calendarId === CALENDARIO_AJENO,
+    JSON.stringify(conAjeno.json)
+  );
+  const ajeno = await recorrerLink(link2);
+  const trasAjeno = (await api("/api/settings/google")).json?.connection;
+  ok(
+    "029: reconectar por link a un calendario destino ajeno → prueba_fallida, y la conexión previa intacta",
+    ajeno.estado === "prueba_fallida" &&
+      trasAjeno?.fields?.clientId === PREVIO &&
+      trasAjeno?.fields?.calendarId === CALENDARIO_AJENO,
+    `estado=${ajeno.estado} fields=${JSON.stringify(trasAjeno?.fields)}`
+  );
+  // De vuelta al calendario principal para lo que sigue.
+  await api("/api/settings/google", {
+    method: "PUT",
+    body: JSON.stringify({ clientId: PREVIO, clientSecret: "secreto-manual", refreshToken: "ref-manual" }),
+  });
   const alFinal = await recorrerLink(link2);
   const reemplazada = (await api("/api/settings/google")).json?.connection;
   ok(

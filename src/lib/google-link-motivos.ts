@@ -68,7 +68,7 @@ export const MENSAJES: Record<Motivo, Mensaje> = {
   permiso_incompleto: {
     titulo: "Falta el permiso del calendario",
     texto:
-      "No se conectó nada. Vuelve a abrir el mismo link y, en la pantalla de Google, marca la casilla para ver y editar los eventos de tu calendario.",
+      "No se conectó nada. Vuelve a abrir el mismo link y, en la pantalla de Google, marca la casilla del permiso para los eventos de tus calendarios.",
     tono: "error",
   },
   otro_navegador: {

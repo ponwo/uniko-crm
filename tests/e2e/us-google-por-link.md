@@ -35,9 +35,9 @@ eligen con `mock_decision` en la URL de Google.
 3. Recorrido sin sesión: inicio → Google (mock) → relevo (mock) → retorno →
    `/conectar-google?estado=ok`. La página dice «quedó conectado» y el nombre del
    calendario, que llegó por cookie: **ninguna redirección lo lleva**.
-4. A Google se le pidió `calendar.events`, `access_type=offline`,
-   `prompt=consent`, con el cliente y el URI de la configuración; la respuesta
-   pasó por el relevo.
+4. A Google se le pidió `calendar.events.owned` (solo los calendarios propios
+   de quien autoriza), `access_type=offline`, `prompt=consent`, con el cliente y
+   el URI de la configuración; la respuesta pasó por el relevo.
 5. La conexión quedó con el cliente de la agencia; **ninguna respuesta** lleva el
    secreto ni el refresh token (solo los últimos 4 del secreto). «Probar» pasa y
    nombra el calendario; la agenda quedó entregando por Google.
@@ -62,8 +62,16 @@ intacta**:
 | terminar en otro navegador (sin la cookie) | `otro_navegador` |
 | `state` manipulado | `link_invalido` |
 
-Después de los siete, el link **sigue pendiente** y todavía conecta,
-reemplazando la conexión previa.
+Después de los siete, el link **sigue pendiente**.
+
+**El calendario destino es de otra cuenta.** El permiso de la app solo alcanza
+los calendarios propios de quien autoriza. Con la conexión manual previa
+apuntando a un calendario compartido (`compartido@group.calendar.google.com`,
+que el acceso manual `calendar.events` del mock sí alcanza), el link termina en
+`prueba_fallida` y la conexión previa —con su calendario— sigue intacta.
+
+De vuelta al calendario principal, el mismo link todavía conecta, reemplazando la
+conexión previa.
 
 ## US3 — El operador controla sus links
 

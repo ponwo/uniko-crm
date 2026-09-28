@@ -43,12 +43,17 @@ API ya está activada. En la
    - Política de privacidad: `https://lanco.cloud/politica-privacidad`
    - Términos: `https://lanco.cloud/terms-and-conditions`
    - Dominio autorizado: `lanco.cloud` (ya está).
-   - **Logo: todavía no.** Con la app externa y en producción, subir el logo la
-     mete al trámite de verificación. Se sube al enviar a verificación (§5).
+   - Contacto del desarrollador: `contacto@lanco.cloud` — ahí escribe Google
+     durante las verificaciones.
+   - **Logo: no por ahora.** Con la app externa y en producción, subir el logo
+     la mete al trámite de verificación de marca, y la marca no se puede editar
+     mientras ese trámite está abierto (§5).
 2. **Público (Audience)**: *Externo* y **En producción**. En modo prueba Google
    revoca el permiso a los 7 días y las citas se quedan sin enlace.
 3. **Acceso a los datos (Data access)**: un solo permiso,
-   `https://www.googleapis.com/auth/calendar.events` (sensible).
+   `https://www.googleapis.com/auth/calendar.events.owned` (sensible): ver,
+   crear, cambiar y borrar eventos en los calendarios **propios** de quien
+   autoriza. Se declara al pedir la verificación del permiso (§5.2).
 
 ## 1. Por cada negocio (~10 minutos)
 
@@ -112,6 +117,7 @@ API ya está activada. En la
 | «Hay que terminar en el mismo navegador» | Cambió de navegador o tardó más de 15 min | Reabrir el mismo link y terminar ahí |
 | «Tu empresa no permite esta conexión» | Workspace con apps externas bloqueadas | El admin de Workspace permite la app por su ID de cliente (*Consola de administración → Seguridad → Controles de API → Control de acceso de apps*), o usar otra cuenta |
 | «La conexión no pasó la prueba» | Canje o prueba fallidos | Ver el log de la instancia (`[google-link] …`): un `401` es el secreto mal copiado en la variable |
+| «La conexión no pasó la prueba» al reconectar un negocio que apuntaba a otro calendario (el log dice «el calendario destino no es `primary`…») | El permiso de LanCo Agenda solo alcanza los calendarios **propios** de la cuenta que autoriza, y el destino guardado es de otra cuenta | Autorizar con la cuenta dueña de ese calendario, o *Desconectar* (el destino vuelve a `primary`) y mandar un link nuevo |
 | Error de Google `redirect_uri_mismatch` | El URI del cliente no es idéntico a `GOOGLE_OAUTH_REDIRECT_URI` | Igualarlos (sin barra final) |
 | Google `403 disallowed_useragent` | Link abierto dentro de una app | Abrirlo en Chrome o Safari |
 | En Ajustes, la conexión aparece rota | El titular quitó el acceso, o se rotó el secreto | Mandar un link nuevo |
@@ -128,45 +134,84 @@ API ya está activada. En la
 
 ## 5. Verificación de Google (quita el aviso de «app no verificada»)
 
-Mientras no esté verificada, la app funciona igual pero el titular ve el aviso y
-Google aplica un tope de usuarios a las apps sin verificar (irrelevante con el
-tamaño de la flota). `calendar.events` es **sensible**, no restringido: no hay
-evaluación de seguridad de terceros.
+Mientras no esté verificada, la app funciona igual, pero el titular ve el aviso y
+Google aplica un tope de 100 usuarios, de por vida, a las apps sin verificar
+(irrelevante con el tamaño de la flota). `calendar.events.owned` es **sensible**,
+no restringido: no hay evaluación de seguridad de terceros.
 
-**Ya se puede hacer (no depende del código):**
+Son dos revisiones y van **en este orden**: Google no deja pedir la del permiso
+sin la marca publicada.
 
-1. **Search Console**: verificar `lanco.cloud` como propiedad de dominio con el
-   registro TXT que da Google, en el DNS de Cloudflare. Tiene que hacerlo una
-   cuenta que sea propietaria o editora del proyecto LanCo Robotics
-   (`ponwo10@gmail.com`).
-2. **Página de la app y política de privacidad**: `lanco.cloud/google-calendar`
-   y la sección 9 de `lanco.cloud/politica-privacidad` (declaración de uso
-   limitado) — llegan con la PR de `lanco-ws`.
+**Estado al 2026-09-28** (consola revisada):
 
-**Cuando el flujo esté en vivo:**
+- Search Console: `lanco.cloud` verificado como propiedad de dominio por
+  `ponwo10@gmail.com`, propietario del proyecto ✓.
+- Página de la app (`lanco.cloud/google-calendar`) y sección 9 de
+  `lanco.cloud/politica-privacidad`, con la declaración de uso limitado ✓.
+- **Revisión de marca en curso, manual**: la privacidad ya pasó (2026-09-28); la
+  página principal y los lineamientos de marca, en revisión. La consola calcula
+  de 4 a 6 semanas, con el primer correo en 3 a 5 días.
 
-3. **Logo** (cuadrado, 120×120) — se sube al enviar.
-4. **Video de demostración** (YouTube, no listado), de punta a punta. **Con la
-   cuenta de Google en inglés**: Google exige ver la pantalla de consentimiento
-   en inglés. Guion:
-   1. Uniko → *Ajustes → Agenda → Generar link*.
-   2. Abrir el link: la página de `lanco.cloud`, *Continuar con Google*.
-   3. La pantalla de consentimiento completa, con «LanCo Agenda» y el ID de
-      cliente visible en la barra de direcciones; aceptar.
-   4. La página «calendario conectado».
-   5. Agendar una cita en Uniko → el evento con su Meet en Google Calendar;
-      moverla → el evento se mueve; cancelarla → el evento desaparece.
-   6. Quitar el acceso desde la cuenta de Google.
-5. **Justificación del permiso** (en inglés):
+### 5.1 Mientras revisan la marca
 
-   > LanCo Agenda creates, updates and deletes the Google Calendar events of the
-   > appointments a business books through its WhatsApp CRM (Uniko), each with a
-   > Google Meet link. `calendar.events` is the narrowest scope that allows
-   > inserting events with conference data and moving or deleting them;
-   > read-only scopes cannot create events. The app never reads the user's
-   > other events: the connection check requests only the calendar's `summary`
-   > field.
+- **No tocar *Información de la marca*.** No se puede editar durante la
+  revisión: habría que cancelarla. Eso incluye el logo.
+- Vigilar `contacto@lanco.cloud` (el contacto del desarrollador; también el
+  spam) y `ponwo10@gmail.com`. Google escribe ahí, y se le contesta en el mismo
+  hilo.
+- Grabar el video (§5.3) con el permiso definitivo ya desplegado.
 
-6. Enviar desde *Google Auth Platform → Centro de verificación*.
-7. Al aprobarse: `APP_VERIFICADA = true` en `modules/googleCalendar.ts` de
+### 5.2 Cuando la marca quede publicada
+
+1. *Acceso a los datos* → *Agregar o quitar permisos* →
+   `https://www.googleapis.com/auth/calendar.events.owned` → Guardar.
+2. *Centro de verificación* → pedir la verificación del acceso a los datos, con
+   la justificación (§5.4) y el link del video.
+3. Al aprobarse: `APP_VERIFICADA = true` en `modules/googleCalendar.ts` de
    `lanco-ws` (quita el aviso de la página) y desplegar el sitio.
+
+### 5.3 El video de demostración
+
+YouTube, **no listado**, de punta a punta. Google exige ver el proceso de
+autorización **en inglés**, el nombre «LanCo Agenda» en la pantalla de
+consentimiento, el **ID de cliente en la barra de direcciones** y el uso de cada
+permiso en detalle.
+
+- Poner en inglés la cuenta de Google del titular mientras se graba (p. ej.
+  `lanco.dmd@gmail.com`), y quitarle antes el acceso a LanCo Agenda para que el
+  recorrido salga completo.
+- En la pantalla de consentimiento, hacer clic en la barra de direcciones para
+  que se lea el `client_id`.
+- Subtítulos en inglés en cada paso: Uniko está en español.
+- Se graba con Win+Shift+R (Recortes) u OBS.
+
+| # | Qué se ve | Subtítulo |
+|---|---|---|
+| 1 | Uniko → *Ajustes → Agenda → Generar link* | The business owner generates a one-time link in Uniko, their WhatsApp CRM. |
+| 2 | El link abre la página de `lanco.cloud` → *Continuar con Google* | The calendar owner opens the link. The page explains what LanCo Agenda will access. |
+| 3 | Elegir la cuenta; la pantalla de consentimiento completa; clic en la barra de direcciones; aceptar | Google's consent screen: LanCo Agenda requests a single permission. The OAuth client ID is visible in the address bar. |
+| 4 | La página «calendario conectado» | Connected. The grant is stored encrypted on the business's own CRM server. |
+| 5 | *Ajustes → Agenda → Probar* | The connection check reads only the calendar's name. |
+| 6 | Agendar una cita (en Uniko o por WhatsApp con el asistente) → el evento con su Meet en Google Calendar | An appointment booked through WhatsApp creates an event with a Google Meet link in the owner's calendar. |
+| 7 | Moverla → el evento se mueve; cancelarla → el evento desaparece | Rescheduling moves the event. Cancelling deletes it. |
+| 8 | Cuenta de Google → *Seguridad → Apps de terceros* → LanCo Agenda → *Quitar acceso* | The owner can revoke access at any time from their Google Account. |
+
+### 5.4 Justificación del permiso (en inglés, para pegar)
+
+> LanCo Agenda creates, updates and deletes the Google Calendar events of the
+> appointments that a business books through its WhatsApp CRM (Uniko), each with
+> a Google Meet link, so the appointments appear on the calendar the business
+> owner already uses to plan their day.
+>
+> We request only `calendar.events.owned`: the narrowest scope that allows
+> inserting events with conference data and moving or deleting them, limited to
+> calendars the user owns. `calendar.events` would also reach calendars that
+> other people share with the user, which the app does not need. Read-only
+> scopes cannot create events. `calendar.app.created` would confine the
+> appointments to a secondary calendar created by the app, away from the owner's
+> own calendar, where they see and plan their day.
+>
+> The app never reads the user's other events: the connection check requests
+> only the calendar's `summary` field (its name). The refresh token is stored
+> encrypted on the business's own CRM server and is deleted when the user
+> disconnects.

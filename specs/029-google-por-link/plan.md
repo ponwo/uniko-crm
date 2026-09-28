@@ -245,9 +245,13 @@ propia app de Google Cloud?". "Probar" muestra "Conexión correcta — calendari
   `error=access_denied|admin_policy_enforced`.
 - `google-mock` `POST token` con `grant_type=authorization_code`: código desconocido o
   reutilizado → 400 `invalid_grant`; `redirect_uri`/`client_id` distintos → 400;
-  `exchange_down` → 503; `partial` → `scope` sin `calendar.events`; `no_refresh` → sin
-  `refresh_token`; `approve` → `refresh_token: "ref-oauth-<n>"` (que el refresco
-  acepta). El refresco existente no cambia.
+  `exchange_down` → 503; `partial` → `scope` sin el permiso de calendario;
+  `no_refresh` → sin `refresh_token`; `approve` → `refresh_token: "ref-oauth-<n>"`
+  (que el refresco acepta). El refresco existente no cambia.
+- *(Revisión 2026-09-28, research D6)* Cada acceso lleva su permiso: el del canje y
+  el de renovar un `ref-oauth-*` es `calendar.events.owned`; el de la conexión
+  manual, `calendar.events`. Con el primero, los eventos del calendario compartido
+  `compartido@group.calendar.google.com` (`MOCK_FOREIGN_CALENDAR`) responden 403.
 - `lanco-relay-mock`: el algoritmo del contrato §3, con la lista = el host de
   `APP_BASE_URL`; 302 en vez de `location.replace` (el arnés no ejecuta JS).
 

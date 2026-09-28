@@ -32,16 +32,43 @@ import {
  *     prueba.** Eso no se puede arreglar desde aquí: se advierte en la guía de
  *     conexión, y cuando pasa, el 401 marca la credencial como rota para que
  *     el dueño se entere por la UI y no por un cliente sin enlace.
- *  3. **`calendar.events` NO autoriza `calendars.get`.** Es el scope que pide
- *     la guía (el mínimo para crear/mover/borrar eventos), pero la referencia
- *     de Calendar API lo excluye de `calendars.get`: un token bien hecho daba
- *     403 justo en «Probar», y el mock no lo delataba porque no exigía scopes
- *     (hallazgo 2026-09-17, al conectar LanCo). La prueba de conexión usa
- *     `events.list?maxResults=1`, que sí lo acepta y devuelve el título del
+ *  3. **Los permisos de eventos NO autorizan `calendars.get`.** Ni
+ *     `calendar.events` (el que pide la guía de la conexión manual) ni
+ *     `calendar.events.owned` (el de la conexión por link): la referencia de
+ *     Calendar API los excluye, y un token bien hecho daba 403 justo en
+ *     «Probar» — el mock no lo delataba porque no exigía scopes (hallazgo
+ *     2026-09-17, al conectar LanCo). La prueba de conexión usa
+ *     `events.list?maxResults=1`, que ambos aceptan y devuelve el título del
  *     calendario en `summary` — misma señal, mismo scope.
  */
 
-export const GOOGLE_SCOPE = "https://www.googleapis.com/auth/calendar.events";
+/**
+ * El permiso que pide la conexión por link (029): el más estrecho que deja
+ * crear, mover y borrar eventos con su Meet, y solo en los calendarios PROPIOS
+ * de quien autoriza. Para verificar la app de la agencia, Google exige
+ * justificar por qué no basta un permiso más estrecho, y `calendar.events`
+ * (todos los calendarios a los que la cuenta tiene acceso) no pasaba esa
+ * pregunta: el diseño es que autorice la cuenta dueña del calendario
+ * (decisión del dueño, 2026-09-28).
+ */
+export const GOOGLE_SCOPE = "https://www.googleapis.com/auth/calendar.events.owned";
+
+/**
+ * Los permisos concedidos que alcanzan para el conector. `calendar.events`
+ * también sirve (es el de la guía manual y el de las conexiones por link
+ * anteriores): rechazarlo daría por incompleta una concesión que cubre de
+ * sobra lo que se usa. Comparación exacta, nunca por prefijo:
+ * `calendar.events.owned.readonly` no deja crear nada.
+ */
+const SCOPES_SUFICIENTES: readonly string[] = [
+  GOOGLE_SCOPE,
+  "https://www.googleapis.com/auth/calendar.events",
+];
+
+/** ¿El `scope` concedido (separado por espacios) alcanza para el conector? */
+export function grantCoversCalendar(scope: string): boolean {
+  return scope.split(/\s+/).some((s) => SCOPES_SUFICIENTES.includes(s));
+}
 
 /** Cuántas veces se re-lee el evento esperando el enlace de Meet. */
 const CONFERENCE_POLLS = 3;
@@ -272,8 +299,8 @@ export const googleConnector: AgendaConnector<GoogleCreds> = {
  * (el relevo de lanco.cloud o la propia instancia), aunque quien canjea sea
  * otro sitio — Google compara la cadena, no quién llama.
  *
- * `scope` son los permisos CONCEDIDOS; quien llama comprueba que incluyan
- * `calendar.events`. El access token de la respuesta se deja en la caché con
+ * `scope` son los permisos CONCEDIDOS; quien llama comprueba que alcancen
+ * (`grantCoversCalendar`). El access token de la respuesta se deja en la caché con
  * la llave de ESE refresh token, así la prueba de conexión que sigue lo usa en
  * vez de renovar otra vez.
  */

@@ -45,7 +45,8 @@ Revoca el link pendiente, si hay.
 
 - Link vigente → **302** a Google (`GOOGLE_AUTH_URL`) con `client_id`,
   `redirect_uri` (= `GOOGLE_OAUTH_REDIRECT_URI`), `response_type=code`,
-  `scope=https://www.googleapis.com/auth/calendar.events`, `access_type=offline`,
+  `scope=https://www.googleapis.com/auth/calendar.events.owned` (desde el
+  2026-09-28; research D6), `access_type=offline`,
   `prompt=consent`, `state`; y `Set-Cookie: uniko_google_oauth=<nonce>; HttpOnly;
   SameSite=Lax; Path=/api/google/oauth; Max-Age=900` (+ `Secure` en HTTPS).
 - Link no válido, vencido o ya usado/revocado → **302** a
@@ -69,8 +70,8 @@ SameSite=Lax; Path=/conectar-google; Max-Age=120`.
 | `link_usado` | El link ya se usó mientras tanto (incluida la carrera de dos pestañas). |
 | `link_invalido` (tardío) | El link se revocó durante la ida y vuelta: si consumir falla, se relee la fila para distinguir usado de revocado — un revocado es `link_invalido` en todas partes. |
 | `google_no_respondio` | El canje falló por red, 5xx o `invalid_grant` (código vencido o reutilizado). |
-| `permiso_incompleto` | El `scope` concedido no incluye `calendar.events`. |
-| `prueba_fallida` | Sin `refresh_token`, o la prueba de conexión contra el calendario falló. |
+| `permiso_incompleto` | El `scope` concedido no incluye `calendar.events.owned` ni `calendar.events` (comparación exacta). |
+| `prueba_fallida` | Sin `refresh_token`, o la prueba de conexión contra el calendario falló — incluido un calendario destino conservado que no es de la cuenta que autoriza. |
 
 En todo caso distinto de `ok`, **ninguna conexión existente se toca** (FR-1417).
 

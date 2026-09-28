@@ -8,6 +8,7 @@ import {
   GOOGLE_SCOPE,
   exchangeAuthorizationCode,
   googleConnector,
+  grantCoversCalendar,
 } from "@/server/agenda/connectors/google";
 import {
   getGoogleCalendarId,
@@ -317,7 +318,7 @@ export async function completeGoogleOAuth(
     return { motivo: status === 401 ? "prueba_fallida" : "google_no_respondio" };
   }
 
-  if (!exchanged.scope.split(/\s+/).includes(GOOGLE_SCOPE)) {
+  if (!grantCoversCalendar(exchanged.scope)) {
     return { motivo: "permiso_incompleto" };
   }
   if (!exchanged.refreshToken) {
@@ -340,7 +341,14 @@ export async function completeGoogleOAuth(
     status: "connected",
   });
   if (!test.ok) {
-    deps.log(`la prueba de conexión falló: ${test.error.slice(0, 200)}`);
+    // El permiso de la app solo alcanza los calendarios PROPIOS de quien
+    // autoriza: un destino conservado de otra cuenta falla aquí, y el operador
+    // tiene que poder leerlo en el log (sin el id, que suele ser un correo).
+    const destino =
+      calendarId === "primary"
+        ? ""
+        : " (el calendario destino no es `primary`: el permiso solo alcanza los calendarios propios de la cuenta que autoriza)";
+    deps.log(`la prueba de conexión falló: ${test.error.slice(0, 200)}${destino}`);
     return { motivo: "prueba_fallida" };
   }
 

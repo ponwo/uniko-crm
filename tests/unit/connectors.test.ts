@@ -392,7 +392,7 @@ describe("google", () => {
           access_token: "tk-canje",
           expires_in: 3599,
           refresh_token: "ref-nuevo",
-          scope: "https://www.googleapis.com/auth/calendar.events",
+          scope: "https://www.googleapis.com/auth/calendar.events.owned",
         });
       }
       return Response.json({ summary: "Agenda" });
@@ -406,7 +406,7 @@ describe("google", () => {
     });
     expect(out).toEqual({
       refreshToken: "ref-nuevo",
-      scope: "https://www.googleapis.com/auth/calendar.events",
+      scope: "https://www.googleapis.com/auth/calendar.events.owned",
     });
     expect(bodies[0]?.get("grant_type")).toBe("authorization_code");
     expect(bodies[0]?.get("redirect_uri")).toBe("https://lanco.cloud/google-calendar/callback");

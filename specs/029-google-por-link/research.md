@@ -24,7 +24,8 @@ Hechos de Google verificados contra su documentación el 2026-09-27
   autorizados verificados en Search Console por un propietario del proyecto; video
   de demostración de punta a punta **con la pantalla de consentimiento en inglés**;
   justificación del permiso. `calendar.events` es sensible, no restringido: sin
-  evaluación de seguridad de terceros.
+  evaluación de seguridad de terceros. (Desde el 2026-09-28 la app pide
+  `calendar.events.owned`, también sensible: ver D6.)
 
 ## D1. Dónde se canjea el permiso: en la instancia
 
@@ -149,10 +150,35 @@ evita que el sitio de LanCo sirva de redirector abierto.
 **Rationale**: el permiso mínimo de la 015; `prompt=consent` garantiza el refresh
 token aunque el titular ya hubiera autorizado antes (p. ej. al reconectar).
 
+**Revisión 2026-09-28 — el permiso pasa a `calendar.events.owned`** (decisión del
+dueño, al preparar la verificación). Google exige, para verificar un permiso
+sensible, «explicar por qué no basta uno más estrecho», y `calendar.events` ya no es
+el más estrecho: `calendar.events.owned` («ver, crear, cambiar y borrar eventos en
+los calendarios de Google que son tuyos») autoriza las cinco llamadas del conector
+—`events.insert` con conferencia, `get`, `patch`, `delete` y `list`— según la
+referencia de Calendar API, y encaja con el diseño: autoriza la cuenta dueña del
+calendario. Se conserva todo lo demás de la decisión.
+
+- *Qué se pierde*: escribir en un calendario que otra cuenta compartió con quien
+  autoriza. El link no ofrece elegir calendario (usa `primary` o conserva el que
+  había); un destino conservado ajeno termina en `prueba_fallida` sin guardar nada,
+  y el log lo explica. La conexión manual (015) sigue con `calendar.events`.
+- *Comprobación del `scope` concedido* (D7): vale `calendar.events.owned` **o**
+  `calendar.events`, por comparación exacta (`.owned.readonly` no deja crear nada).
+  Aceptar el amplio evita dar por incompleta una concesión que cubre de sobra lo que
+  se usa.
+- *Descartadas*: seguir con `calendar.events` y argumentar calendarios compartidos
+  (el link no los ofrece: la justificación no se sostenía); `calendar.app.created`
+  (más estrecho aún, pero las citas vivirían en un calendario secundario creado por
+  la app, lejos del calendario donde el dueño planea su día).
+- Las conexiones hechas antes con `calendar.events` siguen funcionando: el permiso
+  concedido no cambia al cambiar lo que se pide.
+
 ## D7. Qué se comprueba antes de guardar, y en qué orden
 
 **Decisión**: firma y vigencia de `state` → cookie → `error` de Google → link todavía
-vigente → canje → `scope` incluye `calendar.events` → trae `refresh_token` → prueba
+vigente → canje → `scope` alcanza (`calendar.events.owned` o `calendar.events`; ver
+D6) → trae `refresh_token` → prueba
 de conexión (`events.list`, la misma de "Probar") → **transacción**: consumir el link
 + guardar credenciales → fuera de ella, conector de la agenda a `google`.
 
