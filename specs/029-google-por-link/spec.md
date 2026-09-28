@@ -23,7 +23,8 @@ onboarding?"*. Se acordó entonces **un proyecto de Google de LanCo con un clien
 OAuth por negocio** y `lanco.cloud` como único retorno registrado. El 2026-09-27, ante
 la pregunta de cómo llega el permiso a la instancia: (1) **llega solo** — la instancia
 canjea el permiso ella misma; nada de n8n ni de copiar tokens; (2) se **reutiliza el
-proyecto `agendamiento-lanco`**; (3) la app se llama **«LanCo Agenda»** en la pantalla
+proyecto de Google de LanCo** (LanCo Robotics, `lanco-robotics`, cuya app se
+llamaba `agendamiento-lanco`); (3) la app se llama **«LanCo Agenda»** en la pantalla
 de permisos de Google; (4) la **verificación de Google se prepara ya** y se envía
 cuando el flujo funcione (el video de demostración lo exige).
 
@@ -408,7 +409,7 @@ redirect") en realidad también para el modo BYO.
 
 ## Assumptions
 
-- El proyecto `agendamiento-lanco` sigue publicado **en producción** (no en prueba),
+- El proyecto LanCo Robotics (`lanco-robotics`) sigue publicado **en producción** (no en prueba),
   con la app renombrada a «LanCo Agenda» y `lanco.cloud` como dominio autorizado. Hasta
   que Google la verifique, los titulares verán el aviso de app sin verificar; con el
   tamaño de la flota, el tope de usuarios de una app sin verificar no aplica en la

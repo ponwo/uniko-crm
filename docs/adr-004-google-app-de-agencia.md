@@ -24,7 +24,7 @@ central"*.
 ## Decisión
 
 **1. Un proyecto de Google de LanCo, con un cliente OAuth POR NEGOCIO.** El proyecto
-(`agendamiento-lanco`, app «LanCo Agenda») lleva la marca, la pantalla de
+(LanCo Robotics, `lanco-robotics`; app «LanCo Agenda») lleva la marca, la pantalla de
 consentimiento, el dominio autorizado y la verificación: se hacen una vez para
 todos. Cada negocio tiene su propio cliente OAuth dentro, configurado en SU instancia
 por despliegue (`GOOGLE_OAUTH_CLIENT_ID`, `GOOGLE_OAUTH_CLIENT_SECRET`,

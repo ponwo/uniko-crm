@@ -29,8 +29,11 @@ en el camino de ninguna cita.
 
 ## 0. Una sola vez: el proyecto de Google
 
-El proyecto es **`agendamiento-lanco`** (el mismo con el que LanCo conectó su
-propia agenda el 2026-09-23; esa conexión sigue funcionando). En la
+El proyecto es **LanCo Robotics** (`lanco-robotics`, propiedad de
+`ponwo10@gmail.com`): el mismo con el que LanCo conectó su propia agenda el
+2026-09-23, y esa conexión sigue funcionando. Su app se llamaba
+`agendamiento-lanco`; el 2026-09-28 pasó a **LanCo Agenda**. La Google Calendar
+API ya está activada. En la
 [consola](https://console.cloud.google.com) → *Google Auth Platform*:
 
 1. **Marca (Branding)**
@@ -134,7 +137,8 @@ evaluación de seguridad de terceros.
 
 1. **Search Console**: verificar `lanco.cloud` como propiedad de dominio con el
    registro TXT que da Google, en el DNS de Cloudflare. Tiene que hacerlo una
-   cuenta que sea propietaria o editora del proyecto `agendamiento-lanco`.
+   cuenta que sea propietaria o editora del proyecto LanCo Robotics
+   (`ponwo10@gmail.com`).
 2. **Página de la app y política de privacidad**: `lanco.cloud/google-calendar`
    y la sección 9 de `lanco.cloud/politica-privacidad` (declaración de uso
    limitado) — llegan con la PR de `lanco-ws`.
