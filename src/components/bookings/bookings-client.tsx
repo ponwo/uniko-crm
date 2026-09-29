@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useEvents } from "@/components/use-events";
+import { cn } from "@/lib/utils";
 
 /** 015 — Citas: lo agendado por el operador y por la IA, con sus acciones. */
 
@@ -37,8 +38,21 @@ const STATUS_LABEL: Record<Booking["status"], string> = {
   cancelada: "Cancelada",
 };
 
+type StatusFilter = Booking["status"] | "all";
+
+const FILTERS: { id: StatusFilter; label: string }[] = [
+  { id: "agendada", label: "Agendadas" },
+  { id: "realizada", label: "Realizadas" },
+  { id: "no_show", label: "No asistió" },
+  { id: "cancelada", label: "Canceladas" },
+  { id: "all", label: "Todas" },
+];
+
 export function BookingsClient() {
   const [bookings, setBookings] = useState<Booking[] | null>(null);
+  // Arranca en lo accionable: con todo mezclado, las canceladas y las ya
+  // atendidas tapaban las que siguen pendientes.
+  const [filter, setFilter] = useState<StatusFilter>("agendada");
   const [slots, setSlots] = useState<Slot[]>([]);
   const [busy, setBusy] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -121,6 +135,12 @@ export function BookingsClient() {
 
   if (!bookings) return <p className="text-sm text-text-3">Cargando…</p>;
 
+  const countOf = (f: StatusFilter) =>
+    f === "all" ? bookings.length : bookings.filter((b) => b.status === f).length;
+  const visible =
+    filter === "all" ? bookings : bookings.filter((b) => b.status === filter);
+  const filterLabel = FILTERS.find((f) => f.id === filter)?.label ?? "";
+
   return (
     <div className="space-y-6">
       {error && <p className="text-sm text-destructive">{error}</p>}
@@ -165,17 +185,54 @@ export function BookingsClient() {
       </section>
 
       <section className="space-y-2">
-        <h3 className="text-sm font-semibold">
-          Citas <span className="text-text-3">({bookings.length})</span>
-        </h3>
-        {bookings.length === 0 && (
+        <h3 className="text-sm font-semibold">Citas</h3>
+        {bookings.length === 0 ? (
           <p className="text-sm text-text-3">
             Todavía no hay nada agendado. Configura tu horario en Ajustes →
             Agenda para empezar a recibir citas.
           </p>
+        ) : (
+          <div
+            role="group"
+            aria-label="Filtrar citas por estado"
+            className="flex flex-wrap items-center gap-1.5"
+          >
+            {FILTERS.map((f) => {
+              const on = filter === f.id;
+              return (
+                <button
+                  key={f.id}
+                  type="button"
+                  onClick={() => setFilter(f.id)}
+                  aria-pressed={on}
+                  className={cn(
+                    "flex shrink-0 items-center gap-1.5 whitespace-nowrap rounded-full border px-2.5 py-[5px] text-[12.5px] font-semibold transition-colors",
+                    on
+                      ? "border-brand bg-brand text-brand-fg"
+                      : "border-border-strong bg-background text-text-2 hover:border-text-3"
+                  )}
+                >
+                  {f.label}
+                  <span
+                    className={cn(
+                      "rounded-full px-1.5 text-[11px]",
+                      on ? "bg-brand-veil" : "bg-secondary text-text-3"
+                    )}
+                  >
+                    {countOf(f.id)}
+                  </span>
+                </button>
+              );
+            })}
+          </div>
         )}
-        <ul className="divide-y rounded-md border">
-          {bookings.map((b) => (
+        {bookings.length > 0 && visible.length === 0 && (
+          <p className="text-sm text-text-3">
+            No hay citas en «{filterLabel}».
+          </p>
+        )}
+        <ul className={cn("divide-y rounded-md border", visible.length === 0 && "hidden")}>
+          {visible.map((b) => (
             <li key={b.id} className="space-y-2 p-3">
               <div className="flex flex-wrap items-center gap-2">
                 <span className="text-sm font-medium">
