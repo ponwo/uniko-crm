@@ -1,7 +1,7 @@
 import { apiError, withAuth } from "@/lib/api";
 import {
+  googleLinkStatus,
   issueGoogleLink,
-  pendingGoogleLink,
   revokeGoogleLinks,
 } from "@/server/agenda/connectors/google-link";
 import {
@@ -28,7 +28,7 @@ function notOwner(): Response {
 
 export const GET = withAuth(async (session) => {
   if (!googleLinkAvailable()) return new Response(null, { status: 404 });
-  const pending = await pendingGoogleLink(session.organizationId, new Date());
+  const { pending, usedAt } = await googleLinkStatus(session.organizationId, new Date());
   return Response.json({
     canManage: session.role === "owner",
     // Nunca el link: solo que existe y cuándo vence (FR-1408).
@@ -38,6 +38,8 @@ export const GET = withAuth(async (session) => {
           expiresAt: pending.expiresAt.toISOString(),
         }
       : null,
+    // Cuándo se usó el más reciente: con él quedó conectado Google (FR-1429).
+    usedAt: usedAt?.toISOString() ?? null,
   });
 });
 

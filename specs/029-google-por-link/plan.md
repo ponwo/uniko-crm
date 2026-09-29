@@ -174,7 +174,10 @@ dependencias inyectables para las pruebas). Las rutas son delgadas.
   de 32 bytes base64url; en transacción revoca pendientes e inserta `{ token_hash:
   sha256(token), expires_at: now + 72 h }`.
 - `revokeGoogleLinks(organizationId, now)` → número revocado.
-- `pendingGoogleLink(organizationId, now)` → `{ createdAt, expiresAt } | null`.
+- `googleLinkStatus(organizationId, now)` → `{ pending: { createdAt, expiresAt } |
+  null, usedAt: Date | null }` del link más reciente; la decisión, pura, en
+  `linkStatusFor(row, now)` (revisión 2026-09-29, FR-1429; antes
+  `pendingGoogleLink`, solo el pendiente).
 - `checkGoogleLink(token, now)` → `{ ok: true, link } | { ok: false, motivo:
   "link_invalido" | "link_vencido" | "link_usado" }` (revocado cuenta como
   `link_invalido`: para quien lo abre, ya no es un link válido).

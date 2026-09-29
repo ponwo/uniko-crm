@@ -2026,6 +2026,7 @@ async function googleLinkChecks(convB) {
     "029: la pantalla ve el link pendiente y su vencimiento, nunca la llave",
     pendiente.json?.canManage === true &&
       pendiente.json?.pending?.expiresAt === generado.json?.expiresAt &&
+      pendiente.json?.usedAt === null &&
       !JSON.stringify(pendiente.json).includes(llave),
     JSON.stringify(pendiente.json)
   );
@@ -2149,7 +2150,11 @@ async function googleLinkChecks(convB) {
   const otraVez = await recorrerLink(linkUrl);
   ok("029: el mismo link otra vez → «ya se usó»", otraVez.estado === "link_usado", `estado=${otraVez.estado}`);
   const sinPendiente = await api("/api/settings/google/link");
-  ok("029: tras usarse, no queda link pendiente", sinPendiente.json?.pending === null, JSON.stringify(sinPendiente.json));
+  ok(
+    "029: tras usarse, no queda link pendiente y la pantalla sabe cuándo se usó (FR-1429)",
+    sinPendiente.json?.pending === null && Date.parse(sinPendiente.json?.usedAt ?? "") >= antes,
+    JSON.stringify(sinPendiente.json)
+  );
 
   const eco = await api(`/conectar-google?estado=${encodeURIComponent("<script>alert(1)</script>")}`);
   const ecoHtml = await eco.res.text();
@@ -2247,6 +2252,12 @@ async function googleLinkChecks(convB) {
     JSON.stringify(revocado.json)
   );
   ok("029: un link revocado ya no es válido", (await recorrerLink(link4)).estado === "link_invalido");
+  const trasRevocar = await api("/api/settings/google/link");
+  ok(
+    "029: la pantalla no toma un link revocado por usado (FR-1429)",
+    trasRevocar.json?.pending === null && trasRevocar.json?.usedAt === null,
+    JSON.stringify(trasRevocar.json)
+  );
 
   // Dos "Generar link" a la vez: haya carrera o no, después de conectar con
   // uno no queda ninguna otra llave usable (consumir revoca a las hermanas).

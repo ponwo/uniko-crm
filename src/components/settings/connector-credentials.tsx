@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -103,18 +103,22 @@ export function ConnectorCredentials({
     text: string;
   } | null>(null);
 
+  // También la llama la sección del link (029) cuando se usa: la conexión
+  // cambió fuera de esta pantalla.
+  const loadConnection = useCallback(async () => {
+    const res = await fetch(`/api/settings/${connector}`).catch(() => null);
+    if (!res?.ok) return;
+    const data = (await res.json()) as { connection: Connection | null };
+    setConnection(data.connection);
+    if (data.connection) setValues({ ...data.connection.fields });
+  }, [connector]);
+
   useEffect(() => {
     setConnection(null);
     setValues({});
     setMessage(null);
-    void (async () => {
-      const res = await fetch(`/api/settings/${connector}`).catch(() => null);
-      if (!res?.ok) return;
-      const data = (await res.json()) as { connection: Connection | null };
-      setConnection(data.connection);
-      if (data.connection) setValues({ ...data.connection.fields });
-    })();
-  }, [connector]);
+    void loadConnection();
+  }, [loadConnection]);
 
   async function submit(mode: "test" | "save") {
     setBusy(true);
@@ -182,7 +186,9 @@ export function ConnectorCredentials({
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
-        {connector === "google" && <GoogleLinkSection onAvailable={setLinkAvailable} />}
+        {connector === "google" && (
+          <GoogleLinkSection onAvailable={setLinkAvailable} onConnected={loadConnection} />
+        )}
 
         {connector === "google" && linkAvailable && (
           <div className="space-y-1">

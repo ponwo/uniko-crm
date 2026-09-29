@@ -128,11 +128,36 @@ export async function revokeGoogleLinks(
   return rows.length;
 }
 
-/** El link vigente, SIN la llave (FR-1408): solo cuándo se creó y vence. */
-export async function pendingGoogleLink(
+export type LinkStatus = {
+  pending: { createdAt: Date; expiresAt: Date } | null;
+  usedAt: Date | null;
+};
+
+/**
+ * Lo que la pantalla sabe del link más reciente, SIN la llave (FR-1408): si
+ * está pendiente, cuándo se creó y vence; si se usó, cuándo. Quien lo abrió
+ * desde Ajustes sabe así, al volver, que quedó conectado (FR-1429): usarse y
+ * guardar la conexión son una sola transacción.
+ */
+export function linkStatusFor(
+  row: (LinkRow & { createdAt: Date }) | null,
+  now: Date
+): LinkStatus {
+  if (!row) return { pending: null, usedAt: null };
+  return {
+    pending:
+      linkState(row, now) === "pendiente"
+        ? { createdAt: row.createdAt, expiresAt: row.expiresAt }
+        : null,
+    usedAt: row.usedAt,
+  };
+}
+
+/** El estado del link más reciente de la organización (ver `linkStatusFor`). */
+export async function googleLinkStatus(
   organizationId: string,
   now: Date
-): Promise<{ createdAt: Date; expiresAt: Date } | null> {
+): Promise<LinkStatus> {
   const db = getDb();
   // Generar revoca los anteriores, así que el candidato es el más reciente.
   const rows = await db
@@ -148,9 +173,7 @@ export async function pendingGoogleLink(
     .where(scoped(schema.googleLink.organizationId, organizationId))
     .orderBy(desc(schema.googleLink.createdAt))
     .limit(1);
-  const row = rows[0];
-  if (!row || linkState(row, now) !== "pendiente") return null;
-  return { createdAt: row.createdAt, expiresAt: row.expiresAt };
+  return linkStatusFor(rows[0] ?? null, now);
 }
 
 /**

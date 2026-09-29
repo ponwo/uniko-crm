@@ -72,6 +72,7 @@ superficies en 404 y termina. Con la agenda apagada, las cinco en 404.
 | `AGENDA=on` sin `GOOGLE_OAUTH_*` | **217/217** | 5/5 superficies en 404; el conector manual de la 015 sigue verde |
 | sin `AGENDA` | **169/169** | 5/5 superficies en 404 |
 | **2026-09-28, permiso `calendar.events.owned`** (research D6): `AGENDA=on` + app de agencia contra los mocks | **253/253** | 41/41: lo anterior, más a Google se le pide `calendar.events.owned` y un calendario destino ajeno termina en `prueba_fallida` con la conexión previa y su calendario intactos |
+| **2026-09-29, abrir el link desde la pantalla** (FR-1429): `AGENDA=on` + app de agencia contra los mocks | **254/254** | 42/42: lo anterior, más el `GET` del link con `usedAt` nulo mientras está pendiente, con fecha tras usarse, y nulo tras revocar |
 
 En la revisión del 2026-09-28 no se repitieron las dos configuraciones sin app de
 agencia: el cambio no toca esas superficies (siguen en 404), y el conector manual
@@ -89,6 +90,44 @@ Después, la tarjeta de Google aparece sola (el conector quedó en Google) y
 «Probar» dice «Conexión correcta — calendario «Calendario de prueba»». Sin
 errores de consola. En móvil (375 px) la tarjeta se lee bien; el campo del link
 recibió `min-w-0` para no empujar el botón fuera de la tarjeta.
+
+**Recorrido del 2026-09-29 (FR-1429)**, con la primera configuración, sin y con
+`GOOGLE_ONBOARDING_URL`:
+
+- Tras *Generar link*: *Conectar mi calendario* junto a *Copiar*, con `href`
+  igual al link, `target=_blank` y `rel="noopener noreferrer"`. Aviso sin página
+  de aterrizaje: «Se abre Google en otra pestaña para que autorices con la cuenta
+  que elijas: esa es la que recibirá las citas. Si el calendario es de otra
+  persona, mándale el link.» Con
+  `GOOGLE_ONBOARDING_URL=https://lanco.cloud/google-calendar`: «Se abre
+  lanco.cloud en otra pestaña y de ahí Google te pide permiso…», y el enlace va
+  a `lanco.cloud/google-calendar?i=localhost:3000&t=…` (llave de 43).
+- El panel del navegador de vista previa ignora `target=_blank` y abrió el link en
+  la misma pestaña, que terminó en «conectado» (con el cliente de la agencia y
+  `usedAt` guardado). La vuelta se probó con dos pestañas:
+  - el link se generó en la primera, con la conexión borrada antes, y se usó en
+    la segunda: «Listo: tu calendario quedó conectado — Calendario de prueba»;
+  - en la primera, el evento de volver, `visibilitychange` y `focus` a la vez
+    como al cambiar de pestaña, se atendió **una vez**: un `GET` del link y una
+    relectura de la conexión. El link desaparece y sale «Listo: Google quedó
+    conectado. «Probar» te dice qué calendario.». La tarjeta pasa de *Conectar*
+    a *Actualizar*/*Desconectar* con el cliente de la agencia, aparece «Último
+    link: usado el 29 sep 2026, 2:23 p.m.», y *Probar* da «Conexión correcta —
+    calendario «Calendario de prueba»».
+- Volver sin haberlo usado: el link sigue a la vista. Revocarlo desde otra sesión
+  y volver: «Ese link ya no sirve.», sin «Último link» (un revocado no pasa por
+  usado).
+- El texto del link pendiente decía «vence el … p.m.. Si…», porque la fecha en
+  es-MX ya termina en punto. Ahora dice «Hay un link pendiente (vence el 2 oct
+  2026, 2:25 p.m.). Si lo perdiste…».
+- En móvil (375 px), el botón y el aviso caben en la tarjeta, sin scroll
+  horizontal. En la consola, solo los cortes de la conexión en tiempo real al
+  reiniciar el servidor.
+- Después del recorrido se agregó un resguardo contra una carrera: si al volver a
+  la pestaña se pulsa *Generar otro* antes de que responda la consulta, esa
+  respuesta vieja se descarta. Sin ese resguardo borraría de la pantalla el link
+  nuevo, que solo se ve una vez. Los caminos recorridos no cambian; el gate
+  completo salió en verde después del cambio.
 
 ## 4. Ensayo del Principio X (toca `drizzle/`)
 

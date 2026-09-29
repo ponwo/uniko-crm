@@ -29,7 +29,7 @@ eligen con `mock_decision` en la URL de Google.
 
 1. El dueño genera un link: **201**, llave opaca de 43 caracteres, vence a las
    72 horas. `GET` del link muestra el pendiente y su vencimiento, **nunca la
-   llave**.
+   llave**, y `usedAt` nulo.
 2. Un miembro que no es dueño ve la sección sin poder manejarla y recibe **403**
    al generar o revocar.
 3. Recorrido sin sesión: inicio → Google (mock) → relevo (mock) → retorno →
@@ -43,8 +43,25 @@ eligen con `mock_decision` en la URL de Google.
    nombra el calendario; la agenda quedó entregando por Google.
 6. Una cita por la API de servicio crea su evento con Meet en el mock — y el
    contador del relevo **no se mueve**: la operación no pasa por `lanco.cloud`.
-7. El mismo link otra vez → `link_usado`, y ya no hay link pendiente.
+7. El mismo link otra vez → `link_usado`, y ya no hay link pendiente; el `GET`
+   dice cuándo se usó (`usedAt`).
 8. `/conectar-google?estado=<script>…` muestra el mensaje genérico, sin eco.
+
+### En la pantalla: abrir el link ahí mismo (FR-1429)
+
+Lo recorre el navegador de vista previa (el arnés no conduce la pantalla):
+
+1. *Ajustes → Agenda → Google Calendar + Meet → Generar link*: junto al link y
+   *Copiar*, **Conectar mi calendario** con su aviso: «Se abre `lanco.cloud` en
+   otra pestaña…» con página de aterrizaje, «Se abre Google…» sin ella. Es un
+   enlace a otra pestaña (`target=_blank`, `rel="noopener noreferrer"`).
+2. En la otra pestaña, el recorrido termina en «quedó conectado».
+3. De vuelta en la primera pestaña, sin recargar: el link desaparece, la sección
+   dice «Listo: Google quedó conectado», la tarjeta muestra la conexión
+   (*Actualizar*, *Desconectar*) y *Probar* nombra el calendario. Al recargar:
+   «Último link: usado el…».
+4. Si en la otra pestaña se cancela en Google, al volver el link sigue a la
+   vista: sigue sirviendo.
 
 ## US2 — Si algo sale mal, nada se rompe
 
@@ -76,7 +93,8 @@ conexión previa.
 ## US3 — El operador controla sus links
 
 1. Generar otro invalida el anterior (`link_invalido`).
-2. Revocar el pendiente → `revoked: 1`, y ese link queda `link_invalido`.
+2. Revocar el pendiente → `revoked: 1`, y ese link queda `link_invalido`; el
+   `GET` no lo toma por usado (`usedAt` nulo).
 3. Desconectar Google no revive un link usado: sigue `link_usado` (FR-1409).
 
 ## US4 — El relevo solo reenvía dentro de la flota
