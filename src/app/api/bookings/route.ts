@@ -1,14 +1,28 @@
 import { z } from "zod";
 import { parseBody, withAuth } from "@/lib/api";
 import { agendaDisabledResponse, agendaEnabled } from "@/server/agenda/flag";
-import { listBookings } from "@/server/agenda/queries";
+import {
+  listBookings,
+  listContactBookings,
+  upcomingBookings,
+} from "@/server/agenda/queries";
 import { createBlock, createSessionBooking } from "@/server/agenda/service";
 import { bookingErrorResponse, bookingPayload } from "@/server/agenda/http";
 
 export const dynamic = "force-dynamic";
 
-export const GET = withAuth(async (session) => {
+/**
+ * Sin parámetros: todo, para la página de Citas. Con `?contactId=`: las citas
+ * PRÓXIMAS de ese contacto, para la sección «Cita» del panel de la
+ * conversación (030, FR-1502).
+ */
+export const GET = withAuth(async (session, req: Request) => {
   if (!agendaEnabled()) return agendaDisabledResponse();
+  const contactId = new URL(req.url).searchParams.get("contactId");
+  if (contactId) {
+    const all = await listContactBookings(session.organizationId, contactId);
+    return Response.json({ bookings: upcomingBookings(all, new Date()) });
+  }
   const bookings = await listBookings(session.organizationId);
   return Response.json({ bookings });
 });
