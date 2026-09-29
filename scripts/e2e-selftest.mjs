@@ -1045,6 +1045,8 @@ async function agendaChecks() {
     "/api/calendar/settings",
     "/api/calendar/availability",
     "/api/bookings",
+    // 030: las próximas de un contacto, para la sección «Cita» del panel.
+    "/api/bookings?contactId=ct_inexistente",
   ];
 
   if (!encendida) {
@@ -1787,6 +1789,8 @@ async function agendaChecks() {
       console.log("  (sin un día con huecos de sobra: se omite el check de «pide su hora»)");
     }
 
+    await citaManualChecks({ decir, outboxDe });
+
     await api("/api/agent/profile", {
       method: "PUT",
       body: JSON.stringify({ enabled: perfilAntes?.enabled ?? false }),
@@ -1800,6 +1804,174 @@ async function agendaChecks() {
   // `tests/unit/agenda-sandbox.test.ts`, que afirma lo que de verdad importa:
   // que el conector no se llama, ni al crear, ni al reprogramar, ni al
   // cancelar.
+}
+
+/* ============================================================
+ * 030 — La cita que agenda el operador desde la conversación
+ * (specs/030-cita-manual-desde-conversacion, tests/e2e/us-cita-manual.md)
+ *
+ * La API del operador es la que usa la sección «Cita» del panel. Lo que este
+ * bloque sostiene de punta a punta es la razón de ligar la cita a la
+ * conversación: el agente la ve como CITA ACTUAL y, si el cliente pide otra
+ * hora, MUEVE esa misma cita en vez de reservar una segunda. Corre dentro del
+ * tramo del agente de la 015, que lo deja encendido y presta `decir`.
+ * ============================================================ */
+async function citaManualChecks({ decir, outboxDe }) {
+  console.log("\n== 030: la cita que agenda el operador desde la conversación ==");
+  const LEAD_M = "5214627015030";
+  const NOMBRE = "Lead cita manual";
+  const deM = (path) => api(`/api/bookings?contactId=${path}`);
+
+  const saludo = await decir(LEAD_M, "Hola, buenas tardes", "030-1", NOMBRE);
+  const convM = ((await api("/api/conversations")).json?.conversations ?? []).find(
+    (c) => c.contact?.name === NOMBRE
+  );
+  ok(
+    "030: (preparación) la conversación del contacto existe",
+    Boolean(convM?.id && convM?.contact?.id),
+    JSON.stringify({ saludo, conversacion: convM?.id })
+  );
+  if (!convM) return;
+  const contactoM = convM.contact.id;
+
+  const sinCita = await deM(contactoM);
+  ok(
+    "030: sin cita, las próximas del contacto vienen vacías",
+    sinCita.res.ok && (sinCita.json?.bookings ?? []).length === 0,
+    JSON.stringify(sinCita.json)
+  );
+  const inexistente = await deM("ct_inexistente");
+  ok(
+    "030: un contacto que no es de esta organización da la lista vacía (FR-1509)",
+    inexistente.res.ok && (inexistente.json?.bookings ?? []).length === 0,
+    JSON.stringify(inexistente.json)
+  );
+
+  /* -- Agendar desde el panel -- */
+  const huecoM = ((await api("/api/calendar/availability")).json?.slots ?? [])[0];
+  const salidasAntes = (await outboxDe(LEAD_M)).length;
+  const manual = await api("/api/bookings", {
+    method: "POST",
+    body: JSON.stringify({
+      kind: "session",
+      contactId: contactoM,
+      conversationId: convM.id,
+      startUtc: huecoM?.startUtc,
+      notes: "Agendada desde el panel",
+    }),
+  });
+  const idM = manual.json?.booking?.id;
+  ok(
+    "030: el operador agenda desde la conversación (201)",
+    manual.res.status === 201 && Boolean(idM),
+    JSON.stringify(manual.json)
+  );
+  const proximas = (await deM(contactoM)).json?.bookings ?? [];
+  ok(
+    "030: aparece entre las próximas del contacto: manual, ligada a la conversación, con su nota",
+    proximas.length === 1 &&
+      proximas[0]?.id === idM &&
+      proximas[0]?.source === "manual" &&
+      proximas[0]?.conversationId === convM.id &&
+      proximas[0]?.notes === "Agendada desde el panel" &&
+      proximas[0]?.scheduledAtUtc === huecoM?.startUtc,
+    JSON.stringify(proximas)
+  );
+  ok(
+    "030: las próximas del contacto no traen citas de otros contactos",
+    proximas.every((b) => b.contact?.id === contactoM),
+    JSON.stringify(proximas.map((b) => b.contact))
+  );
+  await sleep(1500);
+  ok(
+    "030: agendar desde el panel no le manda nada al contacto (FR-1506)",
+    (await outboxDe(LEAD_M)).length === salidasAntes,
+    `antes=${salidasAntes}`
+  );
+
+  /* -- El agente la ve: pedir otra hora la MUEVE -- */
+  // Sin «tienes», «tienen» ni «hay»: con INVENTARIO encendido, el ai-mock lee
+  // esas palabras como una consulta de existencias.
+  const reoferta = await decir(LEAD_M, "Quiero cambiar mi cita, ¿me pasas los horarios?", "030-2", NOMBRE);
+  ok(
+    "030: al pedir el cambio, el agente ofrece horarios",
+    typeof reoferta.text === "string" && reoferta.text.includes("•"),
+    JSON.stringify(reoferta)
+  );
+  // La hora se toma del menú que el agente enseñó: así está, seguro, entre lo
+  // ofrecido en esta conversación, que es lo único que el motor deja mover.
+  const pedida = (reoferta.text ?? "")
+    .split("\n")
+    .map((l) => l.match(/a las (\d{2}:\d{2})/)?.[1])
+    .find((h) => h && h !== huecoM?.time);
+  if (pedida) {
+    const movida = await decir(LEAD_M, `Sí, a las ${pedida}`, "030-3", NOMBRE);
+    ok(
+      "030: el agente MUEVE la cita manual en vez de reservar otra",
+      typeof movida.text === "string" && /la mov[íi]/i.test(movida.text),
+      JSON.stringify({ pidio: pedida, movida })
+    );
+    const trasAgente = (await deM(contactoM)).json?.bookings ?? [];
+    ok(
+      "030: …sigue siendo UNA sola cita, la misma, a la hora pedida",
+      trasAgente.length === 1 &&
+        trasAgente[0]?.id === idM &&
+        trasAgente[0]?.time === pedida &&
+        trasAgente[0]?.scheduledAtUtc !== huecoM?.startUtc,
+      JSON.stringify({ pedida, trasAgente })
+    );
+  } else {
+    console.log("  (el menú no trajo otra hora: se omite el cambio por el agente)");
+  }
+
+  /* -- Mover y cancelar desde el panel -- */
+  const actual = ((await deM(contactoM)).json?.bookings ?? [])[0];
+  const destino = ((await api("/api/calendar/availability")).json?.slots ?? []).find(
+    (s) => s.startUtc !== actual?.scheduledAtUtc
+  );
+  const salidasAntesOperador = (await outboxDe(LEAD_M)).length;
+  const mover = await api(`/api/bookings/${idM}`, {
+    method: "PATCH",
+    body: JSON.stringify({ action: "reschedule", startUtc: destino?.startUtc }),
+  });
+  const trasMover = (await deM(contactoM)).json?.bookings ?? [];
+  ok(
+    "030: el operador la mueve a otro hueco libre",
+    mover.res.ok && trasMover.length === 1 && trasMover[0]?.scheduledAtUtc === destino?.startUtc,
+    JSON.stringify({ status: mover.res.status, trasMover })
+  );
+  const tomado = await api("/api/bookings", {
+    method: "POST",
+    body: JSON.stringify({
+      kind: "session",
+      contactId: contactoM,
+      conversationId: convM.id,
+      startUtc: destino?.startUtc,
+    }),
+  });
+  ok(
+    "030: agendar en un hueco ya tomado → 409 slot_taken, sin cita nueva (FR-1508)",
+    tomado.res.status === 409 &&
+      tomado.json?.error?.code === "slot_taken" &&
+      ((await deM(contactoM)).json?.bookings ?? []).length === 1,
+    JSON.stringify(tomado.json)
+  );
+  const cancelar = await api(`/api/bookings/${idM}`, {
+    method: "PATCH",
+    body: JSON.stringify({ action: "cancel" }),
+  });
+  const trasCancelar = (await deM(contactoM)).json?.bookings ?? [];
+  ok(
+    "030: cancelada, deja de aparecer entre las próximas",
+    cancelar.res.ok && trasCancelar.length === 0,
+    JSON.stringify(trasCancelar)
+  );
+  await sleep(1000);
+  ok(
+    "030: mover y cancelar desde el panel tampoco le mandan nada (FR-1506)",
+    (await outboxDe(LEAD_M)).length === salidasAntesOperador,
+    `antes=${salidasAntesOperador}`
+  );
 }
 
 main().catch((err) => {

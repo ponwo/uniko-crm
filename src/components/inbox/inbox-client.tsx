@@ -176,6 +176,9 @@ export function InboxClient({ channels }: { channels: readonly Channel[] }) {
       // El agente movió de etapa o cambió el handoff: refresca el panel en vivo.
       setDetailRev((v) => v + 1);
     },
+    // 030 — Se agendó, movió o canceló una cita (la IA, Citas u otra pestaña):
+    // la sección «Cita» del panel se entera por este mismo SSE (FR-1507).
+    onBookingUpdated: () => setDetailRev((v) => v + 1),
     // Catch-up tras reconexión (contrato sse.md): refetch completo.
     //
     // Devuelve la promesa a propósito: el hook la espera para no retirar el
