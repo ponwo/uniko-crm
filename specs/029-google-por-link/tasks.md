@@ -189,7 +189,7 @@ dice y la tarjeta muestra la conexión nueva.
 - [X] T066 Arnés: `usedAt` nulo con el link pendiente, con fecha tras usarse y nulo tras revocar en `scripts/e2e-selftest.mjs`; guion en `tests/e2e/us-google-por-link.md`
 - [X] T067 [P] spec (revisión, actores, US1, FR-1422, FR-1429), `contracts/api.md`, `plan.md`; guía del operador (§1, guion del video) y estado de la verificación (marca verificada el 2026-09-29, logo al final) en `docs/google-agencia.md`
 - [X] T068 Gate técnico, arnés completo y recorrido en el navegador de vista previa (sin y con página de aterrizaje); registro en `specs/029-google-por-link/quickstart.md`
-- [ ] T069 PR; tras el merge (señal del dueño), en uniko-lanco: el botón y su aviso con `lanco.cloud` (sin pulsar *Continuar con Google*)
+- [X] T069 PR; tras el merge (señal del dueño), en uniko-lanco: el botón y su aviso con `lanco.cloud` (sin pulsar *Continuar con Google*) — ponwo/uniko-crm#48 (`284c925`), verificada el 2026-09-29 (quickstart §3)
 
 ---
 

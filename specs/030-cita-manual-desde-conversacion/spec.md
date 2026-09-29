@@ -4,7 +4,7 @@
 
 **Created**: 2026-09-29
 
-**Status**: Implementada y verificada en local (2026-09-29)
+**Status**: Implementada; verificada en local y **en vivo en uniko-lanco** (2026-09-29)
 
 **Carril**: **ligero** (`spec.md` únicamente). No toca el modelo de datos —sin
 migración: una cita manual es la misma fila de `booking` que ya crea la 015— ni un
@@ -247,6 +247,27 @@ moví!»), la misma y sin reservar una segunda.
 **SC-004**: reiniciada con `AGENDA=off`, el panel muestra Detalles, Etapa, Ficha y
 Notas, sin «Cita», y `GET /api/bookings?contactId=…` responde 404. La ruta está también
 en la lista de superficies que el arnés comprueba en 404 con la bandera apagada.
+
+### En vivo — uniko-lanco en `3e8c924` (2026-09-29)
+
+1. **Despliegue**: ponwo/uniko-crm#50 mergeada, `/api/health` 10/10 en `3e8c924`.
+2. **La sección, sin tocar nada** (sesión del dueño en su Chrome):
+   - en la conversación de «Gerardo Parra» aparece «Cita» entre la etapa y la ficha,
+     con «Sin cita próxima» y *Agendar cita*;
+   - el selector trae el horario real de LanCo: de lunes a viernes, y el primer día
+     con horas de 09:00 a 15:30;
+   - se cerró sin agendar.
+3. **La prueba real la hizo el dueño**, desde la conversación de su contacto «Gera
+   Pm», con Google Calendar conectado de verdad: **agendó, movió y canceló**. Lo que
+   quedó en la instancia:
+   - una cita `manual` (`bk_r2bt…`), **ligada a esa conversación**;
+   - entregada por el conector `google`, con Meet real
+     `meet.google.com/yef-ugws-uzc` y sin enlace pendiente;
+   - su última hora fue el miércoles 30 de septiembre a las 14:00, ya movida;
+   - quedó `cancelada`, y el contacto no tiene citas próximas.
+4. **El log de la instancia**, desde el arranque de ese despliegue, trae solo el
+   arranque: ninguna advertencia de la agenda ni de Google al crear, mover y borrar
+   el evento.
 
 ---
 
