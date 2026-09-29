@@ -172,6 +172,27 @@ calendario destino conservado que no es de quien autoriza termina en
 
 ---
 
+## Phase 11: Abrir el link desde la pantalla (revisión 2026-09-29, FR-1429)
+
+**Goal**: quien tiene el calendario y está frente a *Ajustes* lo conecta sin copiar el
+link a otro navegador, sabiendo que lo lleva a `lanco.cloud`; al volver, la pantalla
+ya refleja la conexión.
+
+**Independent Test**: arnés — el `GET` del link dice cuándo se usó el más reciente y
+no toma un revocado por usado; navegador de vista previa — generar → *Conectar mi
+calendario* abre otra pestaña que termina en «conectado» → de vuelta, la sección lo
+dice y la tarjeta muestra la conexión nueva.
+
+- [X] T063 `linkStatusFor` (pura) y `googleLinkStatus` en lugar de `pendingGoogleLink` en `src/server/agenda/connectors/google-link.ts`; `usedAt` en el `GET` de `src/app/api/settings/google/link/route.ts`
+- [X] T064 [P] Unitarios de `linkStatusFor` (sin links, pendiente, usado aunque vencido, revocado o vencido sin usar) en `tests/unit/google-link.test.ts`
+- [X] T065 *Conectar mi calendario*: enlace a otra pestaña (`noopener noreferrer`) con el aviso del sitio al que lleva; al volver a la pestaña con el link a la vista, usado → lo dice y la tarjeta relee la conexión, dejó de servir → lo dice; «Último link: usado el…» (y sin «p.m..» en el del link pendiente) en `src/components/settings/google-link-section.tsx`; `loadConnection` reutilizable en `src/components/settings/connector-credentials.tsx`; `buttonVariants` exportado en `src/components/ui/button.tsx`
+- [X] T066 Arnés: `usedAt` nulo con el link pendiente, con fecha tras usarse y nulo tras revocar en `scripts/e2e-selftest.mjs`; guion en `tests/e2e/us-google-por-link.md`
+- [X] T067 [P] spec (revisión, actores, US1, FR-1422, FR-1429), `contracts/api.md`, `plan.md`; guía del operador (§1, guion del video) y estado de la verificación (marca verificada el 2026-09-29, logo al final) en `docs/google-agencia.md`
+- [X] T068 Gate técnico, arnés completo y recorrido en el navegador de vista previa (sin y con página de aterrizaje); registro en `specs/029-google-por-link/quickstart.md`
+- [ ] T069 PR; tras el merge (señal del dueño), en uniko-lanco: el botón y su aviso con `lanco.cloud` (sin pulsar *Continuar con Google*)
+
+---
+
 ## Dependencies & Execution Order
 
 - **Setup (T001–T004)** → **Foundational (T005–T015)** → historias.

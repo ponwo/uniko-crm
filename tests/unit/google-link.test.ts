@@ -23,6 +23,7 @@ const {
   hashLinkToken,
   linkCheckFor,
   linkState,
+  linkStatusFor,
 } = await import("@/server/agenda/connectors/google-link");
 
 const T0 = new Date("2026-09-27T12:00:00.000Z");
@@ -60,6 +61,36 @@ describe("029 — el estado de un link en el tiempo", () => {
       motivo: "link_invalido",
     });
     expect(linkCheckFor(null, horas(1))).toEqual({ ok: false, motivo: "link_invalido" });
+  });
+});
+
+describe("029 — lo que la pantalla sabe del link más reciente (FR-1408, FR-1429)", () => {
+  const conFecha = { ...base, createdAt: T0 };
+
+  it("sin links: nada pendiente ni usado", () => {
+    expect(linkStatusFor(null, horas(1))).toEqual({ pending: null, usedAt: null });
+  });
+
+  it("pendiente: cuándo se creó y cuándo vence, sin usar", () => {
+    expect(linkStatusFor(conFecha, horas(1))).toEqual({
+      pending: { createdAt: T0, expiresAt: base.expiresAt },
+      usedAt: null,
+    });
+  });
+
+  it("usado: cuándo, aunque ya haya pasado su vencimiento", () => {
+    expect(linkStatusFor({ ...conFecha, usedAt: horas(2) }, horas(100))).toEqual({
+      pending: null,
+      usedAt: horas(2),
+    });
+  });
+
+  it("revocado o vencido sin usar: ni pendiente ni usado", () => {
+    expect(linkStatusFor({ ...conFecha, revokedAt: horas(1) }, horas(2))).toEqual({
+      pending: null,
+      usedAt: null,
+    });
+    expect(linkStatusFor(conFecha, horas(73))).toEqual({ pending: null, usedAt: null });
   });
 });
 

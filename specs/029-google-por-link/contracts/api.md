@@ -12,12 +12,15 @@ configuradas (FR-1401). 404 y no 403: si no está encendida, la superficie no ex
 ### `GET /api/settings/google/link`
 
 ```json
-200 { "canManage": true, "pending": { "createdAt": "…", "expiresAt": "…" } }
-200 { "canManage": false, "pending": null }
+200 { "canManage": true, "pending": { "createdAt": "…", "expiresAt": "…" }, "usedAt": null }
+200 { "canManage": false, "pending": null, "usedAt": "…" }
 ```
 
 `canManage` = el rol es `owner`. `pending` = el link vigente de la organización, sin la
-llave (FR-1408). La pantalla usa el 404 para no mostrar la sección.
+llave (FR-1408). `usedAt` = cuándo se usó el link más reciente, o `null` si no se usó
+(pendiente, revocado o vencido): usarse y guardar la conexión son una sola
+transacción, así que la pantalla que lo abrió sabe al volver que quedó conectado
+(FR-1429). La pantalla usa el 404 para no mostrar la sección.
 
 ### `POST /api/settings/google/link`
 

@@ -28,6 +28,12 @@ llamaba `agendamiento-lanco`); (3) la app se llama **«LanCo Agenda»** en la pa
 de permisos de Google; (4) la **verificación de Google se prepara ya** y se envía
 cuando el flujo funcione (el video de demostración lo exige).
 
+**Revisión 2026-09-29** (dueño, antes de grabar el video de la verificación):
+*"¿no es mejor que cuando se genere el link tenga un botón que diga conectar con
+LanCo Agenda o algo así, en lugar de tener que copiar el link a un navegador
+manualmente? Pero que sí haga la mención de que se redireccionará a lanco.cloud"*
+→ FR-1429.
+
 ## Contexto de negocio
 
 Conectar Google Calendar hoy exige que el negocio cree su propio proyecto en Google
@@ -61,7 +67,9 @@ El camino manual actual (la app propia del negocio) **no cambia** y sigue siendo
 ## Actores
 
 - **Operador**: el equipo de LanCo, con rol **dueño** en la cuenta de Uniko del
-  negocio. Genera el link y se lo manda al titular por su canal habitual.
+  negocio. Genera el link y se lo manda al titular por su canal habitual — o, si
+  el calendario es suyo o está frente a la computadora del titular, lo abre ahí
+  mismo.
 - **Titular del calendario**: la persona cuya cuenta de Google recibirá las citas. No
   necesita cuenta en Uniko ni conocimientos técnicos.
 - **Página de LanCo** (`lanco.cloud`): aterrizaje con la marca de LanCo que explica lo
@@ -90,7 +98,8 @@ conexión quedó guardada, que "Probar" pasa y que una cita crea su evento.
 
 1. **Given** la agenda encendida y la app de agencia configurada, **When** el dueño
    pulsa *Generar link*, **Then** recibe un link que la pantalla describe como de un
-   solo uso y con vencimiento a las 72 horas, con un botón para copiarlo.
+   solo uso y con vencimiento a las 72 horas, con un botón para copiarlo y otro para
+   abrirlo ahí mismo que dice a qué sitio lleva.
 2. **Given** un link vigente, **When** el titular lo recorre sin sesión en Uniko y
    autoriza en Google, **Then** la instancia guarda la conexión cifrada, verifica que
    funciona contra Google y le muestra al titular "conectado" con el nombre del
@@ -102,6 +111,9 @@ conexión quedó guardada, que "Probar" pasa y que una cita crea su evento.
    ningún secreto ni token (solo los últimos 4 del secreto, como hoy).
 5. **Given** un link ya usado con éxito, **When** alguien lo abre otra vez — aunque
    después se haya desconectado Google —, **Then** ve que ya se usó y nada cambia.
+6. **Given** un link recién generado, **When** el dueño lo abre desde la pantalla y
+   autoriza en la otra pestaña, **Then** al volver a *Ajustes* la pantalla dice que
+   Google quedó conectado y *Probar* prueba la conexión nueva, sin recargar.
 
 ---
 
@@ -349,9 +361,16 @@ redirect") en realidad también para el modo BYO.
 
 - **FR-1422**: La tarjeta de Google MUST mostrar, cuando la app de agencia está
   configurada, la sección del link por encima de la conexión manual, con: generar,
-  copiar, vencimiento, estado de link pendiente y revocar.
+  copiar, abrir ahí mismo (FR-1429), vencimiento, estado de link pendiente y
+  revocar.
 - **FR-1423**: *Probar* MUST mostrar el nombre del calendario conectado junto a
   "conexión correcta", en los dos caminos.
+- **FR-1429**: Junto al link recién generado, la sección MUST ofrecer abrirlo en otra
+  pestaña, diciendo a qué sitio lleva (la página de aterrizaje —`lanco.cloud` en la
+  flota de LanCo— o, sin ella, Google) y que la cuenta de Google que se elija es la
+  que recibirá las citas. Al volver a la pantalla con el link a la vista, MUST
+  reflejar sin recargar si ya se usó —y entonces releer la conexión— o si dejó de
+  servir. Sin link a la vista, MUST decir cuándo se usó el más reciente, si se usó.
 
 **`lanco.cloud` (repo `lanco-ws`)**
 

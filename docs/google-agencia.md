@@ -45,9 +45,9 @@ API ya está activada. En la
    - Dominio autorizado: `lanco.cloud` (ya está).
    - Contacto del desarrollador: `contacto@lanco.cloud` — ahí escribe Google
      durante las verificaciones.
-   - **Logo: no por ahora.** Con la app externa y en producción, subir el logo
-     la mete al trámite de verificación de marca, y la marca no se puede editar
-     mientras ese trámite está abierto (§5).
+   - **Logo: al final** (§5.2, paso 5). Subirlo manda la marca a revisión otra
+     vez, y con la marca en revisión no se puede editar ni pedir la verificación
+     del permiso.
 2. **Público (Audience)**: *Externo* y **En producción**. En modo prueba Google
    revoca el permiso a los 7 días y las citas se quedan sin enlace.
 3. **Acceso a los datos (Data access)**: un solo permiso,
@@ -94,9 +94,15 @@ API ya está activada. En la
    > *Avanzado* → *Ir a LanCo Agenda*. Ábrelo en Chrome o Safari, no dentro de
    > Instagram o Facebook. {link}
 
+   Si el calendario es tuyo, o estás frente a la computadora del titular, no
+   hace falta copiarlo: *Conectar mi calendario* lo abre ahí mismo en otra
+   pestaña (pasa por `lanco.cloud`) y conecta **la cuenta de Google que se elija
+   ahí**. Al volver a *Ajustes*, la sección dice si quedó conectado.
 6. **Comprueba.** *Ajustes → Agenda → Probar* debe decir «Conexión correcta —
    calendario «…»». En el calendario principal, ese nombre es el correo de la
-   cuenta: si no es la que esperabas, *Desconectar* y manda un link nuevo.
+   cuenta: si no es la que esperabas, *Desconectar* y manda un link nuevo. Sin
+   link a la vista, la sección dice «Último link: usado el…» cuando el
+   titular terminó.
 
 ## 2. Qué ve el titular
 
@@ -142,33 +148,46 @@ no restringido: no hay evaluación de seguridad de terceros.
 Son dos revisiones y van **en este orden**: Google no deja pedir la del permiso
 sin la marca publicada.
 
-**Estado al 2026-09-28** (consola revisada):
+**Estado al 2026-09-29** (consola revisada):
 
 - Search Console: `lanco.cloud` verificado como propiedad de dominio por
   `ponwo10@gmail.com`, propietario del proyecto ✓.
 - Página de la app (`lanco.cloud/google-calendar`) y sección 9 de
   `lanco.cloud/politica-privacidad`, con la declaración de uso limitado ✓.
-- **Revisión de marca en curso, manual**: la privacidad ya pasó (2026-09-28); la
-  página principal y los lineamientos de marca, en revisión. La consola calcula
-  de 4 a 6 semanas, con el primer correo en 3 a 5 días.
+- **Marca verificada el 2026-09-29** ✓ (revisión manual de un día; la consola
+  calculaba de 4 a 6 semanas).
+- **Permiso: sin pedir todavía.** El *Centro de verificación* dice «No se
+  requiere la verificación» solo porque aún no hay permisos declarados en
+  *Acceso a los datos*; al declararlo, la pide (§5.2).
 
-### 5.1 Mientras revisan la marca
+### 5.1 La marca
 
-- **No tocar *Información de la marca*.** No se puede editar durante la
-  revisión: habría que cancelarla. Eso incluye el logo.
+- **No tocar *Información de la marca*** (nombre, URLs, dominios, logo):
+  cualquier cambio la manda a revisión otra vez, y con la marca en revisión no
+  se puede editar ni pedir la verificación del permiso.
 - Vigilar `contacto@lanco.cloud` (el contacto del desarrollador; también el
   spam) y `ponwo10@gmail.com`. Google escribe ahí, y se le contesta en el mismo
   hilo.
-- Grabar el video (§5.3) con el permiso definitivo ya desplegado.
 
-### 5.2 Cuando la marca quede publicada
+### 5.2 El permiso, y el logo al final
 
-1. *Acceso a los datos* → *Agregar o quitar permisos* →
-   `https://www.googleapis.com/auth/calendar.events.owned` → Guardar.
-2. *Centro de verificación* → pedir la verificación del acceso a los datos, con
-   la justificación (§5.4) y el link del video.
-3. Al aprobarse: `APP_VERIFICADA = true` en `modules/googleCalendar.ts` de
+1. Grabar el video (§5.3) y subirlo a YouTube como **No listado** (uno privado
+   no lo pueden ver los revisores).
+2. *Acceso a los datos* → *Agregar o quitar permisos* →
+   `https://www.googleapis.com/auth/calendar.events.owned` (si no aparece en la
+   tabla, en *Agregar permisos manualmente*) → *Actualizar* → *Guardar*. Queda
+   en «Tus permisos sensibles». Si esa página pide ahí mismo la justificación o
+   el video, van la §5.4 y el link.
+3. *Centro de verificación* → pedir la verificación del acceso a los datos, con
+   la justificación (§5.4) y el link del video. Es sensible, no restringido: no
+   hay evaluación de seguridad.
+4. Al aprobarse: `APP_VERIFICADA = true` en `modules/googleCalendar.ts` de
    `lanco-ws` (quita el aviso de la página) y desplegar el sitio.
+5. **El logo, opcional y al final**: cuadrado de 120×120 px, PNG, JPG o BMP,
+   máximo 1 MB; el de LanCo, sin nada que se parezca a los logos de Google (ni
+   al ícono de Google Calendar). Manda la marca a una revisión más, y la app
+   sigue funcionando mientras tanto: la prueba en vivo del 2026-09-28 se hizo
+   con la marca en revisión.
 
 ### 5.3 El video de demostración
 
@@ -180,18 +199,24 @@ permiso en detalle.
 - Poner en inglés la cuenta de Google del titular mientras se graba (p. ej.
   `lanco.dmd@gmail.com`), y quitarle antes el acceso a LanCo Agenda para que el
   recorrido salga completo.
+- Antes del consentimiento sale «Google hasn't verified this app»: es normal
+  mientras no aprueben el permiso. *Advanced → Go to LanCo Agenda (unsafe)*, en
+  cámara.
 - En la pantalla de consentimiento, hacer clic en la barra de direcciones para
   que se lea el `client_id`.
 - Subtítulos en inglés en cada paso: Uniko está en español.
 - Se graba con Win+Shift+R (Recortes) u OBS.
+- **El paso 8 de verdad deja a uniko-lanco sin Google**: las citas reales dejan
+  de crear su evento. Al terminar, reconectar con un link nuevo — o mostrar el
+  botón sin pulsarlo.
 
 | # | Qué se ve | Subtítulo |
 |---|---|---|
 | 1 | Uniko → *Ajustes → Agenda → Generar link* | The business owner generates a one-time link in Uniko, their WhatsApp CRM. |
-| 2 | El link abre la página de `lanco.cloud` → *Continuar con Google* | The calendar owner opens the link. The page explains what LanCo Agenda will access. |
-| 3 | Elegir la cuenta; la pantalla de consentimiento completa; clic en la barra de direcciones; aceptar | Google's consent screen: LanCo Agenda requests a single permission. The OAuth client ID is visible in the address bar. |
+| 2 | *Conectar mi calendario* → se abre la página de `lanco.cloud` → *Continuar con Google* | The calendar owner opens the link (here, straight from Uniko). The page on lanco.cloud explains what LanCo Agenda will access. |
+| 3 | Elegir la cuenta; «Google hasn't verified this app» → *Advanced*; la pantalla de consentimiento completa; clic en la barra de direcciones; aceptar | Google's consent screen: LanCo Agenda requests a single permission. The OAuth client ID is visible in the address bar. |
 | 4 | La página «calendario conectado» | Connected. The grant is stored encrypted on the business's own CRM server. |
-| 5 | *Ajustes → Agenda → Probar* | The connection check reads only the calendar's name. |
+| 5 | De vuelta en *Ajustes → Agenda*: «Listo: Google quedó conectado» → *Probar* | The connection check reads only the calendar's name. |
 | 6 | Agendar una cita (en Uniko o por WhatsApp con el asistente) → el evento con su Meet en Google Calendar | An appointment booked through WhatsApp creates an event with a Google Meet link in the owner's calendar. |
 | 7 | Moverla → el evento se mueve; cancelarla → el evento desaparece | Rescheduling moves the event. Cancelling deletes it. |
 | 8 | Cuenta de Google → *Seguridad → Apps de terceros* → LanCo Agenda → *Quitar acceso* | The owner can revoke access at any time from their Google Account. |
