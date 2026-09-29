@@ -146,7 +146,7 @@ arnés prueba que el relevo de pruebas se niega a reenviar fuera de su lista.
 - [X] T049 Gate técnico completo (`pnpm typecheck && pnpm lint && pnpm build && pnpm test`) desde `C:\G\gApps\LanCo\Uniko-CRM`
 - [X] T050 Arnés completo en base desechable con los mocks (quickstart §1–§3) y en la configuración sin app de agencia, más el recorrido en el navegador de vista previa de la sección de Ajustes (generar, copiar, revocar) y de la página de resultado (FR-1422, Principio IX); registrar resultados en `specs/029-google-por-link/quickstart.md`
 - [X] T051 `lanco-ws`: `npm run build` y recorrido en navegador (quickstart §5); rama y PR en `github.com/ponwo/lanco-ws`
-- [ ] T052 Ensayo del Principio X contra un respaldo real restaurado (quickstart §4) y registro en `specs/029-google-por-link/quickstart.md` — **fuera de orden**: la #42 se mergeó antes (2026-09-28) y la `0016` ya corrió limpia en uniko-lanco; sigue siendo requisito de la puerta de promoción a `production`
+- [X] T052 Ensayo del Principio X contra un respaldo real restaurado (quickstart §4) y registro en `specs/029-google-por-link/quickstart.md` — **fuera de orden**: la #42 se mergeó antes (2026-09-28) y la `0016` ya corrió limpia en uniko-lanco. Hecho el 2026-09-29 contra los respaldos de los dos clientes (ILTU y NuriaAndrea): aditiva medida, 0 filas tocadas, la app de `main` arrancó contra las dos copias
 - [X] T053 PR de Uniko con plan de reversión, enmienda a ratificar y checklist de verificación en vivo (quickstart §6)
 - [X] T054 Verificación en vivo en uniko-lanco con el dueño (quickstart §6) y registro en `specs/029-google-por-link/quickstart.md`
 
