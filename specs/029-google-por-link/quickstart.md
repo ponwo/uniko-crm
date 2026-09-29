@@ -129,6 +129,20 @@ recibió `min-w-0` para no empujar el botón fuera de la tarjeta.
   nuevo, que solo se ve una vez. Los caminos recorridos no cambian; el gate
   completo salió en verde después del cambio.
 
+**En vivo en uniko-lanco (`284c925`, 2026-09-29, T069).** Con ponwo/uniko-crm#48
+mergeada, `/api/health` dio 10/10 en el commit nuevo. En la sesión del dueño se
+hizo *Generar link* y apareció *Conectar mi calendario*:
+
+- lleva a `https://lanco.cloud/google-calendar` con `i` = el host de la instancia;
+- abre otra pestaña con `noopener noreferrer`;
+- el `href` es el mismo link que muestra el campo;
+- el aviso dice «Se abre lanco.cloud en otra pestaña y de ahí Google te pide
+  permiso…».
+
+No se pulsó *Continuar con Google*: eso queda para el video. El link se revocó
+enseguida y el `GET` volvió con `pending: null, usedAt: null` (el campo nuevo, en
+producción). La conexión de Google siguió intacta (`connected`, `primary`).
+
 ## 4. Ensayo del Principio X (toca `drizzle/`)
 
 Procedimiento: el de
