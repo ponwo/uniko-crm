@@ -161,13 +161,67 @@ select count(*) from google_credentials;                -- el mismo que antes
 Y que la app (build de producción, `pnpm start -p 3100`) arranque contra la copia con
 `/api/health` en `{"ok":true}`. Tirar la base y el volcado al terminar.
 
-**Registro**: **pendiente, y fuera de orden.** La PR #42 se mergeó el
-2026-09-28 (`6aff0d3`) antes del ensayo, que el Principio X pide ANTES de `main`.
-La migración ya corrió en uniko-lanco sin problema: `[migrate] migraciones
-aplicadas` en el log de arranque y `/api/health` 10/10 en `6aff0d3`. Es solo
-aditiva (una tabla nueva, vacía). Aun así, el ensayo con un respaldo real sigue
-siendo **requisito de la puerta de promoción a `production`**: se hace antes de
-llevar la 029 a los clientes, idealmente con el respaldo de uno de ellos.
+**Fuera de orden.** La PR #42 se mergeó el 2026-09-28 (`6aff0d3`) antes del
+ensayo, que el Principio X pide ANTES de `main`. La migración corrió en uniko-lanco
+sin problema (`[migrate] migraciones aplicadas`, `/api/health` 10/10). Aun así el
+ensayo con un respaldo real era **requisito de la puerta de promoción a
+`production`**, y se hizo antes de llevar la 029 a los clientes, con los respaldos
+de los dos.
+
+**Registro (2026-09-29, código de `main` en `0bf191e`):**
+
+- **Contra qué datos**: los respaldos de los **dos clientes**, que van en
+  `production` y por lo tanto **por detrás de la migración**. Contra LanCo no se
+  prueba nada: sigue `main` y ya tiene la `0016`. El dueño los bajó del panel de
+  Coolify: ejecuciones del 2026-09-29, «Back up now».
+  - **I Love The Universe**: `pg-dump-uniko-1790720650.dmp`, 22:24 UTC,
+    **110 593 bytes**;
+  - **NuriaAndrea**: `pg-dump-uniko-1790720608.dmp`, 22:23 UTC, **217 303 bytes**.
+
+  Los dos tamaños se verificaron byte a byte contra lo que reporta Coolify **antes**
+  de restaurar.
+- **Bases desechables** en el PostgreSQL 16 local: `uniko_ensayo_iltu_20260929` y
+  `uniko_ensayo_nuriaandrea_20260929`. Nunca `uniko_dev` ni una instancia.
+- **Restauración** limpia en las dos: 636 ms y 598 ms.
+  - ILTU: 26 conversaciones, 75 mensajes, 26 contactos.
+  - NuriaAndrea: 83 conversaciones, 1063 mensajes, 83 contactos.
+  - Las dos con **16 migraciones** en el diario de Drizzle (hasta la `0015`) y sin
+    `google_link`.
+- **`pnpm db:migrate`** desde un worktree en `0bf191e`, solo migraciones: código 0,
+  **3.1 s y 2.2 s** con el arranque de drizzle-kit incluido, y solo el ruido
+  esperado (`NOTICE` de `CreateSchemaCommand` y `transformCreateStmt`). La última
+  entrada del diario es el `sha256` de `0016_google_link.sql`.
+- **Aditiva, medido y no supuesto.** Inventario del esquema entero antes y después
+  (tablas con sus filas, columnas, índices, restricciones y diario), comparado
+  línea por línea. Idéntico en las dos bases:
+
+  | | Antes | Después |
+  |---|---|---|
+  | Tablas | 33 | 34 (`google_link`, vacía) |
+  | Columnas | 350 | 358 (las 8, todas de `google_link`) |
+  | Índices | 83 | 86 (llave primaria, `google_link_token_uq`, `google_link_org_idx`) |
+  | Restricciones | 92 | 95 |
+  | **Filas** | 214 / 1798 | **214 / 1798** |
+  | Diario de Drizzle | 16 | 17 |
+
+  De lo que existía no cambió **ninguna** línea del inventario, salvo el contador
+  del diario. Las 16 líneas nuevas son todas de `google_link` o del diario.
+  `google_credentials`: 0 filas antes y después en las dos, porque ningún cliente
+  tiene Google conectado.
+- **La app de `main` arrancó contra cada copia** (build de producción, `next start
+  -p 3100`): `/api/health` → `{"ok":true,"version":"1.0.0"}`. El manifiesto sirvió
+  la marca real de cada cliente: «I Love The Universe — CRM de WhatsApp»
+  (`#0fafff`) y «NuriaAndrea CRM — CRM de WhatsApp» (`#0d5bff`). En el log, solo el
+  aviso de Next por los dos lockfiles, que sale porque el worktree vive dentro del
+  repo y no pasa en el contenedor.
+- **Tirado todo**: las dos bases, con `dropdb --force`, y los volcados de la
+  carpeta temporal, más el de LanCo que también se había bajado. En el PostgreSQL
+  local no queda ninguna base `*ensayo*`, y en *Descargas* ningún `pg-dump`. Los
+  originales siguen en el VPS con la retención de Coolify (14 días).
+
+Lo que este ensayo no mide es el volumen, como advierte la 020. La migración solo
+crea una tabla vacía con sus índices y no toca filas existentes, así que su costo no
+crece con los datos del cliente.
 
 ## 5. `lanco.cloud` en local (repo `lanco-ws`)
 
