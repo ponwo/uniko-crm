@@ -126,6 +126,22 @@ export function ConversationList({
           <span className="font-mono text-[12px] text-text-3">{conversations.length}</span>
           {multiChannel && (
             <div className="ml-auto flex items-center gap-1">
+              {/* Volver a todas no puede depender de saber que se "des-pica"
+                  el canal activo: nadie lo descubre. Chip explícito. */}
+              <button
+                onClick={() => setInbox("all")}
+                aria-pressed={inbox === "all"}
+                title="Ver todas las bandejas"
+                className={cn(
+                  "flex items-center gap-1 rounded-full border px-2 py-[3px] text-[11.5px] font-medium transition-colors",
+                  inbox === "all"
+                    ? "border-brand bg-brand-veil text-foreground"
+                    : "text-text-3 hover:bg-accent"
+                )}
+              >
+                Todas
+                <span className="font-mono">{searched.length}</span>
+              </button>
               {channels.map((ch) => {
                 const on = inbox === ch;
                 return (
