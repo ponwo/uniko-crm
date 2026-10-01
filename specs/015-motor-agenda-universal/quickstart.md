@@ -184,3 +184,16 @@ de la puerta de promoción a `production`**, y se hizo antes de llevarla a ellos
 Lo que este ensayo no mide es el volumen, como advierte la 020. La migración solo
 agrega columnas: tres nullable sin default y una con default constante, que en
 PostgreSQL 11+ no reescribe la tabla. Su costo no crece con los datos del cliente.
+
+**PROMOVIDA a `production` en `ef4ccc0` el 2026-10-01** por señal del dueño («haz
+la promoción»), con la puerta completa: CI verde en las dos configuraciones para
+ese commit, LanCo corriendo `ef4ccc0`, uso real y self-test declarados por el dueño
+(su prueba en uniko-lanco), este ensayo, y la reversión declarada (redesplegar
+`bd0cb82`; el código viejo ignora las cuatro columnas). Viajaron 2 commits
+(`5244b3b` y el merge `ef4ccc0`), `bd0cb82..ef4ccc0` con `git push origin
+<sha>:refs/heads/production` (avance directo). `verify-fleet.sh` 3/3 en `ef4ccc0`,
+y `[migrate] migraciones aplicadas` en el arranque de ILTU y NuriaAndrea, sin
+errores. Durante el relevo, NuriaAndrea alternó un minuto entre el contenedor viejo
+y el nuevo; se dio por buena con cuatro lecturas seguidas en `ef4ccc0` y el
+despliegue de Coolify en `finished`. En los clientes la agenda sigue apagada:
+las columnas quedan inertes.
