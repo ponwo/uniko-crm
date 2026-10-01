@@ -808,6 +808,13 @@ export const calendarSettings = pgTable(
     connector: text("connector").notNull().default("enlace-fijo"),
     /** Sala fija del conector `enlace-fijo`; null ⇒ citas sin link. */
     meetingLink: text("meeting_link"),
+    /**
+     * `virtual` (con enlace) o `presencial` (sin enlace, con dirección). El
+     * default es lo que toda instancia hacía antes de existir la columna.
+     */
+    meetingMode: text("meeting_mode").notNull().default("virtual"),
+    /** Dirección del local para las citas presenciales; opcional. */
+    location: text("location"),
     createdAt: timestamp("created_at").notNull().defaultNow(),
     updatedAt: timestamp("updated_at").notNull().defaultNow(),
   },
@@ -860,6 +867,20 @@ export const booking = pgTable(
      * configuración: la cita es un hecho histórico, no una vista del presente.
      */
     meetingLink: text("meeting_link"),
+    /**
+     * Con qué modalidad NACIÓ la cita (`virtual` | `presencial`), copiada de
+     * la configuración como `connector`: si el negocio cambia de modalidad,
+     * las citas ya confirmadas no cambian de naturaleza — ni su reintento de
+     * enlace. null ⇒ cita anterior a la opción, que era virtual.
+     */
+    meetingMode: text("meeting_mode"),
+    /**
+     * La dirección que se le dio al cliente de una cita presencial. Se COPIA
+     * por la misma razón que el link: si el negocio se muda, la cita ya
+     * confirmada conserva a dónde se le dijo que fuera. null ⇒ cita virtual, o
+     * presencial sin dirección configurada.
+     */
+    location: text("location"),
     /**
      * El proveedor falló al crear la reunión. La cita existe igual —un tercero
      * caído no cuesta la conversión— y el operador reintenta desde "Citas".

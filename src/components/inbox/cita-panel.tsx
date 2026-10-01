@@ -32,6 +32,8 @@ type Booking = {
   weekday: string;
   meetingLink: string | null;
   linkPending: boolean;
+  meetingMode: "virtual" | "presencial";
+  location: string | null;
   isTest: boolean;
   notes: string | null;
 };
@@ -239,7 +241,11 @@ export function CitaPanel({
                 <span>{b.durationMinutes} min</span>
                 <Badge variant="secondary">{b.source === "ai" ? "Agendó la IA" : "Manual"}</Badge>
                 {b.isTest && <Badge variant="secondary">Prueba</Badge>}
+                {b.meetingMode === "presencial" && (
+                  <Badge variant="secondary">Presencial</Badge>
+                )}
               </div>
+              {b.location && <p className="text-xs text-text-2">{b.location}</p>}
               {b.meetingLink ? (
                 <a
                   href={b.meetingLink}

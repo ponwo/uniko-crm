@@ -14,8 +14,9 @@ import { Label } from "@/components/ui/label";
 import { cn } from "@/lib/utils";
 import {
   CONNECTOR_META,
-  CONNECTOR_ORDER,
+  listedConnectors,
   type ConnectorId,
+  type MeetingMode,
 } from "@/lib/agenda-connectors";
 import { ConnectorCredentials } from "@/components/settings/connector-credentials";
 
@@ -37,7 +38,24 @@ type Settings = {
   timezone: string;
   connector: ConnectorId;
   meetingLink: string | null;
+  meetingMode: MeetingMode;
+  location: string | null;
 };
+
+const MODES: { id: MeetingMode; label: string; description: string }[] = [
+  {
+    id: "virtual",
+    label: "En línea",
+    description:
+      "Cada cita lleva su enlace de videollamada y se le manda al cliente al confirmar.",
+  },
+  {
+    id: "presencial",
+    label: "Presencial",
+    description:
+      "El cliente viene contigo: no se manda ningún enlace. Si conectaste Google, la cita aparece igual en tu calendario.",
+  },
+];
 
 const DAYS: { key: DayKey; label: string }[] = [
   { key: "mon", label: "Lunes" },
@@ -144,6 +162,8 @@ export function AgendaClient() {
         meetingLink: settings.meetingLink?.trim()
           ? settings.meetingLink.trim()
           : null,
+        meetingMode: settings.meetingMode,
+        location: settings.location?.trim() ? settings.location.trim() : null,
       }),
     }).catch(() => null);
     setSaving(false);
@@ -300,15 +320,76 @@ export function AgendaClient() {
 
       <Card>
         <CardHeader>
+          <CardTitle>Cómo atiendes</CardTitle>
+          <CardDescription>
+            Vale para todas las citas que se agenden desde ahora; las que ya
+            están confirmadas se quedan como nacieron.
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-3">
+          <div className="space-y-2">
+            {MODES.map((mode) => {
+              const active = settings.meetingMode === mode.id;
+              return (
+                <button
+                  key={mode.id}
+                  type="button"
+                  aria-pressed={active}
+                  onClick={() => patch({ meetingMode: mode.id })}
+                  className={cn(
+                    "block w-full rounded-sm border px-3 py-2.5 text-left transition-colors",
+                    active
+                      ? "border-brand bg-brand-tint"
+                      : "border-border hover:bg-accent"
+                  )}
+                >
+                  <span
+                    className={cn(
+                      "block text-sm font-semibold",
+                      active && "text-brand-text"
+                    )}
+                  >
+                    {mode.label}
+                  </span>
+                  <span className="mt-0.5 block text-xs text-text-2">
+                    {mode.description}
+                  </span>
+                </button>
+              );
+            })}
+          </div>
+
+          {settings.meetingMode === "presencial" && (
+            <div className="space-y-1.5">
+              <Label htmlFor="location">Dirección</Label>
+              <Input
+                id="location"
+                value={settings.location ?? ""}
+                onChange={(e) => patch({ location: e.target.value })}
+                placeholder="Calle, número, colonia, ciudad  (opcional)"
+                maxLength={300}
+              />
+              <p className="text-xs text-text-3">
+                Se le manda al cliente al confirmar su cita y queda como
+                ubicación del evento en tu calendario. Si la dejas vacía, la
+                cita se confirma sin dirección.
+              </p>
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
           <CardTitle>Cómo se entrega la reunión</CardTitle>
           <CardDescription>
-            El enlace fijo no depende de nadie. Los demás conectan con tu propia
-            cuenta del proveedor y, si alguna vez falla, la cita se agenda igual
-            y el enlace queda pendiente de reintentar.
+            {settings.meetingMode === "presencial"
+              ? "En citas presenciales no se manda ningún enlace. Con Google, cada cita se registra en tu calendario sin Meet; con el enlace fijo, solo queda en Citas."
+              : "El enlace fijo no depende de nadie. Google conecta con tu propia cuenta y, si alguna vez falla, la cita se agenda igual y el enlace queda pendiente de reintentar."}
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-2">
-          {CONNECTOR_ORDER.map((id) => {
+          {listedConnectors(settings.connector).map((id) => {
             const meta = CONNECTOR_META[id];
             const active = settings.connector === id;
             return (
@@ -345,7 +426,8 @@ export function AgendaClient() {
         </CardContent>
       </Card>
 
-      {settings.connector === "enlace-fijo" && (
+      {settings.connector === "enlace-fijo" &&
+        settings.meetingMode === "virtual" && (
         <Card>
           <CardHeader>
             <CardTitle>Tu sala de siempre</CardTitle>

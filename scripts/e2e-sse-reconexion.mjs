@@ -44,10 +44,16 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 async function aviso(page) {
   const el = page.locator("[data-testid=connection-status]");
   if ((await el.count()) === 0) return null;
-  return {
-    state: await el.getAttribute("data-state"),
-    texto: (await el.innerText()).replace(/\s+/g, " ").trim(),
-  };
+  // El aviso puede retirarse ENTRE el conteo y la lectura —es justo lo que
+  // espera `esperarSinAviso`—, y sin tope Playwright se queda 30 s esperando
+  // un elemento que ya no va a volver y tumba el arnés. Si se fue, no hay aviso.
+  const leido = await Promise.all([
+    el.getAttribute("data-state", { timeout: 1000 }),
+    el.innerText({ timeout: 1000 }),
+  ]).catch(() => null);
+  if (!leido) return null;
+  const [state, texto] = leido;
+  return { state, texto: texto.replace(/\s+/g, " ").trim() };
 }
 
 /** Espera a que el aviso aparezca. Devuelve su estado, o null si no apareció. */

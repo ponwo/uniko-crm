@@ -36,6 +36,13 @@ export type ConnectorMeta = {
    * adaptador y degradando sin bloquear (Principio II, 1.4.0).
    */
   external: boolean;
+  /**
+   * ¿Se le ofrece al operador en Ajustes → Agenda? Uno apagado sigue en el
+   * catálogo: el negocio que ya lo tiene elegido lo sigue viendo y operando, y
+   * volver a ofrecerlo es cambiar este valor. Ocultar NO es quitar del
+   * catálogo — eso degradaría en silencio al enlace fijo a quien lo usa.
+   */
+  listed: boolean;
 };
 
 export const CONNECTOR_META: Record<ConnectorId, ConnectorMeta> = {
@@ -47,6 +54,7 @@ export const CONNECTOR_META: Record<ConnectorId, ConnectorMeta> = {
     updatesMeeting: false,
     writesCalendarEvent: false,
     external: false,
+    listed: true,
   },
   zoom: {
     label: "Zoom",
@@ -58,15 +66,19 @@ export const CONNECTOR_META: Record<ConnectorId, ConnectorMeta> = {
     // configuró allá; el CRM no lo hace ni lo sabe.
     writesCalendarEvent: false,
     external: true,
+    // Oculto desde el 2026-09-30: por ahora se trabaja solo con Google
+    // (decisión del dueño). El adaptador y su suite de contrato siguen vivos.
+    listed: false,
   },
   google: {
     label: "Google Calendar + Meet",
     description:
-      "Cada cita crea un evento en tu calendario con su enlace de Meet.",
+      "Cada cita crea un evento en tu calendario; si atiendes en línea, con su enlace de Meet.",
     perBookingLink: true,
     updatesMeeting: true,
     writesCalendarEvent: true,
     external: true,
+    listed: true,
   },
 };
 
@@ -74,5 +86,35 @@ export function isConnectorId(value: string): value is ConnectorId {
   return (CONNECTOR_ORDER as readonly string[]).includes(value);
 }
 
+/**
+ * Los que se le ofrecen al operador, más el que ya tiene elegido aunque esté
+ * oculto: quien lo usa no debe perderlo de vista ni quedarse sin poder verlo
+ * marcado.
+ */
+export function listedConnectors(current: ConnectorId): ConnectorId[] {
+  return CONNECTOR_ORDER.filter(
+    (id) => CONNECTOR_META[id].listed || id === current
+  );
+}
+
 /** El conector por defecto: el único que no depende de nadie. */
 export const DEFAULT_CONNECTOR: ConnectorId = "enlace-fijo";
+
+/**
+ * 015 (modalidad, 2026-09-30) — Cómo atiende el negocio: en línea o en su
+ * local. Es UNA decisión del negocio, no de cada cita.
+ *
+ *  - `virtual`: lo de siempre — el conector entrega el enlace de la reunión.
+ *  - `presencial`: nadie recibe enlace. Si el conector escribe en el
+ *    calendario (Google), el evento se crea igual pero SIN Meet: el dueño la
+ *    sigue viendo donde mira su día. Al cliente se le da la dirección.
+ */
+export type MeetingMode = "virtual" | "presencial";
+
+export const MEETING_MODES: readonly MeetingMode[] = ["virtual", "presencial"];
+
+export const DEFAULT_MEETING_MODE: MeetingMode = "virtual";
+
+export function isMeetingMode(value: string): value is MeetingMode {
+  return (MEETING_MODES as readonly string[]).includes(value);
+}

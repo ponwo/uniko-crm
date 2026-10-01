@@ -116,9 +116,16 @@ export async function POST(req: Request, ctx: Ctx) {
       summary?: string;
       start?: { dateTime?: string };
       end?: { dateTime?: string };
+      location?: string;
+      conferenceData?: { createRequest?: unknown };
     };
     const state = googleMockState();
     const id = `evt_${state.nextId++}`;
+    // Como Google: la conferencia solo existe si se pidió Y con
+    // `conferenceDataVersion=1` en la URL.
+    const withConference =
+      Boolean(body.conferenceData?.createRequest) &&
+      new URL(req.url).searchParams.get("conferenceDataVersion") === "1";
     state.events.set(id, {
       id,
       summary: body.summary ?? "",
@@ -127,7 +134,12 @@ export async function POST(req: Request, ctx: Ctx) {
       reads: 0,
       meetLink: null,
       updates: 0,
+      withConference,
+      location: body.location ?? null,
     });
+    if (!withConference) {
+      return Response.json({ id, summary: body.summary, location: body.location });
+    }
     // Sin enlace todavía: la conferencia se está creando. Es el
     // comportamiento real de Google y por eso el conector re-lee.
     return Response.json({
@@ -221,6 +233,13 @@ export async function GET(req: Request, ctx: Ctx) {
 
   const state = googleMockState();
   event.reads += 1;
+  if (!event.withConference) {
+    return Response.json({
+      id: event.id,
+      summary: event.summary,
+      location: event.location ?? undefined,
+    });
+  }
   if (!event.meetLink && event.reads > state.conferenceDelayReads) {
     event.meetLink = `https://meet.google.mock/${event.id}`;
   }

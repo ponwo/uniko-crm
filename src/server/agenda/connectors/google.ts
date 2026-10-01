@@ -197,24 +197,32 @@ export const googleConnector: AgendaConnector<GoogleCreds> = {
       Date.parse(req.startUtc) + req.durationMinutes * 60_000
     ).toISOString();
 
+    // Presencial: el evento va al calendario igual —es lo que el dueño mira—
+    // pero sin pedir conferencia. Sin `createRequest` Google no crea Meet, y
+    // tampoco hay nada que esperar.
+    const video = req.video !== false;
+
     const created = (await googleFetch(
       creds,
-      `${eventsPath(creds)}?conferenceDataVersion=1`,
+      video ? `${eventsPath(creds)}?conferenceDataVersion=1` : eventsPath(creds),
       {
         method: "POST",
         body: JSON.stringify({
           summary: req.topic,
           description: req.notes ?? undefined,
+          location: req.location ?? undefined,
           start: { dateTime: req.startUtc, timeZone: "UTC" },
           end: { dateTime: endUtc, timeZone: "UTC" },
-          conferenceData: {
-            createRequest: {
-              // Google exige un id de petición propio; el instante lo hace
-              // único por cita sin necesitar aleatoriedad.
-              requestId: `uniko-${Date.parse(req.startUtc)}`,
-              conferenceSolutionKey: { type: "hangoutsMeet" },
-            },
-          },
+          conferenceData: video
+            ? {
+                createRequest: {
+                  // Google exige un id de petición propio; el instante lo hace
+                  // único por cita sin necesitar aleatoriedad.
+                  requestId: `uniko-${Date.parse(req.startUtc)}`,
+                  conferenceSolutionKey: { type: "hangoutsMeet" },
+                },
+              }
+            : undefined,
         }),
       }
     )) as GoogleEvent | null;
@@ -223,6 +231,7 @@ export const googleConnector: AgendaConnector<GoogleCreds> = {
     if (!eventId) {
       throw new ConnectorError("google", "Google no devolvió el evento creado");
     }
+    if (!video) return { externalId: eventId, joinUrl: null };
 
     let link = meetLinkOf(created);
     // La conferencia se genera en segundo plano: la respuesta del insert suele

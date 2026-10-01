@@ -30,6 +30,11 @@ Es también la razón de que encender la agenda no te obligue a conectar nada.
 
 ### Zoom (`zoom`)
 
+> **Oculto en Ajustes desde el 2026-09-30** (por ahora se trabaja solo con
+> Google). El adaptador, su mock y su suite de contrato siguen vivos; quien ya
+> lo tenía elegido lo sigue viendo y operando. Volver a ofrecerlo es poner
+> `listed: true` en su ficha de `src/lib/agenda-connectors.ts`.
+
 Cada cita crea su propia reunión de Zoom. Reprogramar la mueve conservando el
 mismo enlace; cancelar la borra.
 
@@ -164,6 +169,24 @@ Sin `GOOGLE_ONBOARDING_URL`, el link lleva directo a tu instancia, y Google
 vuelve directo a ella. Es el mismo código; el relevo es solo la forma de que un
 proyecto sirva a muchos dominios sin verificarlos todos.
 
+## Citas en línea o presenciales
+
+En Ajustes → Agenda → **Cómo atiendes**, el negocio elige una vez para todas
+sus citas (no se decide cita por cita):
+
+- **En línea** (el default, lo de siempre): el conector entrega el enlace y se
+  le manda al cliente al confirmar.
+- **Presencial**: nadie recibe enlace. Con **Google**, el evento se crea igual
+  en tu calendario, pero **sin Meet** y con la dirección como ubicación. Con el
+  **enlace fijo** (o Zoom), no se llama al conector: la cita queda en Citas. Al
+  cliente se le manda la **dirección** («Te esperamos en: …») si la
+  configuraste; si no, solo la confirmación.
+
+La cita copia la modalidad y la dirección con las que nació (columnas
+`booking.meeting_mode` y `booking.location`): cambiar de modalidad no toca las
+ya confirmadas. Para un cerebro externo, `POST /api/bot/bookings` devuelve
+`location` junto a `meetingLink` y `linkPending`.
+
 ## Qué pasa cuando el proveedor falla
 
 Nada que te cueste una cita. El orden es deliberado: **primero se escribe la
@@ -178,6 +201,10 @@ caído, rechaza las credenciales o simplemente tarda:
    **reintentar**.
 4. Si el fallo fue de autenticación, la conexión queda marcada como rota en
    Ajustes, con su tarjeta de reconexión.
+
+En una cita **presencial** no hay enlace que esperar: si Google falla, la cita
+se crea igual con `linkPending: false` (al cliente no se le promete nada) y lo
+único que falta es el evento en tu calendario. El punto 4 aplica igual.
 
 ## Escribe tu conector
 

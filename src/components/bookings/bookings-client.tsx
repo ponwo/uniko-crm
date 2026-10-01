@@ -25,6 +25,8 @@ type Booking = {
   connector: string | null;
   meetingLink: string | null;
   linkPending: boolean;
+  meetingMode: "virtual" | "presencial";
+  location: string | null;
   isTest: boolean;
   notes: string | null;
 };
@@ -254,6 +256,9 @@ export function BookingsClient() {
                   </Badge>
                 )}
                 {b.isTest && <Badge variant="secondary">Prueba</Badge>}
+                {b.kind === "session" && b.meetingMode === "presencial" && (
+                  <Badge variant="secondary">Presencial</Badge>
+                )}
                 {b.linkPending && b.status !== "cancelada" && (
                   <Badge variant="secondary">Sin enlace</Badge>
                 )}
@@ -271,6 +276,7 @@ export function BookingsClient() {
                     Enlace de la reunión
                   </a>
                 )}
+                {b.location && <span>{b.location}</span>}
                 {b.notes && <span>{b.notes}</span>}
               </div>
 
