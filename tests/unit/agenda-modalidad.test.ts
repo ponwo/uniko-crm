@@ -203,22 +203,27 @@ describe("la modalidad de la cita", () => {
     expect(result.location).toBe(DIRECCION);
   });
 
-  it("PRESENCIAL y Google caído: la cita queda, SIN prometer un enlace", async () => {
+  it("PRESENCIAL y Google caído: la cita queda, SIN prometer un enlace, y el evento queda pendiente", async () => {
     // `linkPending` es lo que hace decir «en un momento te comparto el
-    // enlace»; a un cliente que viene al local no se le debe ninguno.
+    // enlace»; a un cliente que viene al local no se le debe ninguno. Lo que
+    // falta es el evento en el calendario del dueño, y eso se reintenta.
     settings = { ...BASE, meetingMode: "presencial", location: DIRECCION };
     createMeeting.mockRejectedValueOnce(new Error("Google respondió 503"));
     const result = await reservar();
 
     expect(result.booking.id).toBe(lastInsert?.id);
     expect(result.linkPending).toBe(false);
+    expect(result.eventPending).toBe(true);
     expect(result.meetingLink).toBeNull();
+    // En la base queda la marca de entrega pendiente, para el reintento.
+    expect(row.linkPending).toBe(true);
   });
 
   it("EN LÍNEA y Google caído: sigue quedando pendiente de reintentar", async () => {
     createMeeting.mockRejectedValueOnce(new Error("Google respondió 503"));
     const result = await reservar();
     expect(result.linkPending).toBe(true);
+    expect(result.eventPending).toBe(false);
   });
 
   it("la dirección guardada NO viaja en una cita en línea", async () => {
@@ -227,6 +232,107 @@ describe("la modalidad de la cita", () => {
     settings = { ...BASE, meetingMode: "virtual", location: DIRECCION };
     await reservar();
     expect(lastInsert).toMatchObject({ meetingMode: "virtual", location: null });
+  });
+});
+
+describe("reintentar lo que el proveedor dejó pendiente", () => {
+  /** Una cita de verdad que nació con la entrega pendiente. */
+  function citaPendiente(over: Record<string, unknown> = {}) {
+    return {
+      id: "bk_1",
+      organizationId: "org_1",
+      kind: "session",
+      status: "agendada",
+      source: "ai",
+      scheduledAt: new Date(SLOT),
+      durationMinutes: 30,
+      connector: "google",
+      meetingMode: "presencial",
+      location: DIRECCION,
+      externalRef: null,
+      meetingLink: null,
+      linkPending: true,
+      isTest: false,
+      notes: null,
+      contactId: "ct_1",
+      conversationId: "cv_1",
+      ...over,
+    };
+  }
+
+  beforeEach(() => {
+    settings = { ...BASE };
+    selectRows.length = 0;
+    createMeeting.mockClear();
+    bindConnector.mockClear();
+  });
+
+  async function reintentar() {
+    const { retryMeetingLink } = await import("@/server/agenda/service");
+    return retryMeetingLink({ organizationId: "org_1", bookingId: "bk_1" });
+  }
+
+  it("PRESENCIAL: crea el evento SIN Meet y con la dirección, y ya no queda pendiente", async () => {
+    // La configuración de HOY es virtual a propósito: el reintento respeta la
+    // modalidad con la que NACIÓ la cita, no la actual.
+    row = citaPendiente();
+    selectRows.push([row]); // la cita
+    selectRows.push([{ name: "Ana" }]); // el contacto
+
+    const result = await reintentar();
+
+    expect(createMeeting).toHaveBeenCalledOnce();
+    expect(createMeeting.mock.calls[0]![0]).toMatchObject({
+      video: false,
+      location: DIRECCION,
+    });
+    expect(result.eventPending).toBe(false);
+    expect(result.linkPending).toBe(false);
+    expect(result.meetingLink).toBeNull();
+    expect(row.linkPending).toBe(false);
+    expect(row.externalRef).toBe("evt_1");
+  });
+
+  it("PRESENCIAL con Google caído otra vez: sigue pendiente, sin prometer enlace", async () => {
+    row = citaPendiente();
+    selectRows.push([row]);
+    selectRows.push([{ name: "Ana" }]);
+    createMeeting.mockRejectedValueOnce(new Error("Google respondió 503"));
+
+    const result = await reintentar();
+
+    expect(result.eventPending).toBe(true);
+    expect(result.linkPending).toBe(false);
+  });
+
+  it("VIRTUAL: el reintento entrega el enlace, como siempre", async () => {
+    row = citaPendiente({ meetingMode: "virtual", location: null });
+    selectRows.push([row]);
+    selectRows.push([{ name: "Ana" }]);
+
+    const result = await reintentar();
+
+    expect(createMeeting.mock.calls[0]![0]).toMatchObject({ video: true });
+    expect(result.meetingLink).toBe("https://meet.google.test/abc");
+    expect(result.linkPending).toBe(false);
+    expect(result.eventPending).toBe(false);
+  });
+
+  it("una cita CANCELADA no se reintenta: no crea un evento para algo que no va a pasar", async () => {
+    row = citaPendiente({ status: "cancelada" });
+    selectRows.push([row]);
+
+    await expect(reintentar()).rejects.toMatchObject({ code: "invalid" });
+    expect(bindConnector).not.toHaveBeenCalled();
+    expect(createMeeting).not.toHaveBeenCalled();
+  });
+
+  it("sin nada pendiente → inválido, sin tocar al proveedor", async () => {
+    row = citaPendiente({ linkPending: false, externalRef: "evt_9" });
+    selectRows.push([row]);
+
+    await expect(reintentar()).rejects.toMatchObject({ code: "invalid" });
+    expect(createMeeting).not.toHaveBeenCalled();
   });
 });
 
@@ -254,6 +360,16 @@ describe("lo que el agente le escribe al cliente", () => {
     const turn = await confirmar();
 
     expect(turn.ok).toBe(true);
+    expect(turn.text).toContain(`Te esperamos en: ${DIRECCION}`);
+    expect(turn.text.toLowerCase()).not.toContain("enlace");
+  });
+
+  it("presencial con Google caído: la dirección, y ni una palabra de enlace", async () => {
+    // El evento quedó pendiente para el dueño; al cliente eso no le toca.
+    settings = { ...BASE, meetingMode: "presencial", location: DIRECCION };
+    createMeeting.mockRejectedValueOnce(new Error("Google respondió 503"));
+    const turn = await confirmar();
+
     expect(turn.text).toContain(`Te esperamos en: ${DIRECCION}`);
     expect(turn.text.toLowerCase()).not.toContain("enlace");
   });

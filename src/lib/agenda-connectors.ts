@@ -118,3 +118,28 @@ export const DEFAULT_MEETING_MODE: MeetingMode = "virtual";
 export function isMeetingMode(value: string): value is MeetingMode {
   return (MEETING_MODES as readonly string[]).includes(value);
 }
+
+/**
+ * 015 (reintento del evento, 2026-10-01) — Qué quedó pendiente cuando el
+ * proveedor falló, según la modalidad con la que nació la cita.
+ *
+ * En la base es una sola marca, `booking.link_pending`: «la entrega en el
+ * proveedor quedó pendiente». Lo que falta depende de la cita:
+ *  - virtual: el ENLACE, que es lo que se le debe al cliente;
+ *  - presencial: el EVENTO en el calendario del dueño, que al cliente no le
+ *    toca — a él ya se le dio la dirección.
+ *
+ * Separarlo AQUÍ, una vez, es lo que impide que una presencial diga «en un
+ * momento te comparto el enlace» (agente o cerebro externo) y a la vez deja
+ * que el dueño la reintente desde Citas.
+ */
+export function pendingDelivery(
+  pending: boolean,
+  meetingMode: string | null
+): { linkPending: boolean; eventPending: boolean } {
+  const presencial = meetingMode === "presencial";
+  return {
+    linkPending: pending && !presencial,
+    eventPending: pending && presencial,
+  };
+}

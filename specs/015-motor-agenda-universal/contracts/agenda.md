@@ -60,10 +60,16 @@ operador).
 
 `200` → `{ "bookings": [{ id, kind, status, source, scheduledAtUtc,
 durationMinutes, date, time, weekday, contact: {id,name}|null, conversationId,
-connector, meetingLink, linkPending, meetingMode, location, isTest, notes }] }`
+connector, meetingLink, linkPending, eventPending, meetingMode, location, isTest,
+notes }] }`
 
 `meetingMode` (`virtual`|`presencial`) y `location` (string|null) se agregaron
 el 2026-09-30: la cita copia la modalidad y la dirección con las que nació.
+
+`eventPending` (2026-10-01): cita **presencial** cuyo evento no llegó al
+calendario del dueño. En la base es la misma marca que `linkPending`
+(«entrega pendiente»), separada por la modalidad: una presencial nunca trae
+`linkPending: true`, porque al cliente no se le debe ningún enlace.
 
 ### `POST /api/bookings`
 
@@ -92,10 +98,14 @@ re-validación y el candado atómico anti doble-booking sí aplican.
 { "action": "retry_link" }        // re-invoca createMeeting del conector de ORIGEN
 ```
 
-- `200` → `{ "ok": true }` (+ `label` en reschedule; + `meetingLink` en
-  `retry_link` exitoso)
+- `200` → `{ "ok": true }` (+ `label` en reschedule; + `meetingLink`,
+  `linkPending` y `eventPending` en `retry_link`)
+- `retry_link` sirve para lo que haya quedado pendiente: el enlace de una
+  virtual o el evento (sin Meet, con la dirección) de una presencial, siempre
+  con la modalidad con la que nació la cita.
 - `404 not_found` · `409 slot_taken` (reschedule a hueco tomado) · `422
-  invalid` (reprogramar una cancelada; `retry_link` sin link pendiente)
+  invalid` (reprogramar una cancelada; `retry_link` sin nada pendiente o sobre
+  una cita cancelada)
 - Cancelar una ya cancelada ⇒ `200` sin cambios (idempotente).
 
 ### Conectores: `/api/settings/zoom` y `/api/settings/google`

@@ -2,7 +2,11 @@ import { desc, eq } from "drizzle-orm";
 import { getDb, schema } from "@/lib/db";
 import { scoped } from "@/lib/db/tenant";
 import { partsInTz } from "@/lib/time/slots";
-import { isMeetingMode, type MeetingMode } from "@/lib/agenda-connectors";
+import {
+  isMeetingMode,
+  pendingDelivery,
+  type MeetingMode,
+} from "@/lib/agenda-connectors";
 import { getSettings } from "@/server/agenda/settings";
 
 /** 015 — Listado de citas para la UI, con la hora en la zona del negocio. */
@@ -22,8 +26,13 @@ export type BookingListItem = {
   /** Con qué conector nació la entrega de esta cita. */
   connector: string | null;
   meetingLink: string | null;
-  /** El proveedor falló al crear la reunión: se puede reintentar. */
+  /** Cita virtual cuyo enlace el proveedor no entregó: se puede reintentar. */
   linkPending: boolean;
+  /**
+   * Cita presencial cuyo evento no llegó al calendario del dueño: se puede
+   * reintentar. Al cliente no se le dice nada: ya tiene la dirección.
+   */
+  eventPending: boolean;
   /** Con qué modalidad nació; las anteriores a la opción eran virtuales. */
   meetingMode: MeetingMode;
   /** La dirección que se le dio al cliente de una presencial. */
@@ -62,7 +71,7 @@ function toListItem(
     conversationId: r.booking.conversationId,
     connector: r.booking.connector,
     meetingLink: r.booking.meetingLink,
-    linkPending: r.booking.linkPending,
+    ...pendingDelivery(r.booking.linkPending, r.booking.meetingMode),
     meetingMode:
       r.booking.meetingMode && isMeetingMode(r.booking.meetingMode)
         ? r.booking.meetingMode

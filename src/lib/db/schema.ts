@@ -882,8 +882,11 @@ export const booking = pgTable(
      */
     location: text("location"),
     /**
-     * El proveedor falló al crear la reunión. La cita existe igual —un tercero
-     * caído no cuesta la conversión— y el operador reintenta desde "Citas".
+     * El proveedor falló al entregar. La cita existe igual —un tercero caído no
+     * cuesta la conversión— y el operador reintenta desde "Citas". Lo que
+     * falta depende de la modalidad: el ENLACE en una virtual, el EVENTO del
+     * calendario en una presencial — `pendingDelivery()` lo separa para que a
+     * un cliente presencial nunca se le prometa un enlace.
      */
     linkPending: boolean("link_pending").notNull().default(false),
     /** Conversación del Laboratorio: jamás llama a un conector real. */

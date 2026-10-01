@@ -25,7 +25,8 @@ const patchSchema = z.discriminatedUnion("action", [
 
 /**
  * 015 — Reprogramar, cancelar (idempotente), marcar el resultado o reintentar
- * el enlace que el proveedor no entregó.
+ * lo que el proveedor no entregó: el enlace de una virtual o el evento del
+ * calendario de una presencial (`retry_link` sirve para los dos).
  */
 export const PATCH = withAuth(async (session, req: Request, ctx: Params) => {
   if (!agendaEnabled()) return agendaDisabledResponse();
@@ -67,6 +68,7 @@ export const PATCH = withAuth(async (session, req: Request, ctx: Params) => {
           ok: true,
           meetingLink: result.meetingLink,
           linkPending: result.linkPending,
+          eventPending: result.eventPending,
         });
       }
     }
