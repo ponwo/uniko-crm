@@ -10,6 +10,7 @@ import {
   BookingError,
   createSessionBooking,
   rescheduleForConversation,
+  type BookingResult,
 } from "@/server/agenda/service";
 
 /**
@@ -31,6 +32,21 @@ import {
  * dejaba un menú demasiado pobre para elegir dentro de ella.
  */
 const SHOWN = 4;
+
+/**
+ * Lo que el motor pega debajo de la confirmación: el enlace de una cita
+ * virtual, o la dirección de una presencial. Lo pega el código y no el modelo
+ * por la misma regla que los horarios — el modelo no redacta datos.
+ */
+function withDelivery(base: string, result: BookingResult): string {
+  if (result.meetingLink) return `${base}\nEnlace: ${result.meetingLink}`;
+  // La cita existe; el enlace no. No se promete lo que no se tiene.
+  if (result.linkPending) {
+    return `${base}\nEn un momento te comparto el enlace por aquí.`;
+  }
+  if (result.location) return `${base}\nTe esperamos en: ${result.location}`;
+  return base;
+}
 /**
  * El CATÁLOGO reservable (lo que el modelo puede aceptar) es mucho más ancho
  * que el menú: denso en los días próximos, ralo después. Ver `catalogByDay` —
@@ -206,17 +222,7 @@ export async function bookSlot(input: {
 
     const base =
       input.confirmation?.trim() || `¡Listo! Te agendé para ${result.label}.`;
-    if (result.meetingLink) {
-      return { ok: true, text: `${base}\nEnlace: ${result.meetingLink}` };
-    }
-    if (result.linkPending) {
-      // La cita existe; el enlace no. No se promete lo que no se tiene.
-      return {
-        ok: true,
-        text: `${base}\nEn un momento te comparto el enlace por aquí.`,
-      };
-    }
-    return { ok: true, text: base };
+    return { ok: true, text: withDelivery(base, result) };
   } catch (err) {
     if (!(err instanceof BookingError)) throw err;
 
@@ -272,16 +278,7 @@ export async function moveSlot(input: {
 
     const base =
       input.confirmation?.trim() || `¡Listo! La moví a ${result.label}.`;
-    if (result.meetingLink) {
-      return { ok: true, text: `${base}\nEnlace: ${result.meetingLink}` };
-    }
-    if (result.linkPending) {
-      return {
-        ok: true,
-        text: `${base}\nEn un momento te comparto el enlace por aquí.`,
-      };
-    }
-    return { ok: true, text: base };
+    return { ok: true, text: withDelivery(base, result) };
   } catch (err) {
     if (!(err instanceof BookingError)) throw err;
 

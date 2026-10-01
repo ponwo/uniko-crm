@@ -75,6 +75,24 @@ crear el evento —la conferencia es asíncrona—, el conector re-lee, y si sig
 pendiente entrega el evento sin enlace en vez de fallar. Reintentar re-lee ese
 mismo evento: **nunca** crea uno duplicado en el calendario del dueño.
 
+## Citas presenciales (modalidad, 2026-09-30)
+
+Automatizado en `modalidadChecks()`, con Google conectado contra su mock:
+
+1. La configuración nace **en línea**; una modalidad desconocida se rechaza.
+2. Se guarda **presencial** con su dirección (recortada).
+3. Agendar en presencial: **201**, `meetingLink: null`, `linkPending: false` y
+   `location` con la dirección.
+4. El evento **sí** llega al calendario (mock de Google), **sin** conferencia y
+   con la ubicación.
+5. En Citas la cita se ve como presencial, con su dirección.
+6. De vuelta a **en línea**: la cita nueva lleva su Meet y ninguna dirección;
+   la dirección se conserva en la configuración.
+
+Lo que el agente le escribe al cliente (dirección y ni una palabra de enlace)
+está en `tests/unit/agenda-modalidad.test.ts`. Que Zoom ya no aparezca en
+Ajustes → Agenda (salvo para quien ya lo usa), en `tests/unit/connectors.test.ts`.
+
 ## Sandbox del Laboratorio
 
 1. Una conversación de prueba **puede** agendar (201) y la cita queda marcada

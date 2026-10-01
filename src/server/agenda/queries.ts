@@ -2,6 +2,7 @@ import { desc, eq } from "drizzle-orm";
 import { getDb, schema } from "@/lib/db";
 import { scoped } from "@/lib/db/tenant";
 import { partsInTz } from "@/lib/time/slots";
+import { isMeetingMode, type MeetingMode } from "@/lib/agenda-connectors";
 import { getSettings } from "@/server/agenda/settings";
 
 /** 015 — Listado de citas para la UI, con la hora en la zona del negocio. */
@@ -23,6 +24,10 @@ export type BookingListItem = {
   meetingLink: string | null;
   /** El proveedor falló al crear la reunión: se puede reintentar. */
   linkPending: boolean;
+  /** Con qué modalidad nació; las anteriores a la opción eran virtuales. */
+  meetingMode: MeetingMode;
+  /** La dirección que se le dio al cliente de una presencial. */
+  location: string | null;
   isTest: boolean;
   notes: string | null;
 };
@@ -58,6 +63,11 @@ function toListItem(
     connector: r.booking.connector,
     meetingLink: r.booking.meetingLink,
     linkPending: r.booking.linkPending,
+    meetingMode:
+      r.booking.meetingMode && isMeetingMode(r.booking.meetingMode)
+        ? r.booking.meetingMode
+        : "virtual",
+    location: r.booking.location,
     isTest: r.booking.isTest,
     notes: r.booking.notes,
   };

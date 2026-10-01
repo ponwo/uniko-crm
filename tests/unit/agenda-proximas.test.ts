@@ -44,6 +44,8 @@ function cita(over: Partial<Cita>): Cita {
     connector: "enlace-fijo",
     meetingLink: null,
     linkPending: false,
+    meetingMode: "virtual",
+    location: null,
     isTest: false,
     notes: null,
     ...over,

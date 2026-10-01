@@ -1,6 +1,6 @@
 import { z } from "zod";
 import { apiError, parseBody, withAuth } from "@/lib/api";
-import { CONNECTOR_ORDER } from "@/lib/agenda-connectors";
+import { isConnectorId, isMeetingMode } from "@/lib/agenda-connectors";
 import { agendaDisabledResponse, agendaEnabled } from "@/server/agenda/flag";
 import {
   CalendarSettingsError,
@@ -39,13 +39,20 @@ const putSchema = z.object({
   timezone: z.string().optional(),
   // El catálogo manda: un conector que no existe se rechaza aquí, y el
   // servicio lo vuelve a comprobar por si el llamador no es esta ruta.
+  // Vale el catálogo ENTERO, no solo lo que la pantalla ofrece: un conector
+  // oculto (Zoom) sigue siendo válido para quien ya lo tiene elegido, y
+  // guardar su horario no debe rechazárselo.
   connector: z
     .string()
-    .refine((v) => (CONNECTOR_ORDER as readonly string[]).includes(v), {
-      message: "Conector desconocido",
-    })
+    .refine(isConnectorId, { message: "Conector desconocido" })
     .optional(),
   meetingLink: z.string().nullish(),
+  meetingMode: z
+    .string()
+    .refine(isMeetingMode, { message: "Modalidad desconocida" })
+    .optional(),
+  // Una dirección, no un documento: cabe en un mensaje de WhatsApp.
+  location: z.string().max(300).nullish(),
 });
 
 /**
@@ -65,6 +72,8 @@ export const PUT = withAuth(async (session, req: Request) => {
       // `undefined` = no lo tocaron; `null` = lo vaciaron a propósito.
       meetingLink:
         body.data.meetingLink === undefined ? undefined : body.data.meetingLink,
+      location:
+        body.data.location === undefined ? undefined : body.data.location,
     });
     return Response.json({ settings });
   } catch (err) {

@@ -21,6 +21,7 @@ export type BookingPayload = {
   bookingId: string;
   meetingLink: string | null;
   linkPending: boolean;
+  location: string | null;
   label: string;
 };
 
@@ -34,6 +35,11 @@ export function bookingPayload(result: BookingResult): BookingPayload {
      * tienes.
      */
     linkPending: result.linkPending,
+    /**
+     * Cita presencial: la dirección que hay que darle al cliente. null en las
+     * virtuales, o si el negocio no configuró una.
+     */
+    location: result.location,
     label: result.label,
   };
 }

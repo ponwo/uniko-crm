@@ -29,6 +29,15 @@ export type MeetingRequest = {
   /** Zona IANA del negocio: el proveedor la usa para mostrarla a los suyos. */
   timezone: string;
   notes?: string;
+  /**
+   * false ⇒ cita PRESENCIAL: el conector no genera videollamada. Solo se le
+   * pide eso a un conector que escribe en el calendario (Google: el evento se
+   * crea sin Meet); a los que solo dan enlace el motor ni los llama. Omitido =
+   * con enlace, que es lo que todo conector hacía antes de existir la opción.
+   */
+  video?: boolean;
+  /** Dirección del local, para el evento de una cita presencial. */
+  location?: string;
 };
 
 export type MeetingResult = {

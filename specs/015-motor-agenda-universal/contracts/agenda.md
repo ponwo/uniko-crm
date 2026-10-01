@@ -60,7 +60,10 @@ operador).
 
 `200` → `{ "bookings": [{ id, kind, status, source, scheduledAtUtc,
 durationMinutes, date, time, weekday, contact: {id,name}|null, conversationId,
-connector, meetingLink, linkPending, isTest, notes }] }`
+connector, meetingLink, linkPending, meetingMode, location, isTest, notes }] }`
+
+`meetingMode` (`virtual`|`presencial`) y `location` (string|null) se agregaron
+el 2026-09-30: la cita copia la modalidad y la dirección con las que nació.
 
 ### `POST /api/bookings`
 
@@ -74,7 +77,7 @@ Dos formas, discriminadas por `kind`:
 ```
 
 - **`201`** → `{ "booking": { "id": "bk_…" }, "meetingLink": "…"|null,
-  "linkPending": false|true, "label": "…" }`
+  "linkPending": false|true, "location": "…"|null, "label": "…" }`
 - `409 slot_taken` · `422 invalid_body`
 
 El operador no pasa por `offered_slot` (elige de la disponibilidad que ve); la
@@ -140,7 +143,7 @@ mostrado dejó al agente sin nada que ofrecer cuando el lead pedía otro día.
 
 | Caso | Código | Cuerpo | Qué hacer |
 |---|---|---|---|
-| Creada | **`201`** | `{ "bookingId", "meetingLink": …\|null, "linkPending": bool, "label" }` | Confirmar con ESA etiqueta. Comparte el link solo si no es `null`; con `linkPending: true` di que el enlace llega por este medio — no prometas lo que no tienes |
+| Creada | **`201`** | `{ "bookingId", "meetingLink": …\|null, "linkPending": bool, "location": …\|null, "label" }` | Confirmar con ESA etiqueta. Comparte el link solo si no es `null`; con `linkPending: true` di que el enlace llega por este medio — no prometas lo que no tienes. Con `location` (cita presencial), da esa dirección; una presencial nunca trae link ni `linkPending: true` |
 | No se ofreció | `409` | `{ "error": {"code":"slot_not_offered", …}, "slots": [lo que sí se ofreció] }` | No inventes horarios: re-ofrece los de la lista |
 | Se ocupó | `409` | `{ "error": {"code":"slot_taken", …}, "slots": [alternativas frescas YA registradas como nueva oferta] }` | Discúlpate y ofrece esas; **no** hubo cita |
 | Sin conversación | `404` | `{ "error": {"code":"not_found"} }` | — |

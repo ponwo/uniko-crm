@@ -1,5 +1,10 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { CONNECTOR_META, CONNECTOR_ORDER } from "@/lib/agenda-connectors";
+import {
+  CONNECTOR_META,
+  CONNECTOR_ORDER,
+  isConnectorId,
+  listedConnectors,
+} from "@/lib/agenda-connectors";
 import { enlaceFijoConnector } from "@/server/agenda/connectors/enlace-fijo";
 import { zoomConnector, ZOOM_SCOPES } from "@/server/agenda/connectors/zoom";
 import {
@@ -53,6 +58,21 @@ describe("el catálogo", () => {
   it("el default no habla con nadie", () => {
     expect(CONNECTOR_META["enlace-fijo"].external).toBe(false);
     expect(enlaceFijoConnector.requiresCredentials).toBe(false);
+  });
+
+  it("el camino soberano siempre se ofrece en pantalla", () => {
+    // Ocultar conectores no puede dejar al negocio sin uno que no dependa de
+    // nadie: sería la misma violación que no tenerlo.
+    expect(CONNECTOR_META["enlace-fijo"].listed).toBe(true);
+  });
+
+  it("Zoom está oculto, pero quien ya lo usa lo sigue viendo", () => {
+    // Decisión del dueño (2026-09-30): por ahora solo Google. Ocultar no es
+    // quitar del catálogo — eso degradaría en silencio a quien lo tiene.
+    expect(listedConnectors("google")).not.toContain("zoom");
+    expect(listedConnectors("enlace-fijo")).toEqual(["enlace-fijo", "google"]);
+    expect(listedConnectors("zoom")).toContain("zoom");
+    expect(isConnectorId("zoom")).toBe(true);
   });
 });
 
@@ -226,7 +246,7 @@ describe("google", () => {
     calendarId: "primary",
     status: "connected" as const,
   };
-  const calls: { url: string; method: string }[] = [];
+  const calls: { url: string; method: string; body?: Record<string, unknown> }[] = [];
   let fetchMock: ReturnType<typeof vi.fn>;
   /** Lecturas del evento antes de que la conferencia esté lista. */
   let pendingReads = 0;
@@ -237,7 +257,11 @@ describe("google", () => {
     pendingReads = 0;
     fetchMock = vi.fn(async (url: string, init?: RequestInit) => {
       const method = init?.method ?? "GET";
-      calls.push({ url, method });
+      const body =
+        typeof init?.body === "string" && init.body.startsWith("{")
+          ? (JSON.parse(init.body) as Record<string, unknown>)
+          : undefined;
+      calls.push({ url, method, body });
 
       if (url.endsWith("/token")) {
         return Response.json({ access_token: "tk", expires_in: 3600 });
@@ -293,6 +317,32 @@ describe("google", () => {
     const out = await googleConnector.createMeeting(creds, REQ);
     expect(out.externalId).toBe("evt_1");
     expect(out.joinUrl).toBeNull();
+  });
+
+  it("con enlace, pide Meet y no manda ubicación", async () => {
+    await googleConnector.createMeeting(creds, REQ);
+    const insert = calls.find((c) => c.method === "POST" && c.url.includes("/events"));
+    expect(insert?.url).toContain("conferenceDataVersion=1");
+    expect(insert?.body?.conferenceData).toBeDefined();
+    expect(insert?.body?.location).toBeUndefined();
+  });
+
+  it("PRESENCIAL: crea el evento sin Meet, con la dirección, y no espera ningún enlace", async () => {
+    // El evento va al calendario del dueño igual — es donde mira su día —,
+    // pero sin pedir conferencia: Google no crea Meet y no hay nada que
+    // re-leer.
+    const out = await googleConnector.createMeeting(creds, {
+      ...REQ,
+      video: false,
+      location: "Av. Juárez 10, Centro",
+    });
+    expect(out).toEqual({ externalId: "evt_1", joinUrl: null });
+
+    const insert = calls.find((c) => c.method === "POST" && c.url.includes("/events"));
+    expect(insert?.url).not.toContain("conferenceDataVersion");
+    expect(insert?.body?.conferenceData).toBeUndefined();
+    expect(insert?.body?.location).toBe("Av. Juárez 10, Centro");
+    expect(calls.filter((c) => c.method === "GET")).toHaveLength(0);
   });
 
   it("refrescar lee el MISMO evento: reintentar no duplica la cita en el calendario", async () => {

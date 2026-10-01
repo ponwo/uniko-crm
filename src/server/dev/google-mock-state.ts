@@ -21,6 +21,13 @@ export type MockEvent = {
   reads: number;
   meetLink: string | null;
   updates: number;
+  /**
+   * ¿Se pidió conferencia al crearlo? Sin `conferenceData.createRequest`
+   * Google no crea Meet nunca — es la cita presencial, y el mock no debe
+   * regalarle un enlace.
+   */
+  withConference: boolean;
+  location: string | null;
 };
 
 /**

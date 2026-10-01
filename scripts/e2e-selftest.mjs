@@ -1496,6 +1496,8 @@ async function agendaChecks() {
         !JSON.stringify(conectado.json).includes("ref-bueno"),
       JSON.stringify(conectado.json)
     );
+
+    await modalidadChecks(convB);
     await api("/api/settings/google", { method: "DELETE" });
   }
 
@@ -2152,6 +2154,109 @@ function jwtCon(payload) {
 
 async function estadoRelevo() {
   return (await fetch(`${BASE}/api/dev/lanco-relay-mock/_state`)).json();
+}
+
+/**
+ * 015 (modalidad, 2026-09-30) — Citas presenciales: el negocio elige en
+ * Ajustes → Agenda «En línea» o «Presencial». En presencial nadie recibe
+ * enlace; con Google el evento se crea igual, SIN Meet y con la dirección.
+ * Corre con Google ya conectado contra su mock.
+ */
+async function modalidadChecks(convB) {
+  console.log("\n== 015: citas presenciales (modalidad) ==");
+  const DIRECCION = "Av. Juárez 10, Centro, CDMX";
+
+  const catalogo = await api("/api/calendar/settings");
+  ok(
+    "la configuración nace «en línea» (lo de siempre)",
+    catalogo.json?.settings?.meetingMode === "virtual",
+    JSON.stringify(catalogo.json?.settings)
+  );
+  const mala = await api("/api/calendar/settings", {
+    method: "PUT",
+    body: JSON.stringify({ meetingMode: "a-domicilio" }),
+  });
+  ok("una modalidad desconocida se rechaza (400/422)", [400, 422].includes(mala.res.status), `status=${mala.res.status}`);
+
+  const guardada = await api("/api/calendar/settings", {
+    method: "PUT",
+    body: JSON.stringify({ connector: "google", meetingMode: "presencial", location: `  ${DIRECCION}  ` }),
+  });
+  ok(
+    "se guarda presencial con su dirección (recortada)",
+    guardada.res.ok &&
+      guardada.json?.settings?.meetingMode === "presencial" &&
+      guardada.json?.settings?.location === DIRECCION,
+    JSON.stringify(guardada.json)
+  );
+
+  await fetch(`${BASE}/api/dev/google-mock/_reset`, { method: "POST" });
+  // Reservar consume la oferta: cada cita pide la suya.
+  const ofrecer = async () =>
+    (await bot(`/api/bot/availability?conversationId=${convB.id}&limit=12&perDay=3&days=5`)).json?.slots?.[0];
+  const slotA = await ofrecer();
+  if (!slotA) {
+    ok("hay huecos para probar la modalidad", false);
+    return;
+  }
+
+  const presencial = await bot("/api/bot/bookings", {
+    method: "POST",
+    body: JSON.stringify({ conversationId: convB.id, startUtc: slotA.startUtc }),
+  });
+  ok(
+    "presencial: la cita se crea SIN enlace, sin prometer uno, y con la dirección",
+    presencial.res.status === 201 &&
+      presencial.json?.meetingLink === null &&
+      presencial.json?.linkPending === false &&
+      presencial.json?.location === DIRECCION,
+    JSON.stringify(presencial.json)
+  );
+  const tras = await (await fetch(`${BASE}/api/dev/google-mock/_state`)).json();
+  const evento = tras.events?.[0];
+  ok(
+    "presencial con Google: el evento SÍ llega al calendario, sin Meet y con la ubicación",
+    tras.events?.length === 1 && evento.withConference === false && evento.location === DIRECCION && !evento.meetLink,
+    JSON.stringify(tras.events)
+  );
+  const enCitas = (await api("/api/bookings")).json?.bookings?.find((b) => b.id === presencial.json?.bookingId);
+  ok(
+    "en Citas se ve como presencial, con su dirección",
+    enCitas?.meetingMode === "presencial" && enCitas?.location === DIRECCION && enCitas?.linkPending === false,
+    JSON.stringify(enCitas)
+  );
+  await api(`/api/bookings/${presencial.json?.bookingId}`, {
+    method: "PATCH",
+    body: JSON.stringify({ action: "cancel" }),
+  });
+
+  // De vuelta a en línea: la dirección se conserva en la configuración, pero
+  // la cita nueva lleva Meet y no la dirección.
+  await api("/api/calendar/settings", { method: "PUT", body: JSON.stringify({ meetingMode: "virtual" }) });
+  const slotB = await ofrecer();
+  const virtual = await bot("/api/bot/bookings", {
+    method: "POST",
+    body: JSON.stringify({ conversationId: convB.id, startUtc: slotB?.startUtc }),
+  });
+  ok(
+    "en línea: la cita lleva su Meet y ninguna dirección",
+    virtual.res.status === 201 &&
+      typeof virtual.json?.meetingLink === "string" &&
+      virtual.json.meetingLink.includes("meet.google.mock") &&
+      virtual.json?.location === null,
+    JSON.stringify(virtual.json)
+  );
+  const conserva = (await api("/api/calendar/settings")).json?.settings;
+  ok("la dirección se conserva al volver a «en línea»", conserva?.location === DIRECCION, JSON.stringify(conserva));
+  await api(`/api/bookings/${virtual.json?.bookingId}`, {
+    method: "PATCH",
+    body: JSON.stringify({ action: "cancel" }),
+  });
+
+  await api("/api/calendar/settings", {
+    method: "PUT",
+    body: JSON.stringify({ connector: "enlace-fijo", meetingMode: "virtual", location: null }),
+  });
 }
 
 async function googleLinkChecks(convB) {

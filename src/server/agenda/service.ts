@@ -74,6 +74,8 @@ export type BookingResult = {
   booking: BookingRow;
   meetingLink: string | null;
   linkPending: boolean;
+  /** Dirección de una cita presencial; null en las virtuales o sin dirección. */
+  location: string | null;
   label: string;
 };
 
@@ -196,6 +198,11 @@ export async function createSessionBooking(input: {
         // Copia histórica: si el negocio cambia de conector, esta cita conserva
         // el que le tocó y sigue hablando con él al moverse o cancelarse.
         connector: settings.connector,
+        // Igual que el conector: la modalidad y la dirección son las de HOY y
+        // la cita las conserva aunque el negocio cambie mañana.
+        meetingMode: settings.meetingMode,
+        location:
+          settings.meetingMode === "presencial" ? settings.location : null,
         isTest,
         notes: input.notes ?? null,
       })
@@ -245,6 +252,7 @@ export async function createSessionBooking(input: {
     booking: delivered,
     meetingLink: delivered.meetingLink,
     linkPending: delivered.linkPending,
+    location: delivered.location,
     label: labelInTz(slot.startUtc, settings.timezone),
   };
 }
@@ -343,6 +351,7 @@ export async function rescheduleBooking(input: {
     booking: next,
     meetingLink: next.meetingLink,
     linkPending: next.linkPending,
+    location: next.location,
     label: labelInTz(slot.startUtc, settings.timezone),
   };
 }
@@ -497,6 +506,7 @@ export async function retryMeetingLink(input: {
     booking: delivered,
     meetingLink: delivered.meetingLink,
     linkPending: delivered.linkPending,
+    location: delivered.location,
     label: labelInTz(delivered.scheduledAt.toISOString(), settings.timezone),
   };
 }
@@ -515,6 +525,15 @@ async function deliverMeeting(
 ): Promise<BookingRow> {
   if (booking.isTest) return booking;
   const connectorId = (booking.connector ?? settings.connector) as ConnectorId;
+
+  // PRESENCIAL: nadie recibe enlace. Un conector que solo da enlace (enlace
+  // fijo, Zoom) no tiene nada que hacer y ni se llama; uno que escribe en el
+  // calendario (Google) crea el evento sin videollamada, porque es donde el
+  // dueño mira su día. Se decide por la modalidad con la que NACIÓ la cita.
+  const presencial = booking.meetingMode === "presencial";
+  if (presencial && !CONNECTOR_META[connectorId].writesCalendarEvent) {
+    return booking;
+  }
 
   try {
     const conn = await bindConnector(
@@ -535,6 +554,8 @@ async function deliverMeeting(
             durationMinutes: booking.durationMinutes,
             timezone: settings.timezone,
             notes: booking.notes ?? undefined,
+            video: !presencial,
+            location: booking.location ?? undefined,
           });
 
     return await persistDelivery(booking.id, {
@@ -542,8 +563,12 @@ async function deliverMeeting(
       meetingLink: meeting.joinUrl,
       // Un conector que promete enlace por cita y no lo trajo todavía deja la
       // cita "sin enlace" — reintentable. `enlace-fijo` sin sala configurada,
-      // en cambio, no tiene nada pendiente: simplemente no hay enlace.
-      linkPending: CONNECTOR_META[connectorId].perBookingLink && !meeting.joinUrl,
+      // en cambio, no tiene nada pendiente: simplemente no hay enlace. Y una
+      // presencial nunca espera enlace.
+      linkPending:
+        !presencial &&
+        CONNECTOR_META[connectorId].perBookingLink &&
+        !meeting.joinUrl,
     });
   } catch (err) {
     console.warn(
@@ -557,10 +582,16 @@ async function deliverMeeting(
     // La cita ya existe y se queda: el enlace es lo único que falta. Se
     // conserva la referencia externa si ya la había, para que el reintento
     // sepa que no debe crear otra reunión.
+    //
+    // Una presencial NO queda pendiente: al cliente no se le debe ningún
+    // enlace, y `linkPending` es justo lo que hace decir «en un momento te
+    // comparto el enlace» (al agente y a un cerebro externo). Lo que se pierde
+    // es el evento en el calendario del dueño; la cita sigue en Citas, y si
+    // fue la credencial, la tarjeta de reconexión ya quedó marcada arriba.
     return await persistDelivery(booking.id, {
       externalRef: booking.externalRef,
       meetingLink: null,
-      linkPending: true,
+      linkPending: !presencial,
     });
   }
 }
