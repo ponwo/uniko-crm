@@ -106,3 +106,81 @@ bandera apagada/encendida, camino feliz, las dos garantías con códigos exactos
 la carrera, link pendiente + reintento, y sandbox. Sale distinto de cero si
 algo falla. En CI, los gates corren en la matriz de dos configuraciones: todo
 apagado (default) y todo encendido (`AGENDA=on` + canales) — FR-021.
+
+## 10. Citas presenciales (modalidad, 2026-09-30) y su ensayo del Principio X
+
+El negocio elige en Ajustes → Agenda → «Cómo atiendes» si sus citas son **en
+línea** (lo de siempre) o **presenciales** (sin enlace, con dirección; con Google,
+evento sin Meet). Zoom deja de ofrecerse en Ajustes. Guía:
+[docs/agenda-conectores.md](../../docs/agenda-conectores.md#citas-en-línea-o-presenciales);
+guion E2E: `tests/e2e/us-agenda.md` (`modalidadChecks()`).
+
+Migración `0017_agenda_modalidad`: **solo agrega** cuatro columnas, todas con
+`IF NOT EXISTS` — `calendar_settings.meeting_mode` (`NOT NULL DEFAULT 'virtual'`),
+`calendar_settings.location`, `booking.meeting_mode` y `booking.location`.
+
+**Fuera de orden.** La [PR #54](https://github.com/ponwo/uniko-crm/pull/54) se
+mergeó el 2026-10-01 (`ef4ccc0`) antes del ensayo, que el Principio X pide ANTES
+de `main`. La migración corrió en uniko-lanco sin problema (`[migrate]
+migraciones aplicadas`, `/api/health` en `ef4ccc0`) y el dueño la probó ahí con
+uso real. El ensayo con los respaldos de los clientes seguía siendo **requisito
+de la puerta de promoción a `production`**, y se hizo antes de llevarla a ellos.
+
+**Registro (2026-10-01, código de `main` en `ef4ccc0`):**
+
+- **Contra qué datos**: los respaldos de los **dos clientes**, que siguen en
+  `production` (`bd0cb82`) y por lo tanto **por detrás de la migración**. El dueño
+  los bajó del panel de Coolify («Back up now» del 2026-10-01):
+  - **I Love The Universe**: `pg-dump-uniko-1790863580.dmp`, 14:06 UTC,
+    **114 093 bytes**;
+  - **NuriaAndrea**: `pg-dump-uniko-1790863669.dmp`, 14:07 UTC, **221 139 bytes**.
+
+  Los dos tamaños se verificaron byte a byte contra lo que reporta Coolify
+  **antes** de restaurar.
+- **Bases desechables** en el PostgreSQL 16 local: `uniko_ensayo_iltu_20261001` y
+  `uniko_ensayo_nuriaandrea_20261001`. Nunca `uniko_dev` ni una instancia.
+- **Restauración** limpia en las dos (código 0, nada en stderr): 992 ms y 1066 ms.
+  - ILTU: 26 conversaciones, 75 mensajes, 26 contactos; **1 fila en
+    `calendar_settings`** y 0 citas.
+  - NuriaAndrea: 84 conversaciones, 1070 mensajes, 84 contactos; 0 filas en
+    `calendar_settings` y 0 citas.
+  - Las dos con **17 migraciones** en el diario de Drizzle (hasta la `0016`) y
+    ninguna de las cuatro columnas.
+- **`pnpm db:migrate`** desde un worktree con el árbol idéntico a `ef4ccc0`, solo
+  migraciones: código 0, **4.8 s y 2.9 s** con el arranque de drizzle-kit
+  incluido, y solo el ruido esperado (`NOTICE` de `CreateSchemaCommand` y
+  `transformCreateStmt`). La última entrada del diario es el `sha256` de
+  `0017_agenda_modalidad.sql`.
+- **Aditiva, medido y no supuesto.** Inventario del esquema entero antes y
+  después (tablas con sus filas, columnas, índices, restricciones y diario),
+  comparado línea por línea. Idéntico en las dos bases:
+
+  | | Antes | Después |
+  |---|---|---|
+  | Tablas | 34 | 34 |
+  | Columnas | 358 | 362 (las 4 de la `0017`) |
+  | Índices | 86 | 86 |
+  | Restricciones | 95 | 95 |
+  | **Filas** | 218 / 1813 | **218 / 1813** |
+  | Diario de Drizzle | 17 | 18 |
+
+  Las únicas líneas que cambian son las cuatro columnas nuevas y el contador del
+  diario. La fila de `calendar_settings` de ILTU quedó con `meeting_mode =
+  'virtual'` y `location` nula: exactamente el comportamiento de siempre.
+- **Re-ejecutable.** La `0017` corrida otra vez a mano (`psql -f`) sobre cada copia
+  ya migrada: código 0, cuatro `NOTICE` «ya existe, omitiendo», y el inventario
+  quedó **idéntico** al de después de migrar.
+- **La app de `main` arrancó contra cada copia** (build de producción, `next start
+  -p 3100`): `/api/health` → `{"ok":true,"version":"1.0.0"}`. El manifiesto sirvió
+  la marca real de cada cliente: «I Love The Universe — CRM de WhatsApp»
+  (`#0fafff`) y «NuriaAndrea CRM — CRM de WhatsApp» (`#0d5bff`). En el log, solo el
+  aviso de Next por los dos lockfiles (el worktree vive dentro del repo; no pasa
+  en el contenedor).
+- **Tirado todo**: las dos bases, con `dropdb --force` (en el PostgreSQL local no
+  queda ninguna `*ensayo*`), y los archivos de trabajo del ensayo. Los volcados
+  bajados los borra el dueño de su carpeta; los originales siguen en el VPS con la
+  retención de Coolify (14 días).
+
+Lo que este ensayo no mide es el volumen, como advierte la 020. La migración solo
+agrega columnas: tres nullable sin default y una con default constante, que en
+PostgreSQL 11+ no reescribe la tabla. Su costo no crece con los datos del cliente.

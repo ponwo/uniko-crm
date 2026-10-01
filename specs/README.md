@@ -11,7 +11,7 @@ producto** — y saberlo antes de leerla ahorra una confusión.
 | `002-diseno-atlas-white-label` | — | spec + plan |
 | `003-paridad-inbox-whatsapp` | — | spec |
 | `014-canal-instagram` | Ciclo completo | spec |
-| `015-motor-agenda-universal` | Ciclo completo | spec, plan, research, data-model, 2 contratos, quickstart, checklist, tasks + la enmienda constitucional que habilitó los conectores |
+| `015-motor-agenda-universal` | Ciclo completo | spec, plan, research, data-model, 2 contratos, quickstart, checklist, tasks + la enmienda constitucional que habilitó los conectores. Ajuste 2026-09-30: **citas presenciales** (Ajustes → Agenda → «Cómo atiendes»: en línea o presencial, sin enlace y con dirección; con Google, evento sin Meet) y **Zoom oculto** en Ajustes. Migración `0017` (cuatro columnas, aditiva). [PR #54](https://github.com/ponwo/uniko-crm/pull/54) en `main` (`ef4ccc0`) el 2026-10-01, verificada por el dueño en uniko-lanco; **ensayo del Principio X hecho el 2026-10-01** (fuera de orden: se mergeó antes) contra los respaldos de los dos clientes — quickstart §10 |
 | `016-atribucion-capi` | Ciclo completo | spec, plan, research, data-model, 2 contratos, quickstart, checklist, tasks |
 | `017-canal-messenger` | Ciclo completo | spec (sobre los cimientos de 014: mismo adaptador-por-canal y bandera) |
 | `018-reconexion-sse-resiliente` | Ciclo completo | spec, plan, research, data-model, contratos, quickstart, tasks |
