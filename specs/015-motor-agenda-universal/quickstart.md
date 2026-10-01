@@ -197,3 +197,15 @@ errores. Durante el relevo, NuriaAndrea alternó un minuto entre el contenedor v
 y el nuevo; se dio por buena con cuatro lecturas seguidas en `ef4ccc0` y el
 despliegue de Coolify en `finished`. En los clientes la agenda sigue apagada:
 las columnas quedan inertes.
+
+**Reintento del evento en presencial** ([PR #56](https://github.com/ponwo/uniko-crm/pull/56),
+`52d3a39`, 2026-10-01). Si Google falla al crear el evento de una cita
+presencial, la cita queda en Citas como «Sin evento», con **Reintentar evento**:
+el mismo `retry_link`, que crea el evento sin Meet y con la dirección.
+`booking.link_pending` es la marca de «entrega pendiente», y `pendingDelivery()`
+la separa por modalidad (`linkPending` para el cliente, `eventPending` para el
+dueño), así que a un cliente presencial nunca se le promete un enlace. Una cita
+cancelada ya no se reintenta (`422`). Sin migración. **Promovida a `production` en
+`52d3a39` el mismo día** por señal del dueño: puerta completa sin la condición 4,
+porque no toca `drizzle/`. Viajaron 5 commits (`ef4ccc0..52d3a39`, con los docs
+de #55), `verify-fleet.sh` 3/3 y arranque limpio en ILTU y NuriaAndrea.
