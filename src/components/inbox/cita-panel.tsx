@@ -32,6 +32,7 @@ type Booking = {
   weekday: string;
   meetingLink: string | null;
   linkPending: boolean;
+  eventPending: boolean;
   meetingMode: "virtual" | "presencial";
   location: string | null;
   isTest: boolean;
@@ -264,6 +265,14 @@ export function CitaPanel({
                     </Link>
                   </p>
                 )
+              )}
+              {b.eventPending && (
+                <p className="text-xs text-text-3">
+                  No quedó en tu calendario: Google no respondió.{" "}
+                  <Link href="/bookings" className="text-brand-text hover:underline">
+                    Reintentar en Citas
+                  </Link>
+                </p>
               )}
               {b.notes && <p className="text-xs text-text-2">{b.notes}</p>}
 

@@ -25,6 +25,7 @@ type Booking = {
   connector: string | null;
   meetingLink: string | null;
   linkPending: boolean;
+  eventPending: boolean;
   meetingMode: "virtual" | "presencial";
   location: string | null;
   isTest: boolean;
@@ -262,6 +263,9 @@ export function BookingsClient() {
                 {b.linkPending && b.status !== "cancelada" && (
                   <Badge variant="secondary">Sin enlace</Badge>
                 )}
+                {b.eventPending && b.status !== "cancelada" && (
+                  <Badge variant="secondary">Sin evento</Badge>
+                )}
               </div>
 
               <div className="flex flex-wrap items-center gap-3 text-sm text-text-3">
@@ -295,6 +299,25 @@ export function BookingsClient() {
                     onClick={() => act(b.id, { action: "retry_link" })}
                   >
                     Reintentar enlace
+                  </Button>
+                </div>
+              )}
+
+              {/* Presencial: el cliente ya tiene su dirección y la cita existe;
+                  lo que falta es el evento en el calendario del dueño. Mismo
+                  reintento: crea el evento sin Meet, o re-lee el que ya hay. */}
+              {b.eventPending && b.status !== "cancelada" && (
+                <div className="flex flex-wrap items-center gap-2 rounded-sm bg-subtle p-2">
+                  <span className="text-sm text-text-2">
+                    Esta cita no quedó en tu calendario: Google no respondió.
+                  </span>
+                  <Button
+                    size="sm"
+                    variant="secondary"
+                    disabled={busy === b.id}
+                    onClick={() => act(b.id, { action: "retry_link" })}
+                  >
+                    Reintentar evento
                   </Button>
                 </div>
               )}

@@ -3,7 +3,11 @@ import { getDb, schema } from "@/lib/db";
 import { newId } from "@/lib/db/ids";
 import { scoped } from "@/lib/db/tenant";
 import { labelInTz } from "@/lib/time/slots";
-import { CONNECTOR_META, type ConnectorId } from "@/lib/agenda-connectors";
+import {
+  CONNECTOR_META,
+  pendingDelivery,
+  type ConnectorId,
+} from "@/lib/agenda-connectors";
 import {
   computeAvailability,
   findSlot,
@@ -73,11 +77,31 @@ type BookingRow = typeof schema.booking.$inferSelect;
 export type BookingResult = {
   booking: BookingRow;
   meetingLink: string | null;
+  /**
+   * true ⇒ se le debe un ENLACE al cliente que el proveedor no entregó. Nunca
+   * en una presencial: ahí no hay enlace que prometer.
+   */
   linkPending: boolean;
+  /**
+   * true ⇒ cita presencial cuyo EVENTO no llegó al calendario del dueño. Es
+   * asunto del dueño (se reintenta en Citas), no algo que decirle al cliente.
+   */
+  eventPending: boolean;
   /** Dirección de una cita presencial; null en las virtuales o sin dirección. */
   location: string | null;
   label: string;
 };
+
+/** La forma única de responder sobre una cita: lo pendiente, ya separado. */
+function toResult(row: BookingRow, label: string): BookingResult {
+  return {
+    booking: row,
+    meetingLink: row.meetingLink,
+    ...pendingDelivery(row.linkPending, row.meetingMode),
+    location: row.location,
+    label,
+  };
+}
 
 /** Cuántas alternativas se devuelven cuando el hueco se ocupó. */
 const FRESH_ALTERNATIVES = 3;
@@ -248,13 +272,7 @@ export async function createSessionBooking(input: {
     data: { bookingId: delivered.id },
   });
 
-  return {
-    booking: delivered,
-    meetingLink: delivered.meetingLink,
-    linkPending: delivered.linkPending,
-    location: delivered.location,
-    label: labelInTz(slot.startUtc, settings.timezone),
-  };
+  return toResult(delivered, labelInTz(slot.startUtc, settings.timezone));
 }
 
 export async function createBlock(input: {
@@ -347,13 +365,7 @@ export async function rescheduleBooking(input: {
     type: "booking.updated",
     data: { bookingId: next.id },
   });
-  return {
-    booking: next,
-    meetingLink: next.meetingLink,
-    linkPending: next.linkPending,
-    location: next.location,
-    label: labelInTz(slot.startUtc, settings.timezone),
-  };
+  return toResult(next, labelInTz(slot.startUtc, settings.timezone));
 }
 
 /**
@@ -478,8 +490,10 @@ export async function markBookingStatus(input: {
 }
 
 /**
- * Reintenta la entrega de una cita que quedó sin enlace porque el proveedor
- * falló. Habla con el conector con el que NACIÓ la cita, no con el activo.
+ * Reintenta la entrega de una cita que el proveedor dejó a medias: el enlace
+ * de una virtual, o el evento del calendario de una presencial. Habla con el
+ * conector con el que NACIÓ la cita, no con el activo, y con la modalidad con
+ * la que nació.
  *
  * Sin esto, un hipo del proveedor sería una pérdida silenciosa que nadie
  * repara — que es exactamente lo que pasa hoy en el fork.
@@ -490,7 +504,15 @@ export async function retryMeetingLink(input: {
 }): Promise<BookingResult> {
   const booking = await getOwnBooking(input.organizationId, input.bookingId);
   if (!booking.linkPending) {
-    throw new BookingError("invalid", "Esta cita no tiene un enlace pendiente");
+    throw new BookingError(
+      "invalid",
+      "Esta cita no tiene nada pendiente en el proveedor"
+    );
+  }
+  // Entregar una cita cancelada crearía una reunión —o un evento en el
+  // calendario del dueño— para algo que ya no va a pasar.
+  if (booking.status === "cancelada") {
+    throw new BookingError("invalid", "La cita está cancelada");
   }
   const settings = await getSettings(input.organizationId);
   const contactName = booking.contactId
@@ -502,13 +524,10 @@ export async function retryMeetingLink(input: {
     type: "booking.updated",
     data: { bookingId: delivered.id },
   });
-  return {
-    booking: delivered,
-    meetingLink: delivered.meetingLink,
-    linkPending: delivered.linkPending,
-    location: delivered.location,
-    label: labelInTz(delivered.scheduledAt.toISOString(), settings.timezone),
-  };
+  return toResult(
+    delivered,
+    labelInTz(delivered.scheduledAt.toISOString(), settings.timezone)
+  );
 }
 
 /**
@@ -579,19 +598,18 @@ async function deliverMeeting(
         () => {}
       );
     }
-    // La cita ya existe y se queda: el enlace es lo único que falta. Se
-    // conserva la referencia externa si ya la había, para que el reintento
-    // sepa que no debe crear otra reunión.
+    // La cita ya existe y se queda: la entrega es lo único que falta —el
+    // enlace en una virtual, el evento del calendario en una presencial— y el
+    // dueño la reintenta desde Citas. Se conserva la referencia externa si ya
+    // la había, para que el reintento sepa que no debe crear otra reunión.
     //
-    // Una presencial NO queda pendiente: al cliente no se le debe ningún
-    // enlace, y `linkPending` es justo lo que hace decir «en un momento te
-    // comparto el enlace» (al agente y a un cerebro externo). Lo que se pierde
-    // es el evento en el calendario del dueño; la cita sigue en Citas, y si
-    // fue la credencial, la tarjeta de reconexión ya quedó marcada arriba.
+    // En una presencial esta marca NO llega al cliente: `toResult` la separa
+    // como `eventPending`, así que ni el agente ni un cerebro externo dicen
+    // «en un momento te comparto el enlace».
     return await persistDelivery(booking.id, {
       externalRef: booking.externalRef,
       meetingLink: null,
-      linkPending: !presencial,
+      linkPending: true,
     });
   }
 }

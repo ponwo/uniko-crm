@@ -201,10 +201,15 @@ caído, rechaza las credenciales o simplemente tarda:
    **reintentar**.
 4. Si el fallo fue de autenticación, la conexión queda marcada como rota en
    Ajustes, con su tarjeta de reconexión.
+5. Una cita **cancelada** no se reintenta (`422`): crearía una reunión —o un
+   evento en tu calendario— para algo que ya no va a pasar.
 
 En una cita **presencial** no hay enlace que esperar: si Google falla, la cita
-se crea igual con `linkPending: false` (al cliente no se le promete nada) y lo
-único que falta es el evento en tu calendario. El punto 4 aplica igual.
+se crea igual, el cliente recibe su dirección y `linkPending` sigue en `false`
+(nadie promete un enlace). Lo que falta es el **evento en tu calendario**: la
+cita aparece en Citas marcada **"sin evento"**, con un botón para **reintentar
+el evento**, que lo crea sin Meet y con la dirección (`eventPending` en
+`GET /api/bookings`). Los puntos 4 y 5 aplican igual.
 
 ## Escribe tu conector
 

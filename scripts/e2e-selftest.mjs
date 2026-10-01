@@ -2230,6 +2230,94 @@ async function modalidadChecks(convB) {
     body: JSON.stringify({ action: "cancel" }),
   });
 
+  // Google caído (aquí: desconectado) en una presencial: la cita se crea, al
+  // cliente no se le promete enlace, y lo que queda pendiente es el EVENTO del
+  // calendario del dueño, que se reintenta desde Citas cuando Google vuelve.
+  const credsGoogle = JSON.stringify({
+    clientId: "cli.apps.googleusercontent.com",
+    clientSecret: "secreto-google",
+    refreshToken: "ref-bueno",
+  });
+  await api("/api/settings/google", { method: "DELETE" });
+  const slotCaido = await ofrecer();
+  const sinGoogle = await bot("/api/bot/bookings", {
+    method: "POST",
+    body: JSON.stringify({ conversationId: convB.id, startUtc: slotCaido?.startUtc }),
+  });
+  ok(
+    "presencial con Google caído: la cita SE CREA, con la dirección y sin prometer enlace",
+    sinGoogle.res.status === 201 &&
+      sinGoogle.json?.linkPending === false &&
+      sinGoogle.json?.meetingLink === null &&
+      sinGoogle.json?.location === DIRECCION,
+    JSON.stringify(sinGoogle.json)
+  );
+  const pendiente = (await api("/api/bookings")).json?.bookings?.find((b) => b.id === sinGoogle.json?.bookingId);
+  ok(
+    "en Citas queda «sin evento» para el dueño, no «sin enlace»",
+    pendiente?.eventPending === true && pendiente?.linkPending === false,
+    JSON.stringify(pendiente)
+  );
+
+  await fetch(`${BASE}/api/dev/google-mock/_reset`, { method: "POST" });
+  await api("/api/settings/google", { method: "PUT", body: credsGoogle });
+  const reintento = await api(`/api/bookings/${sinGoogle.json?.bookingId}`, {
+    method: "PATCH",
+    body: JSON.stringify({ action: "retry_link" }),
+  });
+  ok(
+    "con Google de vuelta, «Reintentar evento» lo entrega y ya no queda pendiente",
+    reintento.res.ok &&
+      reintento.json?.eventPending === false &&
+      reintento.json?.linkPending === false &&
+      reintento.json?.meetingLink === null,
+    `status=${reintento.res.status} ${JSON.stringify(reintento.json)}`
+  );
+  const trasReintento = await (await fetch(`${BASE}/api/dev/google-mock/_state`)).json();
+  ok(
+    "…el evento llegó al calendario SIN Meet y con la dirección",
+    trasReintento.events?.length === 1 &&
+      trasReintento.events[0].withConference === false &&
+      trasReintento.events[0].location === DIRECCION,
+    JSON.stringify(trasReintento.events)
+  );
+  const yaEntregada = (await api("/api/bookings")).json?.bookings?.find((b) => b.id === sinGoogle.json?.bookingId);
+  ok("…y en Citas ya no dice «sin evento»", yaEntregada?.eventPending === false, JSON.stringify(yaEntregada));
+  const otraVez = await api(`/api/bookings/${sinGoogle.json?.bookingId}`, {
+    method: "PATCH",
+    body: JSON.stringify({ action: "retry_link" }),
+  });
+  ok("reintentar otra vez → 422: ya no hay nada pendiente", otraVez.res.status === 422, `status=${otraVez.res.status}`);
+  await api(`/api/bookings/${sinGoogle.json?.bookingId}`, {
+    method: "PATCH",
+    body: JSON.stringify({ action: "cancel" }),
+  });
+
+  // Una cancelada con el evento pendiente NO se reintenta: crearía un evento
+  // en el calendario del dueño para algo que ya no va a pasar.
+  await api("/api/settings/google", { method: "DELETE" });
+  const slotCancelar = await ofrecer();
+  const pendYCancelada = await bot("/api/bot/bookings", {
+    method: "POST",
+    body: JSON.stringify({ conversationId: convB.id, startUtc: slotCancelar?.startUtc }),
+  });
+  await api(`/api/bookings/${pendYCancelada.json?.bookingId}`, {
+    method: "PATCH",
+    body: JSON.stringify({ action: "cancel" }),
+  });
+  await fetch(`${BASE}/api/dev/google-mock/_reset`, { method: "POST" });
+  await api("/api/settings/google", { method: "PUT", body: credsGoogle });
+  const reintentoCancelada = await api(`/api/bookings/${pendYCancelada.json?.bookingId}`, {
+    method: "PATCH",
+    body: JSON.stringify({ action: "retry_link" }),
+  });
+  const trasCancelada = await (await fetch(`${BASE}/api/dev/google-mock/_state`)).json();
+  ok(
+    "una cita cancelada no se reintenta (422) y no aparece ningún evento",
+    pendYCancelada.res.status === 201 && reintentoCancelada.res.status === 422 && trasCancelada.events?.length === 0,
+    `status=${reintentoCancelada.res.status} eventos=${trasCancelada.events?.length}`
+  );
+
   // De vuelta a en línea: la dirección se conserva en la configuración, pero
   // la cita nueva lleva Meet y no la dirección.
   await api("/api/calendar/settings", { method: "PUT", body: JSON.stringify({ meetingMode: "virtual" }) });

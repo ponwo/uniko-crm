@@ -86,7 +86,16 @@ Automatizado en `modalidadChecks()`, con Google conectado contra su mock:
 4. El evento **sí** llega al calendario (mock de Google), **sin** conferencia y
    con la ubicación.
 5. En Citas la cita se ve como presencial, con su dirección.
-6. De vuelta a **en línea**: la cita nueva lleva su Meet y ninguna dirección;
+6. **Google caído en una presencial** (desconectado): la cita se crea (**201**)
+   con la dirección, `linkPending: false` y sin enlace — al cliente no se le
+   promete nada. En Citas queda `eventPending: true` («sin evento»), no «sin
+   enlace».
+7. Con Google de vuelta, **reintentar** entrega el evento: `eventPending: false`,
+   y el mock tiene el evento **sin** conferencia y con la ubicación. Reintentar
+   otra vez → **422** (ya no hay nada pendiente).
+8. Una cita **cancelada** con el evento pendiente no se reintenta: **422** y
+   ningún evento en el calendario.
+9. De vuelta a **en línea**: la cita nueva lleva su Meet y ninguna dirección;
    la dirección se conserva en la configuración.
 
 Lo que el agente le escribe al cliente (dirección y ni una palabra de enlace)
