@@ -2,6 +2,7 @@ import { and, desc, eq, gt, sql } from "drizzle-orm";
 import { getDb, schema } from "@/lib/db";
 import { scoped } from "@/lib/db/tenant";
 import { isWindowOpen, windowRemainingMs } from "@/server/inbox/window";
+import { requiresTemplate } from "@/server/channels/capabilities";
 import type { ConversationDto } from "@/lib/types";
 
 export async function listConversations(
@@ -116,6 +117,7 @@ export function serializeConversation(
     unreadCount: c.unreadCount,
     windowOpen: isWindowOpen(c.lastInboundAt),
     windowRemainingMs: windowRemainingMs(c.lastInboundAt),
+    templateRequired: requiresTemplate(c.channel, c.lastInboundAt),
     preview,
   };
 }

@@ -17,6 +17,12 @@ export type ConversationDto = {
   unreadCount: number;
   windowOpen: boolean;
   windowRemainingMs: number;
+  /**
+   * 031 — Solo se le puede escribir con una plantilla aprobada: su canal la
+   * exige fuera de ventana (WhatsApp) y la ventana está cerrada. En Instagram
+   * y Messenger es siempre false: ahí la ventana cerrada no bloquea.
+   */
+  templateRequired: boolean;
   preview: string | null;
 };
 
@@ -99,6 +105,11 @@ export type FichaDto = Record<string, FichaValue>;
 export type ContactDto = {
   id: string;
   name: string;
+  /**
+   * 031 — Su canal permite escribirle primero (con plantilla): solo WhatsApp.
+   * A uno de Instagram o Messenger se le responde desde la Bandeja.
+   */
+  canWriteFirst: boolean;
   /** null en contactos que llegaron solo con BSUID (003). */
   phone: string | null;
   notes: string | null;

@@ -19,6 +19,7 @@ import {
   X,
 } from "lucide-react";
 import type { ConversationDto, TemplateDto } from "@/lib/types";
+import { CHANNEL_LABEL } from "@/lib/channels";
 import { esEnviable } from "@/lib/templates";
 import { cn } from "@/lib/utils";
 import { formatBytes, formatRemaining } from "./helpers";
@@ -104,8 +105,8 @@ export function Composer({
   // sin depender del cierre de un render concreto.
   const attachmentsRef = useRef<Attachment[]>([]);
   const sendingRef = useRef(false);
-  const windowOpenRef = useRef(conversation.windowOpen);
-  windowOpenRef.current = conversation.windowOpen;
+  const templateRequiredRef = useRef(conversation.templateRequired);
+  templateRequiredRef.current = conversation.templateRequired;
 
   useEffect(() => {
     let cancelled = false;
@@ -222,7 +223,7 @@ export function Composer({
       if (!dragHasFiles(e)) return;
       e.preventDefault();
       depth++;
-      if (windowOpenRef.current) setDragging(true);
+      if (!templateRequiredRef.current) setDragging(true);
     };
     const onOver = (e: DragEvent) => {
       if (!dragHasFiles(e)) return;
@@ -240,9 +241,9 @@ export function Composer({
       e.preventDefault();
       depth = 0;
       setDragging(false);
-      // Con la ventana cerrada no hay a dónde adjuntar: solo evitamos que el
-      // navegador navegue al archivo.
-      if (!windowOpenRef.current) return;
+      // Cuando solo cabe una plantilla no hay a dónde adjuntar: solo evitamos
+      // que el navegador navegue al archivo.
+      if (templateRequiredRef.current) return;
       const files = e.dataTransfer?.files;
       if (files && files.length > 0) addFiles(Array.from(files));
     };
@@ -393,7 +394,10 @@ export function Composer({
     onSent();
   }
 
-  if (!conversation.windowOpen) {
+  // 031 — La plantilla es regla de WhatsApp. En Instagram y Messenger la
+  // ventana cerrada no esconde la caja: la respuesta sale como de agente
+  // humano y la plataforma decide.
+  if (conversation.templateRequired) {
     return (
       <div className="border-t bg-background px-[18px] py-3.5">
         <div className="mb-3 flex items-start gap-2 rounded-md border border-warning-soft bg-warning-tint p-3 text-sm text-warning-text">
@@ -699,9 +703,18 @@ export function Composer({
         ) : (
           <span />
         )}
-        <p className="ml-auto shrink-0 font-mono text-[10.5px] tracking-[0.04em] text-text-3">
-          Ventana abierta · quedan {formatRemaining(conversation.windowRemainingMs)}
-        </p>
+        {conversation.windowOpen ? (
+          <p className="ml-auto shrink-0 font-mono text-[10.5px] tracking-[0.04em] text-text-3">
+            Ventana abierta · quedan {formatRemaining(conversation.windowRemainingMs)}
+          </p>
+        ) : (
+          <p
+            className="ml-auto text-right font-mono text-[10.5px] tracking-[0.04em] text-text-3"
+            title={`${CHANNEL_LABEL[conversation.channel]} no usa plantillas: fuera de la ventana de 24 h tu respuesta sale marcada como de agente humano, y Meta la acepta hasta 7 días después del último mensaje del cliente.`}
+          >
+            Fuera de la ventana de 24 h · sale como respuesta de agente humano
+          </p>
+        )}
       </div>
     </div>
   );

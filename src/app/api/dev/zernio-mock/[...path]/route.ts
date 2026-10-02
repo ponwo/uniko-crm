@@ -161,6 +161,15 @@ export async function POST(req: Request, ctx: Ctx) {
     path[3] === "messages"
   ) {
     const body = await json(req);
+    // 031 — Pasados 7 días Meta rechaza la respuesta de agente humano. Un hilo
+    // cuyo id lleva `vencida` lo imita, para que el arnés pruebe ese camino
+    // infeliz sin depender del reloj (el mock no sabe del último entrante).
+    if (body.messageTag === "HUMAN_AGENT" && path[2]!.includes("vencida")) {
+      return Response.json(
+        { error: "(#10) This message is sent outside of allowed window." },
+        { status: 400 }
+      );
+    }
     const id = nextZernioMessageId();
     state.sent.push({
       n: state.seq,
