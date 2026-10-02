@@ -4,7 +4,7 @@
 
 **Created**: 2026-10-02
 
-**Status**: Implementada y verificada en local (2026-10-02); falta en vivo en uniko-lanco
+**Status**: Implementada; verificada en local y **en vivo en uniko-lanco**; **promovida a `production` en `98a9094`** (2026-10-02, flota 3/3)
 
 **Carril**: **ligero** (`spec.md` únicamente). No toca el modelo de datos —sin
 migración: el canal ya vive en `contact.channel` y `conversation.channel` desde la
@@ -191,6 +191,50 @@ carga sus plantillas aparte), en `next dev` la primera `GET /api/templates` tras
 código tardó 5 s en compilar, y la vista previa de una conversación de la corrida
 anterior ya decía el texto que se esperaba. El guion espera con holgura y usa textos
 únicos por corrida.
+
+### En vivo — uniko-lanco en `98a9094` (2026-10-02)
+
+1. **Despliegue**: el dueño mergeó [PR #58](https://github.com/ponwo/uniko-crm/pull/58)
+   (`98a9094`, 18:56 UTC) y uniko-lanco se redesplegó sola. `/api/health` respondió
+   `98a9094` en tres lecturas seguidas, y el log desde el arranque solo trae
+   «migraciones aplicadas» y el arranque de Next.
+2. **En la sesión del dueño (su Chrome), sin enviar nada**:
+   - `GET /api/conversations`: Instagram y Messenger, con su último entrante de hace
+     ~22 días, viajan con `windowOpen=false` y `templateRequired=false`; las dos de
+     WhatsApp, con la ventana cerrada, con `templateRequired=true`;
+   - en la Bandeja, Instagram y Messenger enseñan la caja, los atajos y el pie de
+     agente humano; WhatsApp (último mensaje del día anterior), el aviso y el
+     selector de plantillas;
+   - Contactos ofrece *Escribir primero* a los dos contactos de WhatsApp y no a los
+     de Instagram y Messenger;
+   - sondas sin efectos: una plantilla y *Escribir primero* sobre la conversación de
+     Instagram responden 409 `channel_without_templates` con el mensaje en español;
+     siguen las mismas 4 conversaciones y ningún mensaje nuevo;
+   - la consola, sin errores.
+3. **Lo que no se probó en vivo**: un envío real fuera de ventana. Las conversaciones
+   de Instagram y Messenger de LanCo son del 10 de septiembre, más de 7 días: Meta lo
+   rechazaría, y Uniko lo explicaría (FR-1605). Un envío feliz pide un DM de entre 1 y
+   7 días de antigüedad.
+
+### Promoción a `production` en `98a9094` (2026-10-02)
+
+Por señal del dueño, con la puerta completa:
+
+- **Por máquina**: LanCo en `98a9094` igual que `main`, la CI en verde en `default` y
+  `completo`, y sin `drizzle/`, así que la condición 4 no aplica.
+- **Declaradas por el dueño**: uso real en LanCo; el self-test contra LanCo, cubierto
+  por la prueba en vivo (los mocks dan 404 allá); y el plan de reversión: revertir
+  #58 con un PR, verificar en LanCo y volver a promover; si urge, redesplegar los
+  clientes en `52d3a39`. No hay datos que deshacer.
+
+Viajaron 4 commits (`52d3a39..98a9094`, con los docs de #57). `verify-fleet.sh` dio
+3/3 en `98a9094`, con cinco lecturas seguidas estables por instancia, los despliegues
+de Coolify de ILTU y NuriaAndrea en `finished` y arranque limpio.
+
+**En ILTU y NuriaAndrea `CHANNELS` está encendida** con los tres canales desde el
+2026-09-11, así que el cambio es visible para sus operadores si tienen Instagram o
+Messenger conectados. Durante la puerta se dijo lo contrario; se corrigió al cerrar,
+leyendo la variable en Coolify.
 
 ---
 
