@@ -7,7 +7,9 @@ import { getContactById } from "@/server/contacts";
 import { getOrCreateConversation } from "@/server/inbox/ingest";
 import { SendError } from "@/server/inbox/send";
 import { isWindowOpen } from "@/server/inbox/window";
+import { usesTemplates } from "@/server/channels/capabilities";
 import {
+  channelWithoutTemplates,
   sendTemplate,
   TemplateError,
   templateErrorStatus,
@@ -34,6 +36,13 @@ export const POST = withAuth(async (session, req: Request, ctx: Params) => {
   const { id } = await ctx.params;
   const contact = await getContactById(session.organizationId, id);
   if (!contact) return apiError(404, "not_found", "Contacto no encontrado");
+  // 031 — Escribir primero es con plantilla, y las plantillas son de WhatsApp.
+  // Se rechaza antes de tocar nada: si no, `getOrCreateConversation` le
+  // abriría una conversación de WhatsApp a un contacto de Instagram.
+  if (!usesTemplates(contact.channel)) {
+    const err = channelWithoutTemplates(contact.channel);
+    return apiError(templateErrorStatus(err), err.code, err.message);
+  }
   if (!contact.phone && !contact.waIdentity) {
     return apiError(422, "no_identity", "Este contacto no tiene a dónde escribir");
   }
@@ -66,7 +75,10 @@ export const POST = withAuth(async (session, req: Request, ctx: Params) => {
   }
 
   const conversation =
-    existing[0] ?? (await getOrCreateConversation(session.organizationId, id));
+    existing[0] ??
+    (await getOrCreateConversation(session.organizationId, id, {
+      channel: contact.channel,
+    }));
 
   try {
     const result = await sendTemplate({

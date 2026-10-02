@@ -26,6 +26,8 @@ import {
 } from "@/server/whatsapp/credentials";
 import { callGraphSend, SendError } from "@/server/inbox/send";
 import { serializeMessage } from "@/server/inbox/ingest";
+import { capabilitiesFor, usesTemplates } from "@/server/channels/capabilities";
+import type { Channel } from "@/lib/channels";
 import type { WebhookValue } from "@/server/inbox/webhook";
 
 /** Errores tipados del servicio de plantillas → HTTP en la capa de API. */
@@ -37,7 +39,9 @@ export class TemplateError extends Error {
     | "not_found"
     | "already_exists"
     | "meta_error"
-    | "meta_unavailable";
+    | "meta_unavailable"
+    /** 031: la conversación es de un canal sin plantillas (Instagram, Messenger). */
+    | "channel_without_templates";
 
   constructor(code: TemplateError["code"], message: string) {
     super(message);
@@ -54,10 +58,24 @@ const TEMPLATE_ERROR_STATUS: Record<TemplateError["code"], number> = {
   already_exists: 409,
   meta_error: 422,
   meta_unavailable: 503,
+  channel_without_templates: 409,
 };
 
 export function templateErrorStatus(err: TemplateError): number {
   return TEMPLATE_ERROR_STATUS[err.code];
+}
+
+/**
+ * 031 — Una plantilla pedida en un canal que no las tiene. Lo usan el envío
+ * en la conversación y *Escribir primero*, para que el operador lea lo mismo
+ * venga por donde venga.
+ */
+export function channelWithoutTemplates(channel: Channel): TemplateError {
+  const { label } = capabilitiesFor(channel);
+  return new TemplateError(
+    "channel_without_templates",
+    `Las plantillas son de WhatsApp. A esta persona de ${label} respóndele con texto desde la Bandeja, aunque hayan pasado más de 24 h.`
+  );
 }
 
 export { countVariables, renderBody, validateBodyVariables };
@@ -686,6 +704,39 @@ export async function sendTemplate(input: {
 }): Promise<{ messageId: string }> {
   const db = getDb();
 
+  // La conversación va primero: si aquí cabe una plantilla lo decide su
+  // canal, antes que la plantilla misma.
+  const rows = await db
+    .select({ conversation: schema.conversation, contact: schema.contact })
+    .from(schema.conversation)
+    .innerJoin(
+      schema.contact,
+      eq(schema.conversation.contactId, schema.contact.id)
+    )
+    .where(
+      scoped(
+        schema.conversation.organizationId,
+        input.organizationId,
+        eq(schema.conversation.id, input.conversationId)
+      )
+    )
+    .limit(1);
+  const row = rows[0];
+  if (!row) throw new TemplateError("not_found", "Conversación no encontrada");
+  if (row.conversation.isTest) {
+    // Aserción dura del sandbox (FR-031)
+    throw new SendError(
+      "sandbox_violation",
+      "Conversación de prueba del Laboratorio: el envío real está prohibido"
+    );
+  }
+  // 031 — Las plantillas son de WhatsApp. En otro canal esto intentaría una de
+  // WhatsApp con el teléfono del contacto: hoy solo la frena que los de
+  // Instagram y Messenger no traen teléfono, y eso no es una regla.
+  if (!usesTemplates(row.conversation.channel)) {
+    throw channelWithoutTemplates(row.conversation.channel);
+  }
+
   const templates = await db
     .select()
     .from(schema.template)
@@ -736,31 +787,6 @@ export async function sendTemplate(input: {
       variableCount === 1
         ? "La plantilla requiere el valor de {{1}}"
         : `La plantilla requiere ${variableCount} valores: falta {{${n}}}`
-    );
-  }
-
-  const rows = await db
-    .select({ conversation: schema.conversation, contact: schema.contact })
-    .from(schema.conversation)
-    .innerJoin(
-      schema.contact,
-      eq(schema.conversation.contactId, schema.contact.id)
-    )
-    .where(
-      scoped(
-        schema.conversation.organizationId,
-        input.organizationId,
-        eq(schema.conversation.id, input.conversationId)
-      )
-    )
-    .limit(1);
-  const row = rows[0];
-  if (!row) throw new TemplateError("not_found", "Conversación no encontrada");
-  if (row.conversation.isTest) {
-    // Aserción dura del sandbox (FR-031)
-    throw new SendError(
-      "sandbox_violation",
-      "Conversación de prueba del Laboratorio: el envío real está prohibido"
     );
   }
 

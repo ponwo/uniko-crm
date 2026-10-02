@@ -25,9 +25,12 @@ import {
 import { sendMessengerText } from "@/server/messenger/send";
 import {
   capabilitiesFor,
+  humanAgentExpired,
+  requiresTemplate,
   textFits,
   windowClosedMessage,
 } from "@/server/channels/capabilities";
+import type { Channel } from "@/lib/channels";
 import { isChannelEnabled } from "@/server/channels/enabled";
 import { serializeMessage } from "@/server/inbox/ingest";
 import {
@@ -174,12 +177,10 @@ async function prepareSend(
 
   // El nucleo no decide la politica: la consulta. WhatsApp exige plantilla
   // fuera de ventana; Instagram etiqueta y sigue; otro canal podria no tener
-  // ventana en absoluto.
-  const caps = capabilitiesFor(row.conversation.channel);
+  // ventana en absoluto. 031: es la MISMA regla con la que la Bandeja decide
+  // si esconde la caja de texto.
   if (
-    caps.windowMs !== null &&
-    caps.outsideWindow === "template" &&
-    !isWindowOpen(row.conversation.lastInboundAt)
+    requiresTemplate(row.conversation.channel, row.conversation.lastInboundAt)
   ) {
     throw new SendError(
       "window_closed",
@@ -662,10 +663,35 @@ async function callInstagramSend(
           "Instagram no está disponible en este momento; intenta de nuevo"
         );
       }
-      throw new SendError("meta_error", err.message);
+      throw new SendError(
+        "meta_error",
+        platformRejection(
+          "instagram",
+          target.conversation.lastInboundAt,
+          humanAgentTag,
+          err.message
+        )
+      );
     }
     throw err;
   }
+}
+
+/**
+ * 031 — Fuera de WhatsApp la ventana cerrada no bloquea: la respuesta sale como
+ * de agente humano y la plataforma decide. Pasados 7 días la rechaza con un
+ * error en inglés que el operador no tiene por qué saber leer: se le dice la
+ * causa y se conserva el texto de la plataforma para diagnosticar.
+ */
+function platformRejection(
+  channel: Channel,
+  lastInboundAt: Date | null,
+  humanAgentTag: boolean,
+  raw: string
+): string {
+  if (!humanAgentTag || !humanAgentExpired(lastInboundAt)) return raw;
+  const { label } = capabilitiesFor(channel);
+  return `${label} ya no acepta respuestas en esta conversación: pasaron más de 7 días desde el último mensaje de la persona. Cuando vuelva a escribir podrás responderle. (${label}: ${raw})`;
 }
 
 /**
@@ -718,7 +744,15 @@ async function callMessengerSend(
           "Messenger no está disponible en este momento; intenta de nuevo"
         );
       }
-      throw new SendError("meta_error", err.message);
+      throw new SendError(
+        "meta_error",
+        platformRejection(
+          "messenger",
+          target.conversation.lastInboundAt,
+          humanAgentTag,
+          err.message
+        )
+      );
     }
     throw err;
   }

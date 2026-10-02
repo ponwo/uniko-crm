@@ -1,4 +1,5 @@
 import { CHANNEL_LABEL, type Channel } from "@/lib/channels";
+import { isWindowOpen } from "@/server/inbox/window";
 
 /**
  * 014 — Capacidades declaradas por canal.
@@ -77,6 +78,49 @@ export const CHANNEL_CAPABILITIES: Record<Channel, ChannelCapabilities> = {
 
 export function capabilitiesFor(channel: Channel): ChannelCapabilities {
   return CHANNEL_CAPABILITIES[channel] ?? CHANNEL_CAPABILITIES.whatsapp;
+}
+
+/**
+ * 031 — Hasta cuándo aceptan Instagram y Messenger una respuesta etiquetada
+ * como de agente humano: 7 días desde el último mensaje del cliente. Uniko no
+ * la aplica —la plataforma decide—; la usa para explicar su rechazo.
+ */
+const HUMAN_AGENT_MS = 7 * DAY_MS;
+
+/** 031 — ¿El canal tiene plantillas? Solo donde la plantilla reabre la ventana. */
+export function usesTemplates(channel: Channel): boolean {
+  return capabilitiesFor(channel).outsideWindow === "template";
+}
+
+/**
+ * 031 — ¿A esta conversación solo se le puede escribir con plantilla ahora
+ * mismo? Es LA regla: `prepareSend` la usa para rechazar el texto libre y la
+ * Bandeja para esconder la caja. Fuera de un canal con plantillas, la ventana
+ * cerrada no bloquea al operador.
+ */
+export function requiresTemplate(
+  channel: Channel,
+  lastInboundAt: Date | null,
+  now: Date = new Date()
+): boolean {
+  const caps = capabilitiesFor(channel);
+  return (
+    caps.windowMs !== null &&
+    caps.outsideWindow === "template" &&
+    !isWindowOpen(lastInboundAt, now)
+  );
+}
+
+/**
+ * 031 — ¿Ya pasó el plazo en que la plataforma acepta al agente humano? Sin
+ * entrantes no hay plazo que explicar: false.
+ */
+export function humanAgentExpired(
+  lastInboundAt: Date | null,
+  now: Date = new Date()
+): boolean {
+  if (!lastInboundAt) return false;
+  return now.getTime() - lastInboundAt.getTime() >= HUMAN_AGENT_MS;
 }
 
 /** Mensaje para el operador cuando la ventana está cerrada, según el canal. */

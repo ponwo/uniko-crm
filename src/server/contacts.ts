@@ -2,6 +2,7 @@ import { eq } from "drizzle-orm";
 import { getDb, schema } from "@/lib/db";
 import { scoped } from "@/lib/db/tenant";
 import { effectiveSource } from "@/server/contact-source";
+import { usesTemplates } from "@/server/channels/capabilities";
 import type { FichaDto, PriorityValue } from "@/lib/types";
 
 export function serializeContact(
@@ -12,6 +13,9 @@ export function serializeContact(
   return {
     id: c.id,
     name: c.name,
+    // 031: escribir primero es con plantilla, y solo un canal con plantillas
+    // (WhatsApp) lo permite. Se pregunta a las capacidades, no a la pantalla.
+    canWriteFirst: usesTemplates(c.channel),
     phone: c.phone,
     notes: c.notes,
     stageName,

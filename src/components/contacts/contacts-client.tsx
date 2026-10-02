@@ -201,16 +201,20 @@ export function ContactsClient() {
                     Editar
                   </Button>
                   {/* A quien nunca escribió hay que abrirle la conversación con
-                      una plantilla: es regla de Meta, no del CRM. */}
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    aria-label="Escribir primero"
-                    title="Escribir primero (con plantilla)"
-                    onClick={() => setEscribiendo(c)}
-                  >
-                    <Send className="h-4 w-4" />
-                  </Button>
+                      una plantilla: es regla de Meta, no del CRM. 031: y solo
+                      de WhatsApp; a un contacto de Instagram o Messenger se le
+                      responde desde la Bandeja. */}
+                  {c.canWriteFirst && (
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      aria-label="Escribir primero"
+                      title="Escribir primero (con plantilla)"
+                      onClick={() => setEscribiendo(c)}
+                    >
+                      <Send className="h-4 w-4" />
+                    </Button>
+                  )}
                   <Link href={`/inbox?contact=${c.id}`}>
                     <Button variant="ghost" size="icon" aria-label="Abrir conversación">
                       <MessageSquareText className="h-4 w-4" />
