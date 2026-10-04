@@ -90,9 +90,8 @@ API ya está activada. En la
 
    > Para que las citas lleguen a tu Google Calendar con su enlace de Meet,
    > abre este link y autoriza con la cuenta de Google de ese calendario (toma
-   > un minuto). Si Google te dice que la app no está verificada, toca
-   > *Avanzado* → *Ir a LanCo Agenda*. Ábrelo en Chrome o Safari, no dentro de
-   > Instagram o Facebook. {link}
+   > un minuto). Ábrelo en Chrome o Safari, no dentro de Instagram o Facebook.
+   > {link}
 
    Si el calendario es tuyo, o estás frente a la computadora del titular, no
    hace falta copiarlo: *Conectar mi calendario* lo abre ahí mismo en otra
@@ -106,8 +105,9 @@ API ya está activada. En la
 
 ## 2. Qué ve el titular
 
-1. `lanco.cloud`: «Conecta tu Google Calendar con {negocio}», qué se autoriza, el
-   aviso de app sin verificar (mientras dure) y *Continuar con Google*. Si abrió
+1. `lanco.cloud`: «Conecta tu Google Calendar con {negocio}», qué se autoriza y
+   *Continuar con Google* (ya sin aviso de «app no verificada»: Google la verificó
+   el 2026-10-04). Si abrió
    el link dentro de una app, le pide abrirlo en el navegador (Google no deja
    autorizar desde ahí: `403 disallowed_useragent`).
 2. Google: elige la cuenta y acepta el permiso de «LanCo Agenda».
@@ -140,15 +140,40 @@ API ya está activada. En la
 
 ## 5. Verificación de Google (quita el aviso de «app no verificada»)
 
-Mientras no esté verificada, la app funciona igual, pero el titular ve el aviso y
-Google aplica un tope de 100 usuarios, de por vida, a las apps sin verificar
-(irrelevante con el tamaño de la flota). `calendar.events.owned` es **sensible**,
-no restringido: no hay evaluación de seguridad de terceros.
+**Verificada: Google aprobó `calendar.events.owned` el 2026-10-04** (proyecto
+`lanco-robotics`). Ya no sale el aviso de «app no verificada» ni rige el tope de
+100 usuarios. Lo que sigue en esta sección queda como registro de cómo se llegó y
+como guía si hay que volver a pasar por esto (un permiso nuevo, o cualquier cambio
+a la pantalla de consentimiento, exige otra verificación: la aprobación no se
+hereda).
+
+Antes de aprobarse, la app funcionaba igual, pero el titular veía el aviso y
+Google aplicaba el tope. `calendar.events.owned` es **sensible**, no restringido:
+no hay evaluación de seguridad de terceros.
 
 Son dos revisiones y van **en este orden**: Google no deja pedir la del permiso
 sin la marca publicada.
 
-**Estado al 2026-09-29** (consola revisada):
+**Historia (2026-09-29 → 10-04)**:
+
+- **Marca**: verificada el 2026-09-29 (un día).
+- **Permiso**: pedido el 2026-09-29; tres rondas hasta la aprobación del
+  2026-10-04. Lo que Google objetó, y por tanto lo que el video debe mostrar:
+  1. *Flujo de consentimiento*: la cuenta de grabación aún tenía acceso concedido,
+     y Google mostró «LanCo Agenda ya tiene acceso parcial» en vez de la pantalla
+     de otorgamiento, y en español. Se regrabó con el acceso borrado y la cuenta
+     en English.
+  2. *Mínimo privilegio*: pidió el consentimiento **con el permiso expandido**
+     («See access details»), el **efecto en la cuenta de Google** (crear, mover y
+     **borrar** un evento, vistos en Calendar), el permiso idéntico al declarado
+     en la consola, y **por qué no basta uno más estrecho** (la §5.4 lo
+     argumenta). Se respondió **por el hilo del correo** y se actualizó el vínculo
+     del video en *Acceso a los datos*.
+  3. Aprobada.
+- El ID de cliente en la barra de direcciones **no** lo exige Google (su guía no lo
+  menciona); no estorba, pero no cuenta como requisito.
+
+**Estado al 2026-09-29** (previo a pedir el permiso):
 
 - Search Console: `lanco.cloud` verificado como propiedad de dominio por
   `ponwo10@gmail.com`, propietario del proyecto ✓.
@@ -182,7 +207,8 @@ sin la marca publicada.
    la justificación (§5.4) y el link del video. Es sensible, no restringido: no
    hay evaluación de seguridad.
 4. Al aprobarse: `APP_VERIFICADA = true` en `modules/googleCalendar.ts` de
-   `lanco-ws` (quita el aviso de la página) y desplegar el sitio.
+   `lanco-ws` (quita el aviso de la página) y desplegar el sitio. Hecho el
+   2026-10-04 (ponwo/lanco-ws#16).
 5. **El logo, opcional y al final**: cuadrado de 120×120 px, PNG, JPG o BMP,
    máximo 1 MB; el de LanCo, sin nada que se parezca a los logos de Google (ni
    al ícono de Google Calendar). Manda la marca a una revisión más, y la app
@@ -193,17 +219,26 @@ sin la marca publicada.
 
 YouTube, **no listado**, de punta a punta. Google exige ver el proceso de
 autorización **en inglés**, el nombre «LanCo Agenda» en la pantalla de
-consentimiento, el **ID de cliente en la barra de direcciones** y el uso de cada
-permiso en detalle.
+consentimiento, el permiso **expandido y legible** («See access details» abierto),
+el uso de cada permiso en detalle y su **efecto en la cuenta de Google** (el
+evento creado, movido y borrado, visto en Calendar). Lo que aprobó el 2026-10-04
+fue el tercer video, con esas piezas.
 
+- **Quitar de verdad el acceso antes de grabar** (*Seguridad → Apps de terceros →
+  LanCo Agenda → Eliminar todas las conexiones*) y comprobar que ya no aparece.
+  Si no, Google muestra «LanCo Agenda ya tiene acceso parcial» y no la pantalla
+  de otorgamiento: fue el primer rechazo.
 - Poner en inglés la cuenta de Google del titular mientras se graba (p. ej.
-  `lanco.dmd@gmail.com`), y quitarle antes el acceso a LanCo Agenda para que el
-  recorrido salga completo.
+  `lanco.dmd@gmail.com`).
+- En la pantalla de consentimiento, **pulsar «See access details»** y dejar el
+  permiso expandido unos 5 s.
+- Al terminar de grabar, comprobar el video en una ventana de incógnito y
+  **responder por el hilo del correo** de Google (no con un correo nuevo),
+  actualizando también el vínculo en *Acceso a los datos*.
 - Antes del consentimiento sale «Google hasn't verified this app»: es normal
   mientras no aprueben el permiso. *Advanced → Go to LanCo Agenda (unsafe)*, en
   cámara.
-- En la pantalla de consentimiento, hacer clic en la barra de direcciones para
-  que se lea el `client_id`.
+- Opcional: clic en la barra de direcciones para que se lea el `client_id`.
 - Subtítulos en inglés en cada paso: Uniko está en español.
 - Se graba con Win+Shift+R (Recortes) u OBS.
 - **El paso 8 de verdad deja a uniko-lanco sin Google**: las citas reales dejan
@@ -222,6 +257,13 @@ permiso en detalle.
 | 8 | Cuenta de Google → *Seguridad → Apps de terceros* → LanCo Agenda → *Quitar acceso* | The owner can revoke access at any time from their Google Account. |
 
 ### 5.4 Justificación del permiso (en inglés, para pegar)
+
+Esta es la justificación inicial. En la segunda ronda Google pidió explicar «por
+qué no basta un permiso más estrecho» en el correo de respuesta; la respuesta que
+se aprobó reforzó el último párrafo con las alternativas: los permisos de solo
+lectura (`.readonly`, `freebusy`) no pueden escribir; `calendar.events` abarca
+calendarios ajenos; `calendar.app.created` separaría las citas en un calendario
+secundario, lejos del principal donde el dueño planea su día.
 
 > LanCo Agenda creates, updates and deletes the Google Calendar events of the
 > appointments that a business books through its WhatsApp CRM (Uniko), each with
