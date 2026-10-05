@@ -38,7 +38,8 @@ Con ≥ 2 y `shown` vacío: `Por ahora no tengo <query> en talla <size>.` o `Por
 tengo <query> con existencia.`; `query` y `size` se imprimen como los mandó el modelo
 (recortados). Se muestran a lo sumo `SHOW_LIMIT = 5`; si quedaron más, o MS-Stock marcó
 `truncated`, se añade un último mensaje de texto `Hay más coincidencias, ¿me dices cuál
-te interesa?`.
+te interesa?`. (032: FR-1710 — con más de 10 o `truncated` y catálogo PDF, el cierre es
+«Hay más modelos en nuestro catálogo, ¿te lo mando?».)
 
 **Rationale**: "un producto" es el único caso en el que la alternativa útil es el
 mismo producto en otra talla (decisión del dueño); en el resto, lo que no tiene lo
