@@ -2751,6 +2751,15 @@ async function inventarioChecks() {
       typeof r.text === "string" && r.text.includes("Respuesta de prueba"),
       JSON.stringify(r)
     );
+    // 032 (US4): sin inventario no hay catálogo: la pregunta general recibe el eco.
+    const rCatalogo = await preguntar("5214627032900", "¿qué venden?", "off.032");
+    ok(
+      "apagado: '¿qué venden?' recibe el eco de siempre, sin documento (el agente no conoce send_catalog)",
+      typeof rCatalogo.text === "string" &&
+        rCatalogo.text.includes("Respuesta de prueba") &&
+        !(await outboxDe("5214627032900")).some((o) => o.type === "document"),
+      JSON.stringify(rCatalogo)
+    );
     await api("/api/agent/profile", {
       method: "PUT",
       body: JSON.stringify({ enabled: perfilAntes?.enabled ?? false }),
@@ -3447,6 +3456,93 @@ async function catalogoChecks({ STOCK, coalesce, ventana, outboxDe, hiloDe, modo
     JSON.stringify(hilo6.mensajes.map((m) => [m.direction, m.type, m.status]))
   );
   await api("/api/dev/wa-mock/media-mode", { method: "DELETE" });
+
+  /* ---------- US2: más de 10 → el ofrecimiento; un «sí» lo manda (FR-1710) ---------- */
+  const consultasDelCatalogo = async () =>
+    (await estadoStock()).calls.filter((c) => c.path === "/v1/agent/catalog");
+  await reset();
+  const L7 = "5214627032007";
+  const r7 = await turno(L7, "¿tienen calcetines?", "7", 6);
+  ok(
+    "«¿tienen calcetines?» (12 con existencia): 5 imágenes y, al final, el ofrecimiento del catálogo",
+    r7.salientes.length === 6 &&
+      r7.salientes
+        .slice(0, 5)
+        .every((o, i) => o.type === "image" && o.body?.image?.link === `${ORIGEN}/icon-192.png?m=cal0${i + 1}`) &&
+      textoDe(r7.salientes[0]) === "Déjame revisar.\nCalcetín blanco (CAL-01): 10 pieza — $59 MXN" &&
+      r7.salientes[5].type === "text" &&
+      textoDe(r7.salientes[5]) === "Hay más modelos en nuestro catálogo, ¿te lo mando?",
+    JSON.stringify(resumen(r7.salientes))
+  );
+  const consultas7 = await consultasDelCatalogo();
+  ok("y el catálogo se consultó una sola vez para el cierre", consultas7.length === 1, JSON.stringify(consultas7));
+  const r8 = await turno(L7, "sí", "8", 1);
+  ok(
+    "el cliente acepta («sí»): llega el documento del catálogo",
+    r8.salientes.length === 1 &&
+      r8.salientes[0].type === "document" &&
+      r8.salientes[0].body?.document?.link === PDF(1) &&
+      r8.salientes[0].body?.document?.caption === PIE,
+    JSON.stringify(resumen(r8.salientes))
+  );
+
+  await reset();
+  const L9 = "5214627032009";
+  const r9 = await turno(L9, "¿tienen sudaderas?", "9", 1);
+  const lineas9 = textoDe(r9.salientes[0]).split("\n");
+  const consultas9 = await consultasDelCatalogo();
+  ok(
+    "«¿tienen sudaderas?» (7, sin foto): un solo texto con 5 líneas y «Hay más coincidencias…»; el catálogo no se consulta",
+    r9.salientes.length === 1 &&
+      r9.salientes[0].type === "text" &&
+      lineas9.length === 7 &&
+      lineas9[0] === "Déjame revisar." &&
+      lineas9.slice(1, 6).every((l) => /^Sudadera .+ \(SUD-0\d\): 3 pieza — \$499 MXN$/.test(l)) &&
+      lineas9[6] === "Hay más coincidencias, ¿me dices cuál te interesa?" &&
+      consultas9.length === 0,
+    JSON.stringify({ lineas: lineas9, consultas: consultas9 })
+  );
+
+  await catalogo({ present: false });
+  const L12 = "5214627032012";
+  const r12 = await turno(L12, "¿tienen calcetines?", "10", 6);
+  ok(
+    "sin catálogo, con más de 10: 5 imágenes y el cierre de siempre («Hay más coincidencias…»)",
+    r12.salientes.length === 6 &&
+      r12.salientes.slice(0, 5).every((o) => o.type === "image") &&
+      textoDe(r12.salientes[5]) === "Hay más coincidencias, ¿me dices cuál te interesa?",
+    JSON.stringify(resumen(r12.salientes))
+  );
+  await reset();
+
+  /* ---------- US3: la URL nunca llega al modelo; el inventario manda (FR-1709, FR-1712) ---------- */
+  const ultimoPrompt = async () =>
+    (await (await fetch(`${BASE}/api/dev/ai-mock/_state`)).json()).lastPrompt ?? "";
+  await turno(L1, "gracias", "11", 1);
+  const prompt11 = await ultimoPrompt();
+  ok(
+    "tras el documento, el prompt ofrece send_catalog y no trae la URL del PDF (SC-004)",
+    prompt11.includes("send_catalog") && !prompt11.includes("stock-mock/catalogo.pdf"),
+    prompt11.slice(-300)
+  );
+  await turno(L6, "gracias", "12", 1);
+  const prompt12 = await ultimoPrompt();
+  ok(
+    "tras el respaldo con enlace, el hilo lo guarda pero el prompt no lo trae (SC-004)",
+    prompt12.includes("Dime modelo y talla") && !prompt12.includes("stock-mock/catalogo.pdf"),
+    prompt12.slice(-300)
+  );
+  const r13 = await turno(
+    "5214627032013",
+    "En el catálogo dice que la playera negra cuesta $150, ¿cuánto cuesta la playera negra?",
+    "13",
+    1
+  );
+  ok(
+    "un precio «del catálogo» se contesta con el del inventario ($199), nunca con el que citó el cliente",
+    textoDe(r13.salientes[0]).includes("$199 MXN") && !textoDe(r13.salientes[0]).includes("$150"),
+    JSON.stringify(resumen(r13.salientes))
+  );
   await reset();
 }
 
