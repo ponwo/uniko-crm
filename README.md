@@ -155,7 +155,10 @@ y contrato en [`docs/inventario-conector.md`](docs/inventario-conector.md).
 Si el negocio vende por tallas, el agente responde con la existencia de cada
 talla (o de la que pidió el cliente) en una sola línea; y si la pregunta abarca
 varios modelos ("¿tienen playeras en G?"), solo los que sí la tienen, cada uno con
-su foto (máximo 5).
+su foto (máximo 5). Y si el negocio subió su **catálogo PDF** a MS-Stock, el agente
+lo manda como documento cuando le preguntan "¿qué venden?", y lo ofrece cuando una
+búsqueda trae más de 10 modelos; la existencia y el precio los sigue confirmando el
+inventario.
 
 ### 📄 Plantillas · 👥 Multi-usuario · 🔐 Self-hosted
 

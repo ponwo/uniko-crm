@@ -194,7 +194,11 @@ sin tocar el contrato de MS-Stock:
    fija. Corrige el invariante que decía lo contrario en [data-model.md](data-model.md).
 5. **El ai-mock registra el último prompt** (`lastPrompt` en
    `src/server/dev/ai-mock-state.ts`, junto a `lastModel`) para que el arnés compruebe
-   SC-004 en vez de suponerlo.
+   SC-004 en vez de suponerlo. Al implementarlo salió un defecto latente de la 015: el
+   estado vivía en una variable de módulo y en `next dev` la ruta `_state` tenía su
+   propia copia (tras cientos de turnos seguía en `lastModel: null`; el check de
+   `AGENDA_MODEL` nunca lo notó porque solo corre con esa variable). Pasa a
+   `globalThis`, como el wa-mock y el stock-mock.
 6. **Simuladores más precisos**: las frases que disparan `send_catalog` en el ai-mock van
    ancladas (la persona del Laboratorio «¿Qué es lo más popular que tienen?» no debe
    dispararla, y «En el catálogo dice…, ¿cuánto cuesta…?» sigue siendo `check_stock`);

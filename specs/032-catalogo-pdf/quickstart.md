@@ -67,6 +67,16 @@ cambios; «¿qué venden?» recibe el eco de siempre y el ai-mock no propone `se
    transcript muestra `[Documento: Catálogo de prueba.pdf]` y el pie. (Las conversaciones
    de prueba no se abren en la bandeja: el Laboratorio enseña transcripts.)
 
+**Revisado el 2026-10-05** con el navegador integrado sobre la base de la corrida A
+(`uniko_dev_032c`): en la bandeja, «Lead catálogo 5214627032001» enseña la burbuja de
+documento con el icono, «Catálogo de prueba.pdf», el pie («¡Claro!» + «Dime modelo y
+talla…») y la marca IA; el enlace apunta a `…/stock-mock/catalogo.pdf?v=1` con
+`target="_blank"` (no a `/api/media/…`). En el Laboratorio, el caso «Pregunta qué
+venden» muestra «Agente: [Documento: Catálogo de prueba.pdf] ¡Claro! Dime modelo y talla
+y te confirmo existencia y precio» (el transcript junta las líneas, como con cualquier
+mensaje). El navegador integrado no tiene visor de PDF (ofrece descargarlo); la validez
+del archivo la cubren los tests (`%PDF-` y `xref`).
+
 ## 4. Contra MS-Stock real en local
 
 MS-Stock local (`uv run uvicorn app.main:create_app --factory --port 8000` en el repo
@@ -77,6 +87,17 @@ ms-stock-dev` y sus `R2_*` de prueba) y un PDF subido con `curl -X PUT
 `STOCK_BASE_URL=http://localhost:8000` y esa llave. En el Laboratorio: «¿qué venden?» →
 documento con el nombre que dio MS-Stock; `DELETE /v1/catalog` y repetir → solo la frase.
 Confirma la forma del §4b contra el servicio de verdad.
+
+**Resultado (2026-10-05)**: MS-Stock `7da4467` local (base `ms_stock_dev` en la 0005, stub
+S3 en el 9000 como R2 con `R2_PUBLIC_BASE_URL=http://127.0.0.1:9000/ms-stock-dev`), PDF
+subido con `PUT /v1/catalog?filename=Catálogo Otoño 2026`; Uniko con un `.env.local`
+temporal (`STOCK_BASE_URL=http://127.0.0.1:8000` + su llave de desarrollo) y el
+wa-mock. «¿qué venden?» → **un** `document` con `link`
+`http://127.0.0.1:9000/ms-stock-dev/catalog/<uuid>.pdf`, `filename` «Catálogo Otoño
+2026.pdf» y el pie, en 6,6 s (coalescencia de 6 s incluida); MS-Stock registró
+`GET /v1/agent/catalog` → 200. Tras `DELETE /v1/catalog` (204): solo `text` «¡Claro!» en
+6,8 s, y MS-Stock registró → 404. La forma real (`{url, filename, updated_at}`) es la que
+valida `catalogSchema`.
 
 ## 5. Despliegue e instancia de pruebas (SC-006)
 
@@ -91,6 +112,35 @@ Confirma la forma del §4b contra el servicio de verdad.
    y su pie, y abre en el teléfono.
 5. **Sin promover a `production`**: la promoción (que llega a NuriaAndrea) es señal aparte
    del dueño, con la puerta de la constitución (`uniko-promote`).
+
+## Resultados del self-test local (2026-10-05)
+
+Gate: `pnpm typecheck`, `pnpm lint`, `pnpm build` y `pnpm test` verdes (104 archivos,
+993 tests; la línea base antes de la 032 era 100 / 924).
+
+| Corrida | Base | `e2e-selftest` | `e2e-lab` | Resto de `pnpm test:e2e` |
+|---|---|---|---|---|
+| US1, `INVENTARIO=on` (solo selftest + lab) | `uniko_dev_032a` | 181/181 (11 de la 032) | 40/40 (4 de la 032) | — |
+| A, `INVENTARIO=on`, completa | `uniko_dev_032c` | **189/189** (19 de la 032) | **40/40** | SSE 26/26 · PWA 46/46 · push 5/5 · Instagram 8/8 · plantillas 80/80 · multivariable 21/21 · por canal 11/11 (*) |
+| B, `INVENTARIO=` vacía, completa | `uniko_dev_032d` | **119/119** (incluye «¿qué venden?» → eco, sin documento) | **32/32** | SSE 26/26 · PWA 46/46 · push 5/5 · Instagram 8/8 · plantillas 80/80 · multivariable 21/21 · por canal 11/11 — `pnpm test:e2e` exit 0 |
+
+(*) En la corrida completa, «con el selector de plantillas aprobadas» se pasó de
+sus 30 s: `next dev` estaba compilando media docena de rutas a la vez (en el log,
+`GET /api/templates` —una consulta simple— tardó 18 s en cola). Repetido con las rutas
+compiladas: 11/11. No toca nada de la 032.
+
+Dos hallazgos de las corridas:
+
+- **Primera corrida A (`uniko_dev_032b`, 187/189)**: el check del prompt (SC-004)
+  leyó `lastPrompt` vacío. El estado del ai-mock vivía en una variable de módulo y,
+  en `next dev`, la ruta `_state` tenía su propia copia (defecto latente de la 015:
+  `lastModel` tampoco se veía). Pasó a `globalThis`, como el wa-mock y el stock-mock
+  (research R12.5). El otro rojo («un producto», 026) fue `next dev` recompilando el
+  ai-mock (6,4 s) a mitad del turno.
+- **Rutas que `next dev` descarta**: para las corridas se mantuvieron activas, con un
+  GET de lectura cada 10 s, las tres rutas de mocks que usa el turno del agente
+  (completions del ai-mock, stock-mock, Graph del wa-mock). Sin eso, recompilarlas a
+  mitad del arnés hace caer turnos fuera de la ventana.
 
 ## Criterio de "Hecho"
 

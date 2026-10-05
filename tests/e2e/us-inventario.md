@@ -112,6 +112,50 @@ El stock-mock devuelve `image_url` para `PLY-NEG` (`{origen}/icon-192.png`) y
     como Meta) y el motor no mandó la roja hasta tener el `sent` de la negra; con el
     estado ausente, el tope de 2 s manda el siguiente igual (test unitario).
 
+## 032 — Catálogo PDF (`send_catalog` y cierre con más de 10)
+
+Automatizado en `catalogoChecks()` de `scripts/e2e-selftest.mjs` (sección `032`,
+solo con `INVENTARIO=on`) y en `scripts/e2e-lab.mjs` (el caso del Laboratorio).
+El stock-mock trae «Catálogo de prueba.pdf» (`…/catalogo.pdf?v=1`), 12 calcetines con
+foto y 7 sudaderas sin foto. Pie esperado: `¡Claro!\n\nDime modelo y talla y te
+confirmo existencia y precio`.
+
+26. "¿qué venden?" → UN `document` con `link` `…/api/dev/stock-mock/catalogo.pdf?v=1`,
+    `filename` «Catálogo de prueba.pdf» y el pie, antes de coalescencia + 5 s; el link
+    sirve un PDF; en el hilo, un `document` IA con nombre, `media.payload.url` y el pie
+    como texto, sin `failed`; `/api/media/<asset>` → 302 al PDF.
+27. "mándame el catálogo completo" (el ai-mock devuelve una frase de más de 1024) → el
+    pie no pasa de 1024, termina en `…\n\nDime modelo y talla…` y empieza con «¡Claro!».
+28. `_catalog {present:true, filename:"Catálogo Otoño 2026.pdf"}` + "¿tienes
+    catálogo?" → el nombre nuevo y `?v=2`: cada envío consulta el catálogo en ese
+    momento.
+29. `_catalog {present:false}` + "¿qué venden?" → un solo `text` «¡Claro!»; ningún
+    `document` ni mención de un fallo.
+30. stock-mock `down` y `slow` + "¿qué venden?" → un solo `text` «¡Claro!» antes de
+    coalescencia + 5 s.
+31. wa-mock `media-mode {reject, link:"catalogo.pdf"}` + "mándame el catálogo" → un
+    solo `text` con el pie y, en la línea siguiente, la URL; el hilo sin `failed`.
+32. "¿tienen calcetines?" (12 con existencia) → 5 `image` (`CAL-01`…`CAL-05`) y un
+    `text` final «Hay más modelos en nuestro catálogo, ¿te lo mando?»; el stock-mock
+    registra exactamente una consulta a `/v1/agent/catalog`.
+33. El mismo lead responde "sí" → un `document` como en el caso 26.
+34. "¿tienen sudaderas?" (7, sin foto) → un solo `text` con 5 líneas y «Hay más
+    coincidencias, ¿me dices cuál te interesa?» como última; ninguna consulta a
+    `/v1/agent/catalog`.
+35. `_catalog {present:false}` + "¿tienen calcetines?" → 5 `image` + «Hay más
+    coincidencias…».
+36. El prompt que recibió el ai-mock después del documento (caso 26) contiene
+    `send_catalog` y no la URL del PDF.
+37. El prompt después del respaldo con enlace (caso 31) tampoco trae la URL: el hilo
+    la guarda, el historial del modelo no.
+38. "En el catálogo dice que la playera negra cuesta $150, ¿cuánto cuesta la playera
+    negra?" → la respuesta trae «$199 MXN» (el del inventario) y no «$150».
+39. Laboratorio (`e2e-lab.mjs`): un escenario «¿qué venden?» → el transcript termina
+    en `[Documento: Catálogo de prueba.pdf]` y el pie; el outbox del wa-mock no crece.
+
+Con `INVENTARIO` ausente: "¿qué venden?" recibe el eco de siempre, sin `document`
+(US0).
+
 ## US1 — Abrir el inventario desde Uniko sin llave
 
 1. Sin sesión, `GET /api/inventario/sso` → **401** y no emite pase.
