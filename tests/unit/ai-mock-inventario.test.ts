@@ -61,3 +61,60 @@ describe("026 — ai-mock y check_stock", () => {
     expect(run(CON, "lo compro").action).toBe("move_stage");
   });
 });
+
+/**
+ * 032 — `send_catalog` (FR-1714): solo si el prompt la ofrece, y antes que
+ * `check_stock` («¿tienes catálogo?» trae un «tienes» que check_stock leería como
+ * producto). Las frases van ancladas: una pregunta por un producto, aunque mencione
+ * el catálogo, sigue siendo check_stock.
+ */
+const CON_CATALOGO = `${CON} - {"action":"send_catalog","reply":"..."} - catálogo PDF`;
+
+describe("032 — ai-mock y send_catalog", () => {
+  it("con la acción en el prompt, las preguntas generales piden el catálogo", () => {
+    const generales = [
+      "¿qué venden?",
+      "¿Qué tienen?",
+      "que manejan?",
+      "¿tienes catálogo?",
+      "¿tienen catalogo?",
+      "mándame el catálogo",
+      "¿me puedes enviar el catálogo?",
+      "pásame el catálogo",
+    ];
+    for (const pregunta of generales) {
+      expect(run(CON_CATALOGO, pregunta), pregunta).toEqual({ action: "send_catalog", reply: "¡Claro!" });
+    }
+  });
+
+  it("«catálogo completo» trae una frase de más de 1024 caracteres (para ejercitar el recorte del pie)", () => {
+    const out = run(CON_CATALOGO, "mándame el catálogo completo");
+    expect(out.action).toBe("send_catalog");
+    expect(out.reply.length).toBeGreaterThan(1024);
+    expect(out.reply.startsWith("¡Claro!")).toBe(true);
+  });
+
+  it("una pregunta por un producto sigue siendo check_stock, aunque mencione el catálogo", () => {
+    expect(run(CON_CATALOGO, "¿tienen playera negra?")).toEqual({
+      action: "check_stock",
+      query: "playera negra",
+      reply: "Déjame revisar.",
+    });
+    expect(
+      run(
+        CON_CATALOGO,
+        "En el catálogo dice que la playera negra cuesta $150, ¿cuánto cuesta la playera negra?"
+      )
+    ).toMatchObject({ action: "check_stock", query: "playera negra" });
+  });
+
+  it("la frase de la persona del Laboratorio («¿Qué es lo más popular que tienen?») no la dispara", () => {
+    expect(run(CON_CATALOGO, "¿Qué es lo más popular que tienen?").action).not.toBe("send_catalog");
+  });
+
+  it("sin la acción en el prompt, nunca la propone", () => {
+    expect(run(CON, "¿qué venden?").action).not.toBe("send_catalog");
+    expect(run(SIN, "¿qué venden?").action).toBe("reply");
+    expect(run(SIN, "mándame el catálogo").action).toBe("reply");
+  });
+});

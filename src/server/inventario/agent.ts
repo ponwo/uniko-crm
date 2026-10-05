@@ -1,4 +1,9 @@
-import { lookup, type StockProduct, type StockVariant } from "@/server/inventario/client";
+import {
+  getCatalog,
+  lookup,
+  type StockProduct,
+  type StockVariant,
+} from "@/server/inventario/client";
 
 /**
  * 026 — Lo que el agente incluido puede hacer con el inventario: consultar.
@@ -20,6 +25,11 @@ import { lookup, type StockProduct, type StockVariant } from "@/server/inventari
  * mensajes en orden (`messages`), cada uno con su texto y, si el producto la
  * tiene, su foto (FR-1301..FR-1308). Con un solo producto resuelto la lista tiene
  * un elemento con el texto de siempre (FR-1302): nada de la 026 cambia ahí.
+ *
+ * 032 — Y el catálogo PDF del negocio (`send_catalog`, FR-1702..FR-1708): el modelo
+ * decide CUÁNDO mandarlo; aquí se pide a MS-Stock, se arma el pie y se devuelve qué
+ * enviar (el documento y su texto de respaldo) o `ok: false` para degradar. El
+ * modelo nunca ve el PDF ni su URL.
  */
 
 /** Un mensaje que hay que mandar, en orden. Texto (o pie, si hay foto) y foto por URL. */
@@ -235,4 +245,68 @@ function formatPrice(amount: number, currency: string): string {
     // Moneda que Intl no conoce: número y código, sin símbolo.
     return `${formatQuantity(amount)} ${currency}`;
   }
+}
+
+/* ---------- 032 — Catálogo PDF del negocio (`send_catalog`) ---------- */
+
+/**
+ * La frase fija del pie (contrato §4b de MS-Stock): el PDF enseña qué se vende; la
+ * existencia y el precio los confirma `check_stock`. Nunca se recorta (FR-1704).
+ */
+export const CATALOG_FOOTER = "Dime modelo y talla y te confirmo existencia y precio";
+/** Límite de WhatsApp para el pie de un documento. */
+export const CATALOG_CAPTION_MAX = 1024;
+
+/**
+ * Lo que hay que mandar cuando el modelo pide el catálogo: el documento por URL, tal
+ * como lo publicó MS-Stock, con su pie; y el texto de respaldo (pie + enlace) para un
+ * canal sin documentos o si Meta lo rechaza (FR-1703, FR-1705, FR-1706). `ok: false`
+ * ⇒ el pipeline degrada a la frase del modelo (FR-1708).
+ */
+export type CatalogTurn =
+  | {
+      ok: true;
+      document: { url: string; filename: string; caption: string };
+      fallbackText: string;
+    }
+  | { ok: false };
+
+/**
+ * El pie: la frase de entrada del modelo (si la hay), una línea en blanco y la frase
+ * fija, sin pasar de 1024. Si no cabe, se recorta la frase del modelo —sin partir un
+ * emoji ni dejar espacios antes de «…»—, nunca la fija (FR-1703, FR-1704). Se mide
+ * en unidades UTF-16 (`length`): lo más conservador.
+ */
+export function buildCatalogCaption(intro: string): string {
+  const frase = intro.trim();
+  const cola = `\n\n${CATALOG_FOOTER}`;
+  if (!frase) return CATALOG_FOOTER;
+  if (frase.length + cola.length <= CATALOG_CAPTION_MAX) return `${frase}${cola}`;
+  const cabe = CATALOG_CAPTION_MAX - cola.length - 1; // 1 = «…»
+  let recorte = "";
+  for (const ch of Array.from(frase)) {
+    if (recorte.length + ch.length > cabe) break;
+    recorte += ch;
+  }
+  return `${recorte.trimEnd()}…${cola}`;
+}
+
+/**
+ * `send_catalog`: pide el catálogo en ESTE turno —nunca se reutiliza una URL de un
+ * turno anterior: cambia con cada reemplazo— y arma lo que hay que mandar. Sin
+ * catálogo o con MS-Stock fallando, `ok: false` y el motivo tipado en el log, sin la
+ * llave (FR-1702, FR-1708).
+ */
+export async function sendCatalogTurn(input: { intro?: string }): Promise<CatalogTurn> {
+  const found = await getCatalog();
+  if (!found.ok) {
+    console.error(`[agente] catálogo: ${found.error} al consultar MS-Stock`);
+    return { ok: false };
+  }
+  const caption = buildCatalogCaption(input.intro ?? "");
+  return {
+    ok: true,
+    document: { url: found.data.url, filename: found.data.filename, caption },
+    fallbackText: `${caption}\n${found.data.url}`,
+  };
 }

@@ -1,5 +1,6 @@
 import { and, eq } from "drizzle-orm";
 import { getDb, schema } from "@/lib/db";
+import { scoped } from "@/lib/db/tenant";
 import { describeSendError } from "@/lib/meta/send-errors";
 import { publish } from "@/server/events/bus";
 import { sendText } from "@/server/inbox/send";
@@ -39,6 +40,7 @@ export async function applyStatusUpdate(
       type: schema.message.type,
       text: schema.message.text,
       origin: schema.message.origin,
+      mediaAssetId: schema.message.mediaAssetId,
     })
     .from(schema.message)
     .where(
@@ -79,17 +81,47 @@ export async function applyStatusUpdate(
   // pie, que ES la respuesta del agente. Al aplicar ese `failed`, el texto
   // sale solo, una vez: los estados son monotónicos, así que un webhook
   // repetido no lo manda dos veces (FR-1120). Un fallo aquí no rompe el webhook.
-  if (next === "failed" && msg.origin === "ai" && msg.type === "image" && msg.text) {
-    try {
-      await sendText({
-        conversationId: msg.conversationId,
-        organizationId,
-        text: msg.text,
-        aiGenerated: true,
-      });
-    } catch (err) {
-      const motivo = err instanceof Error ? err.message : String(err);
-      console.error(`[agente] foto: Meta la reportó failed y el texto de respaldo tampoco salió (${motivo})`);
-    }
+  //
+  // 032 — Lo mismo con el catálogo PDF (FR-1706): el respaldo es el pie y, en la
+  // línea siguiente, el enlace del PDF (sale del asset), para que el cliente reciba
+  // el catálogo aunque Meta no haya podido entregar el documento.
+  if (next !== "failed" || msg.origin !== "ai" || !msg.text) return;
+  if (msg.type !== "image" && msg.type !== "document") return;
+  const esCatalogo = msg.type === "document";
+  try {
+    const text = esCatalogo
+      ? await conEnlace(organizationId, msg.mediaAssetId, msg.text)
+      : msg.text;
+    await sendText({
+      conversationId: msg.conversationId,
+      organizationId,
+      text,
+      aiGenerated: true,
+    });
+  } catch (err) {
+    const motivo = err instanceof Error ? err.message : String(err);
+    console.error(
+      esCatalogo
+        ? `[agente] catálogo: Meta reportó failed el documento y el texto de respaldo tampoco salió (${motivo})`
+        : `[agente] foto: Meta la reportó failed y el texto de respaldo tampoco salió (${motivo})`
+    );
   }
+}
+
+/** 032 — El pie del documento más el enlace del PDF de su asset (solo http/https). */
+async function conEnlace(
+  organizationId: string,
+  mediaAssetId: string | null,
+  pie: string
+): Promise<string> {
+  if (!mediaAssetId) return pie;
+  const rows = await getDb()
+    .select({ payload: schema.mediaAsset.payload })
+    .from(schema.mediaAsset)
+    .where(
+      scoped(schema.mediaAsset.organizationId, organizationId, eq(schema.mediaAsset.id, mediaAssetId))
+    )
+    .limit(1);
+  const url = (rows[0]?.payload as { url?: unknown } | null | undefined)?.url;
+  return typeof url === "string" && /^https?:\/\//.test(url) ? `${pie}\n${url}` : pie;
 }

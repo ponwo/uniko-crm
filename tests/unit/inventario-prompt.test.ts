@@ -50,3 +50,26 @@ describe("026 — el prompt y el inventario", () => {
     expect(p).toMatch(/SKU/);
   });
 });
+
+/**
+ * 032 — `send_catalog` en el prompt (FR-1701, FR-1712): solo con la bandera; para
+ * preguntas generales (un producto concreto sigue siendo `check_stock`), y con la
+ * advertencia de que la frase de entrada no promete el adjunto: si no hay catálogo,
+ * esa frase sale sola.
+ */
+describe("032 — el prompt y el catálogo PDF", () => {
+  it("encendida: la acción, sin prometer el adjunto, para preguntas generales", () => {
+    const p = prompt(true);
+    expect(p).toContain('{"action":"send_catalog","reply":"..."}');
+    expect(p).toMatch(/NO debe prometer el adjunto/);
+    expect(p).toMatch(/preguntas generales \(qué venden, qué tienen, si hay catálogo\) → send_catalog/);
+    expect(p).toMatch(/un producto concreto → check_stock/);
+  });
+
+  it("apagada (o sin decir nada): ni la acción ni el catálogo", () => {
+    for (const p of [prompt(false), prompt(undefined)]) {
+      expect(p).not.toContain("send_catalog");
+      expect(p.toLowerCase()).not.toContain("catálogo");
+    }
+  });
+});

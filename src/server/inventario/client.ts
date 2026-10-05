@@ -8,7 +8,7 @@ import { getEnv } from "@/lib/env";
  * "busca esto" y recibe datos o un motivo de fallo tipado.
  *
  * Contrato del otro lado: ../MS-Sotck/specs/003-sso-uniko/contracts/uniko-integration.md
- * (§4). Tres reglas que atraviesan todo:
+ * (§4; el catálogo PDF, §4b, desde la 032). Tres reglas que atraviesan todo:
  *  - 3 s por llamada y sin reintentos dentro del turno: el cliente está esperando
  *    en WhatsApp y un inventario lento no puede volverse un agente mudo.
  *  - Nunca lanza. El pipeline decide qué hacer con cada `error` (degradar).
@@ -31,12 +31,15 @@ export const SEARCH_LIMIT = 25;
  * texto — se trata como "sin foto", nunca como respuesta inválida.
  */
 function toImageUrl(value: unknown): string | null {
-  if (typeof value !== "string") return null;
+  return typeof value === "string" && isHttpUrl(value) ? value : null;
+}
+
+function isHttpUrl(value: string): boolean {
   try {
     const url = new URL(value);
-    return url.protocol === "http:" || url.protocol === "https:" ? value : null;
+    return url.protocol === "http:" || url.protocol === "https:";
   } catch {
-    return null;
+    return false;
   }
 }
 
@@ -95,6 +98,19 @@ export const searchResultSchema = z.object({
   truncated: z.boolean(),
 });
 export type SearchResult = z.infer<typeof searchResultSchema>;
+
+/**
+ * 032 — Catálogo PDF del negocio (contrato §4b, desde la feature 006 de MS-Stock).
+ * A diferencia de la foto, aquí una URL mala SÍ invalida la respuesta: sin URL no hay
+ * nada que mandar, y un catálogo a medias no existe. El nombre es con el que el
+ * cliente recibe el documento; 240 es el tope de WhatsApp para ese nombre.
+ */
+export const catalogSchema = z.object({
+  url: z.string().refine(isHttpUrl),
+  filename: z.string().min(1).max(240),
+  updated_at: z.string(),
+});
+export type CatalogInfo = z.infer<typeof catalogSchema>;
 
 export type StockError =
   | "not_found"
@@ -197,6 +213,16 @@ export async function lookup(
   const found = await searchProducts(q);
   if (!found.ok) return found;
   return { ok: true, data: { products: found.data.results, truncated: found.data.truncated } };
+}
+
+/**
+ * `GET /v1/agent/catalog` — el catálogo PDF que el negocio subió en el portal de
+ * MS-Stock, o `not_found` (no hay, el servicio no tiene almacenamiento, o es anterior
+ * a su 006). Sin caché a propósito: la URL cambia con cada reemplazo y mandar una
+ * vieja sería mandar un PDF que ya no existe (FR-1702).
+ */
+export function getCatalog(): Promise<StockResult<CatalogInfo>> {
+  return request("/v1/agent/catalog", catalogSchema, { auth: true });
 }
 
 const healthSchema = z.object({ status: z.string() });

@@ -1,7 +1,8 @@
-import { and, asc, eq } from "drizzle-orm";
+import { and, asc, eq, inArray } from "drizzle-orm";
 import { judgeModelName } from "@/lib/ai";
 import { getDb, schema } from "@/lib/db";
 import { newId } from "@/lib/db/ids";
+import { scoped } from "@/lib/db/tenant";
 import { publish } from "@/server/events/bus";
 import { runAgentTurn } from "@/server/ai/pipeline";
 import { renderKb } from "@/server/ai/prompts";
@@ -323,16 +324,49 @@ async function runConversation(
     .where(eq(schema.message.conversationId, convId))
     .orderBy(asc(schema.message.createdAt));
 
+  // 032 — El nombre de los documentos del agente (el catálogo PDF), para el transcript.
+  const docIds = messages.flatMap((m) =>
+    m.direction === "out" && m.type === "document" && m.mediaAssetId ? [m.mediaAssetId] : []
+  );
+  const nombres = new Map<string, string | null>();
+  if (docIds.length > 0) {
+    const assets = await db
+      .select({ id: schema.mediaAsset.id, fileName: schema.mediaAsset.fileName })
+      .from(schema.mediaAsset)
+      .where(scoped(schema.mediaAsset.organizationId, organizationId, inArray(schema.mediaAsset.id, docIds)));
+    for (const a of assets) nombres.set(a.id, a.fileName);
+  }
+
   return {
     conversationId: convId,
     handoff,
-    transcript: messages
-      .filter((m) => m.text)
-      .map((m) => ({
-        role: m.direction === "in" ? ("cliente" as const) : ("agente" as const),
-        text: m.text!,
-      })),
+    transcript: transcriptDe(messages, nombres),
   };
+}
+
+/**
+ * El transcript que ven el reporte de la corrida y el juez. 032 — Un documento del
+ * agente (el catálogo PDF) se marca con su nombre antes del pie: el Laboratorio enseña
+ * transcripts, no hilos, y sin la marca el juez leería un pie suelto sin saber que el
+ * PDF salió (US1-5). Los mensajes sin texto que no son documento se omiten, como
+ * siempre. Exportada para su test.
+ */
+export function transcriptDe(
+  mensajes: { direction: string; type: string; text: string | null; mediaAssetId: string | null }[],
+  nombres: Map<string, string | null>
+): { role: "cliente" | "agente"; text: string }[] {
+  const transcript: { role: "cliente" | "agente"; text: string }[] = [];
+  for (const m of mensajes) {
+    const role = m.direction === "in" ? ("cliente" as const) : ("agente" as const);
+    if (m.direction === "out" && m.type === "document") {
+      const nombre = m.mediaAssetId ? nombres.get(m.mediaAssetId) : null;
+      const marca = nombre ? `[Documento: ${nombre}]` : "[Documento]";
+      transcript.push({ role, text: m.text ? `${marca}\n${m.text}` : marca });
+      continue;
+    }
+    if (m.text) transcript.push({ role, text: m.text });
+  }
+  return transcript;
 }
 
 async function upsertTestContact(

@@ -51,3 +51,31 @@ describe("026 — la acción check_stock", () => {
     expect(degradeAction({ action: "check_stock", query: "x" })).toEqual({ action: "none" });
   });
 });
+
+/**
+ * 032 — `send_catalog` (FR-1701): la misma familia que `check_stock`, así que solo
+ * existe con la bandera. `reply` es una frase de entrada, no el catálogo: lo demás
+ * lo pone el sistema, y si no hay catálogo el turno degrada a esa frase (FR-1708).
+ */
+describe("032 — la acción send_catalog", () => {
+  it("con la bandera, la acepta con o sin reply; lo que sobra se descarta", () => {
+    const schema = agentActionSchema({ agenda: false, inventario: true });
+    expect(schema.safeParse({ action: "send_catalog" }).success).toBe(true);
+    const parsed = schema.safeParse({
+      action: "send_catalog",
+      reply: "¡Claro!",
+      url: "https://inventado.example/catalogo.pdf",
+    });
+    expect(parsed.success).toBe(true);
+    expect(parsed.success && parsed.data).toEqual({ action: "send_catalog", reply: "¡Claro!" });
+    expect(schema.safeParse({ action: "send_catalog", reply: 42 }).success).toBe(false);
+  });
+
+  it("degradar send_catalog: la frase del modelo si la hay, none si no", () => {
+    expect(degradeAction({ action: "send_catalog", reply: "¡Claro!" })).toEqual({
+      action: "reply",
+      text: "¡Claro!",
+    });
+    expect(degradeAction({ action: "send_catalog" })).toEqual({ action: "none" });
+  });
+});

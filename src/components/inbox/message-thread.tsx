@@ -44,16 +44,17 @@ type ContactPayload = {
 /**
  * 026 — Una imagen enviada por URL (foto del producto) no tiene archivo en el
  * volumen: se pinta desde su URL pública, la misma que recibió el cliente.
+ * 032 — Igual el documento enviado por URL (el catálogo PDF): se abre desde ella.
  */
-function linkedImageUrl(media: MessageMediaDto): string | null {
-  if (media.kind !== "image") return null;
+function linkedUrl(media: MessageMediaDto): string | null {
+  if (media.kind !== "image" && media.kind !== "document") return null;
   const url = (media.payload as { url?: unknown } | null)?.url;
-  return typeof url === "string" ? url : null;
+  return typeof url === "string" && /^https?:\/\//.test(url) ? url : null;
 }
 
 /** 008 — Previsualización del adjunto de un mensaje, por tipo. */
 function MediaBlock({ media }: { media: MessageMediaDto }) {
-  const src = linkedImageUrl(media) ?? `/api/media/${media.assetId}`;
+  const src = linkedUrl(media) ?? `/api/media/${media.assetId}`;
 
   if (media.kind === "location") {
     const loc = (media.payload ?? {}) as LocationPayload;

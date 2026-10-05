@@ -7,7 +7,7 @@ import { getEnv, isAiConfigured } from "@/lib/env";
 import { chatJson, type ChatMessage } from "@/lib/ai";
 import { publish } from "@/server/events/bus";
 import { isWindowOpen } from "@/server/inbox/window";
-import { SendError, sendImageLink, sendText } from "@/server/inbox/send";
+import { SendError, sendDocumentLink, sendImageLink, sendText } from "@/server/inbox/send";
 import { capabilitiesFor } from "@/server/channels/capabilities";
 import {
   agentActionSchema,
@@ -30,7 +30,12 @@ import {
   offeredSlotsFor,
 } from "@/server/agenda/agent";
 import { inventarioEnabled } from "@/server/inventario/flag";
-import { checkStockTurn, type StockMessage } from "@/server/inventario/agent";
+import {
+  checkStockTurn,
+  sendCatalogTurn,
+  type CatalogTurn,
+  type StockMessage,
+} from "@/server/inventario/agent";
 
 /**
  * Turno del agente (FR-021..FR-025).
@@ -313,6 +318,28 @@ export async function runAgentTurn(conversationId: string): Promise<void> {
     }
   }
 
+  // 032 — Catálogo PDF. El modelo solo decide CUÁNDO; el sistema lo pide a MS-Stock
+  // en este turno y lo manda como documento. Sin catálogo o con MS-Stock fallando,
+  // degrada a la frase del modelo, que no prometió el adjunto (FR-1708). Las
+  // conversaciones de prueba lo piden igual: es lectura, y el envío se persiste sin
+  // tocar la API (FR-1707).
+  if (action.action === "send_catalog") {
+    if (!inventario) {
+      action = degradeAction(action);
+    } else {
+      const turn = await sendCatalogTurn({ intro: action.reply });
+      if (turn.ok) {
+        await deliverCatalog(conversation, turn);
+        publish(organizationId, {
+          type: "conversation.updated",
+          data: { conversation: { id: conversationId } },
+        });
+        return;
+      }
+      action = degradeAction(action);
+    }
+  }
+
   if (action.action === "move_stage") {
     const stage = resolveStage(action.stage, stages);
     if (!stage) {
@@ -384,7 +411,7 @@ async function deliverReply(
 ): Promise<{ ok: boolean; photoMessageId: string | null }> {
   const imageUrl = opts.imageUrl ?? null;
   if (conversation.isTest) {
-    await persistTestOutbound(conversation, text, imageUrl);
+    await persistTestOutbound(conversation, text, imageUrl ? { kind: "image", url: imageUrl } : null);
     return { ok: true, photoMessageId: null };
   }
   const photo =
@@ -445,6 +472,51 @@ export async function deliverReplies(
   }
 }
 
+/**
+ * 032 — Entrega el catálogo PDF (FR-1703, FR-1705..FR-1707): UN documento por URL —el
+ * PDF nunca pasa por Uniko— con su nombre y su pie, con el mismo tope de espera que
+ * la foto. Si el canal no envía documentos, o Meta lo rechaza o no lo acepta a
+ * tiempo, sale el texto de respaldo (pie + enlace) para que el cliente reciba el
+ * enlace igual; la ventana cerrada escala como cualquier envío del agente; el
+ * Laboratorio persiste el documento sin tocar la API. Exportada solo para su test.
+ */
+export async function deliverCatalog(
+  conversation: Conversation,
+  turn: Extract<CatalogTurn, { ok: true }>
+): Promise<void> {
+  const { url, filename, caption } = turn.document;
+  if (conversation.isTest) {
+    await persistTestOutbound(conversation, caption, { kind: "document", url, fileName: filename });
+    return;
+  }
+  if (!capabilitiesFor(conversation.channel).outboundMedia) {
+    await deliverReply(conversation, turn.fallbackText);
+    return;
+  }
+  try {
+    await sendDocumentLink({
+      conversationId: conversation.id,
+      organizationId: conversation.organizationId,
+      link: url,
+      filename,
+      caption,
+      aiGenerated: true,
+      signal: AbortSignal.timeout(PHOTO_TIMEOUT_MS),
+    });
+    return;
+  } catch (err) {
+    if (err instanceof SendError && err.code === "window_closed") {
+      await applyHandoff(conversation.id, conversation.organizationId, "ventana");
+      return;
+    }
+    const motivo = err instanceof Error ? err.message : String(err);
+    console.error(
+      `[agente] catálogo: no se pudo enviar el documento (${motivo}); sale el texto con el enlace`
+    );
+  }
+  await deliverReply(conversation, turn.fallbackText);
+}
+
 /** Sondea `message.status` hasta que deje de ser `pending` o venza el tope (FR-1314). */
 async function waitUntilSent(messageId: string): Promise<void> {
   const db = getDb();
@@ -488,26 +560,33 @@ async function sendPhoto(
   }
 }
 
+/** Lo que acompaña a un saliente del sandbox: la foto del producto (026) o el catálogo PDF (032). */
+type TestMedia =
+  | { kind: "image"; url: string }
+  | { kind: "document"; url: string; fileName: string };
+
 /**
  * Mensaje saliente del sandbox: se persiste, JAMÁS toca la API (FR-031). Con
- * foto, se persiste como el envío real la dejaría (asset con la URL y el
- * texto como pie), para que el Laboratorio enseñe lo mismo que vería el cliente.
+ * foto o documento, se persiste como el envío real lo dejaría (asset con la URL
+ * —y el nombre, si es documento— y el texto como pie), para que el Laboratorio
+ * enseñe lo mismo que vería el cliente.
  */
 async function persistTestOutbound(
   conversation: Conversation,
   text: string,
-  imageUrl: string | null = null
+  media: TestMedia | null = null
 ): Promise<void> {
   const db = getDb();
   let mediaAssetId: string | null = null;
-  if (imageUrl) {
+  if (media) {
     mediaAssetId = newId("mediaAsset");
     await db.insert(schema.mediaAsset).values({
       id: mediaAssetId,
       organizationId: conversation.organizationId,
-      kind: "image",
+      kind: media.kind,
+      ...(media.kind === "document" ? { fileName: media.fileName } : {}),
       caption: text || null,
-      payload: { url: imageUrl },
+      payload: { url: media.url },
       fetchStatus: "available",
     });
   }
@@ -516,7 +595,7 @@ async function persistTestOutbound(
     organizationId: conversation.organizationId,
     conversationId: conversation.id,
     direction: "out",
-    type: mediaAssetId ? "image" : "text",
+    type: media ? media.kind : "text",
     text,
     status: "sent",
     aiGenerated: true,

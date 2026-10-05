@@ -130,6 +130,30 @@ export function aiMockCompletion(messages: InMessage[]): string {
   }
 
   /**
+   * 032 — Catálogo PDF (FR-1714), SOLO si el system prompt nombra la acción (misma
+   * razón que check_stock, abajo) y ANTES de check_stock: «¿tienes catálogo?» trae
+   * un «tienes» que check_stock leería como si «catálogo» fuera un producto.
+   *
+   * Las frases van ancladas a propósito: «¿Qué es lo más popular que tienen?» (una
+   * persona del Laboratorio) no pide el catálogo, y «En el catálogo dice $150,
+   * ¿cuánto cuesta…?» es una consulta de precio, no un pedido del PDF. «catálogo
+   * completo» devuelve una frase larguísima para que el arnés ejercite el recorte
+   * del pie (FR-1704).
+   */
+  if (system.includes("send_catalog")) {
+    const general =
+      /^¿?\s*qu[eé]\s+(?:venden|tienen|manejan)\b/i.test(lastUser.trim()) ||
+      /\b(?:tienes|tienen|hay)\s+(?:un\s+|el\s+)?cat[aá]logo/i.test(lastUser) ||
+      /\b(?:m[aá]nd|env[ií]|p[aá]s)\w*\s+(?:\w+\s+){0,2}(?:el\s+)?cat[aá]logo/i.test(lastUser);
+    if (general) {
+      const reply = /cat[aá]logo\s+completo/i.test(lastUser)
+        ? `¡Claro! ${"Te cuento todo lo que manejamos, modelo por modelo y talla por talla. ".repeat(16).trim()}`
+        : "¡Claro!";
+      return JSON.stringify({ action: "send_catalog", reply });
+    }
+  }
+
+  /**
    * 026 — Consulta de inventario, SOLO si el system prompt menciona la acción.
    *
    * Con la bandera apagada el esquema del turno no conoce `check_stock`: si el

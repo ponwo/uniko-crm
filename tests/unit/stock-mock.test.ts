@@ -29,6 +29,11 @@ async function setMode(mode: string) {
   return POST(req, ctx("_mode"));
 }
 
+async function setCatalog(body: unknown) {
+  const req = new Request(`${BASE}/_catalog`, { method: "POST", body: JSON.stringify(body) });
+  return POST(req, ctx("_catalog"));
+}
+
 describe("026 — stock-mock", () => {
   beforeEach(() => {
     vi.stubEnv("WA_MOCK_ENABLED", "true");
@@ -219,5 +224,118 @@ describe("026 — stock-mock", () => {
     const wrongAud = await get("portal/sso", { query: `token=${await mk(SECRET, "http://otra")}` });
     expect(wrongAud.status).toBe(400);
     expect(stockMockSnapshot().lastSso).toBeNull();
+  });
+});
+
+/**
+ * 032 — El catálogo PDF del negocio (contrato §4b de MS-Stock): misma llave y mismos
+ * modos infelices que el resto de `/v1/agent/*`, conmutable con `_catalog`, y una URL
+ * que cambia con cada catálogo puesto (como un reemplazo real). El PDF se sirve sin
+ * llave, como lo sirve el almacenamiento público de MS-Stock.
+ */
+describe("032 — stock-mock: catálogo PDF", () => {
+  beforeEach(() => {
+    vi.stubEnv("WA_MOCK_ENABLED", "true");
+    vi.stubEnv("NODE_ENV", "test");
+    vi.stubEnv("STOCK_API_KEY", KEY);
+    vi.stubEnv("STOCK_SSO_SECRET", SECRET);
+    vi.stubEnv("STOCK_BASE_URL", BASE);
+    resetStockMock();
+  });
+
+  afterEach(() => {
+    vi.unstubAllEnvs();
+    resetStockMock();
+  });
+
+  it("sin llave → 401 y queda registrado; con llave → la forma del contrato con la URL versionada", async () => {
+    expect((await get("v1/agent/catalog")).status).toBe(401);
+    const r = await get("v1/agent/catalog", { key: KEY });
+    expect(r.status).toBe(200);
+    const body = await r.json();
+    expect(body).toEqual({
+      url: "http://localhost:3000/api/dev/stock-mock/catalogo.pdf?v=1",
+      filename: "Catálogo de prueba.pdf",
+      updated_at: expect.any(String),
+    });
+    expect(Number.isNaN(Date.parse(body.updated_at))).toBe(false);
+    expect(stockMockSnapshot().calls).toEqual([
+      { path: "/v1/agent/catalog", authorized: false },
+      { path: "/v1/agent/catalog", authorized: true },
+    ]);
+    expect(stockMockSnapshot().catalog).toMatchObject({ filename: "Catálogo de prueba.pdf", version: 1 });
+  });
+
+  it("_catalog lo quita (404 como MS-Stock) y lo vuelve a poner con otro nombre y otra URL", async () => {
+    expect((await setCatalog({ present: false })).status).toBe(200);
+    const sin = await get("v1/agent/catalog", { key: KEY });
+    expect(sin.status).toBe(404);
+    expect(await sin.json()).toEqual({ error: { code: "NOT_FOUND", message: "No hay catálogo." } });
+
+    expect((await setCatalog({ present: true, filename: "Catálogo Otoño 2026.pdf" })).status).toBe(200);
+    const otro = await (await get("v1/agent/catalog", { key: KEY })).json();
+    expect(otro.filename).toBe("Catálogo Otoño 2026.pdf");
+    expect(otro.url).toBe("http://localhost:3000/api/dev/stock-mock/catalogo.pdf?v=2");
+
+    // Presente sin nombre: conserva el que tenía; la URL vuelve a cambiar.
+    await setCatalog({ present: true });
+    const igual = await (await get("v1/agent/catalog", { key: KEY })).json();
+    expect(igual.filename).toBe("Catálogo Otoño 2026.pdf");
+    expect(igual.url).toBe("http://localhost:3000/api/dev/stock-mock/catalogo.pdf?v=3");
+  });
+
+  it("_catalog con un cuerpo fuera de forma → 422 y el catálogo no cambia", async () => {
+    const malos: unknown[] = [
+      {},
+      { present: "sí" },
+      { present: true, filename: "catalogo.docx" },
+      { present: true, filename: "x.pd" },
+      { present: true, filename: `${"x".repeat(97)}.pdf` },
+    ];
+    for (const body of malos) {
+      const r = await setCatalog(body);
+      expect(r.status, JSON.stringify(body).slice(0, 60)).toBe(422);
+      expect((await r.json()).error.code).toBe("VALIDATION_ERROR");
+    }
+    expect(stockMockSnapshot().catalog).toMatchObject({ filename: "Catálogo de prueba.pdf", version: 1 });
+  });
+
+  it("los modos infelices aplican al catálogo como al resto de /v1/agent/*", async () => {
+    await setMode("down");
+    expect((await get("v1/agent/catalog", { key: KEY })).status).toBe(503);
+    await setMode("unauthorized");
+    expect((await get("v1/agent/catalog", { key: KEY })).status).toBe(401);
+    await setMode("garbage");
+    expect(await (await get("v1/agent/catalog", { key: KEY })).text()).toBe("not json");
+  });
+
+  it("catalogo.pdf es público (sin llave ni modos infelices) y es un PDF de verdad", async () => {
+    await setMode("down");
+    const r = await get("catalogo.pdf");
+    expect(r.status).toBe(200);
+    expect(r.headers.get("content-type")).toBe("application/pdf");
+    const pdf = await r.text();
+    expect(pdf.startsWith("%PDF-")).toBe(true);
+    expect(pdf.trimEnd().endsWith("%%EOF")).toBe(true);
+    // El visor del navegador lo abre: `startxref` apunta a la tabla `xref`.
+    const start = Number(/startxref\s+(\d+)/.exec(pdf)?.[1]);
+    expect(pdf.slice(start, start + 4)).toBe("xref");
+    expect(stockMockSnapshot().calls).toEqual([]);
+  });
+
+  it("_reset vuelve al catálogo de prueba con v=1", async () => {
+    await setCatalog({ present: true, filename: "Otro.pdf" });
+    await setCatalog({ present: false });
+    resetStockMock();
+    const body = await (await get("v1/agent/catalog", { key: KEY })).json();
+    expect(body.filename).toBe("Catálogo de prueba.pdf");
+    expect(body.url).toBe("http://localhost:3000/api/dev/stock-mock/catalogo.pdf?v=1");
+  });
+
+  it("en producción no existe: v1/agent/catalog, catalogo.pdf y _catalog → 404", async () => {
+    vi.stubEnv("NODE_ENV", "production");
+    expect((await get("v1/agent/catalog", { key: KEY })).status).toBe(404);
+    expect((await get("catalogo.pdf")).status).toBe(404);
+    expect((await setCatalog({ present: false })).status).toBe(404);
   });
 });

@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
+  getCatalog,
   getProduct,
   health,
   lookup,
@@ -271,5 +272,131 @@ describe("026 — adaptador de MS-Stock", () => {
     expect(looksLikeSku("¿PLY-NEG?")).toBe(false);
     expect(looksLikeSku("X".repeat(65))).toBe(false);
     expect(looksLikeSku("")).toBe(false);
+  });
+});
+
+/**
+ * 032 — El catálogo PDF del negocio (contrato §4b, feature 006 de MS-Stock): la
+ * misma tubería que el resto (llave, 3 s, sin reintentos, nunca lanza), pero aquí
+ * una URL mala SÍ invalida la respuesta —sin URL no hay nada que mandar— y nada
+ * se cachea: la URL cambia en cada reemplazo (FR-1702).
+ */
+describe("032 — adaptador de MS-Stock: catálogo PDF", () => {
+  const CATALOG = {
+    url: "https://img.stock.example/catalog/ab12.pdf",
+    filename: "Catálogo Otoño 2026.pdf",
+    updated_at: "2026-10-04T18:00:00Z",
+  };
+
+  beforeEach(() => {
+    vi.stubEnv("APP_BASE_URL", "http://localhost:3000");
+    vi.stubEnv("DATABASE_URL", "postgresql://t:t@localhost:5432/t");
+    vi.stubEnv("BETTER_AUTH_SECRET", "secret-de-test-suficiente");
+    vi.stubEnv("ENCRYPTION_KEY", Buffer.alloc(32, 3).toString("base64"));
+    vi.stubEnv("META_WEBHOOK_VERIFY_TOKEN", "verify-test");
+    vi.stubEnv("INVENTARIO", "on");
+    vi.stubEnv("STOCK_BASE_URL", "https://stock.example/");
+    vi.stubEnv("STOCK_API_KEY", KEY);
+    vi.stubEnv("STOCK_SSO_SECRET", "s".repeat(40));
+    vi.resetModules();
+  });
+
+  afterEach(() => {
+    vi.unstubAllEnvs();
+    vi.unstubAllGlobals();
+    vi.useRealTimers();
+  });
+
+  it("200 → url, filename y updated_at; la ruta del contrato, la llave en X-API-Key y sin caché", async () => {
+    const fetchMock = vi.fn().mockResolvedValue(json(CATALOG));
+    vi.stubGlobal("fetch", fetchMock);
+    expect(await getCatalog()).toEqual({ ok: true, data: CATALOG });
+    const [url, init] = fetchMock.mock.calls[0] as [string, RequestInit];
+    expect(url).toBe("https://stock.example/v1/agent/catalog");
+    expect(new Headers(init.headers).get("x-api-key")).toBe(KEY);
+    expect(init.cache).toBe("no-store");
+  });
+
+  it("cada llamada vuelve a preguntar: un reemplazo cambia la URL y nunca se manda la vieja", async () => {
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce(json(CATALOG))
+      .mockResolvedValueOnce(json({ ...CATALOG, url: "https://img.stock.example/catalog/cd34.pdf" }));
+    vi.stubGlobal("fetch", fetchMock);
+    const primera = await getCatalog();
+    const segunda = await getCatalog();
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+    expect(primera.ok && primera.data.url).toBe(CATALOG.url);
+    expect(segunda.ok && segunda.data.url).toBe("https://img.stock.example/catalog/cd34.pdf");
+  });
+
+  it("404 (sin catálogo, sin almacenamiento o MS-Stock anterior a la 006) → not_found; 401 y 503 tipados", async () => {
+    const cases: [number, string][] = [
+      [404, "not_found"],
+      [401, "unauthorized"],
+      [503, "unavailable"],
+    ];
+    for (const [status, error] of cases) {
+      vi.stubGlobal(
+        "fetch",
+        vi.fn().mockResolvedValue(json({ error: { code: "X", message: "x" } }, status))
+      );
+      expect(await getCatalog(), `status ${status}`).toEqual({ ok: false, error });
+    }
+  });
+
+  it("una forma fuera del contrato → invalid, nunca un catálogo a medias", async () => {
+    const { updated_at: _omit, ...sinFecha } = CATALOG;
+    void _omit;
+    const malos: unknown[] = [
+      { ...CATALOG, url: "ftp://img.stock.example/catalog/ab12.pdf" },
+      { ...CATALOG, url: "javascript:alert(1)" },
+      { ...CATALOG, url: "no es una url" },
+      { ...CATALOG, url: 42 },
+      { ...CATALOG, filename: "" },
+      { ...CATALOG, filename: `${"x".repeat(237)}.pdf` },
+      sinFecha,
+    ];
+    for (const body of malos) {
+      vi.stubGlobal("fetch", vi.fn().mockResolvedValue(json(body)));
+      expect(await getCatalog(), JSON.stringify(body).slice(0, 80)).toEqual({
+        ok: false,
+        error: "invalid",
+      });
+    }
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(new Response("not json", { status: 200 })));
+    expect(await getCatalog()).toEqual({ ok: false, error: "invalid" });
+  });
+
+  it("un nombre de 240 caracteres todavía vale (el límite de WhatsApp para un documento)", async () => {
+    const largo = `${"x".repeat(236)}.pdf`;
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(json({ ...CATALOG, filename: largo })));
+    const r = await getCatalog();
+    expect(r.ok && r.data.filename).toBe(largo);
+  });
+
+  it("una respuesta que nunca llega → timeout en ~3 s; un fallo de red no deja la llave en el log", async () => {
+    vi.useFakeTimers();
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockImplementation(
+        (_url: string, init: RequestInit) =>
+          new Promise((_resolve, reject) => {
+            init.signal?.addEventListener("abort", () =>
+              reject(new DOMException("aborted", "AbortError"))
+            );
+          })
+      )
+    );
+    const pending = getCatalog();
+    await vi.advanceTimersByTimeAsync(3_100);
+    expect(await pending).toEqual({ ok: false, error: "timeout" });
+    vi.useRealTimers();
+
+    const error = vi.spyOn(console, "error").mockImplementation(() => {});
+    vi.stubGlobal("fetch", vi.fn().mockRejectedValue(new TypeError("fetch failed")));
+    expect(await getCatalog()).toEqual({ ok: false, error: "network" });
+    expect(JSON.stringify(error.mock.calls)).not.toContain(KEY);
+    error.mockRestore();
   });
 });
