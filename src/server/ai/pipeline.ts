@@ -33,6 +33,7 @@ import { inventarioEnabled } from "@/server/inventario/flag";
 import {
   checkStockTurn,
   sendCatalogTurn,
+  stripCatalogLink,
   type CatalogTurn,
   type StockMessage,
 } from "@/server/inventario/agent";
@@ -217,7 +218,9 @@ export async function runAgentTurn(conversationId: string): Promise<void> {
         .filter((m) => m.text)
         .map((m) => ({
           role: m.direction === "in" ? ("user" as const) : ("assistant" as const),
-          content: m.text!,
+          // 032 — El respaldo del catálogo guarda el enlace en el hilo (es lo que
+          // recibió el cliente), pero la URL del PDF nunca llega al modelo (FR-1709).
+          content: m.direction === "in" ? m.text! : stripCatalogLink(m.text!),
           at: m.createdAt,
         }));
       // Con la agenda apagada no hay zona horaria del negocio de dónde tirar,

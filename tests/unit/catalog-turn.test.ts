@@ -11,7 +11,7 @@ import type { CatalogInfo, StockResult } from "@/server/inventario/client";
 const getCatalog = vi.fn<() => Promise<StockResult<CatalogInfo>>>();
 vi.mock("@/server/inventario/client", () => ({ getCatalog: () => getCatalog() }));
 
-const { buildCatalogCaption, CATALOG_FOOTER, sendCatalogTurn } = await import(
+const { buildCatalogCaption, CATALOG_FOOTER, sendCatalogTurn, stripCatalogLink } = await import(
   "@/server/inventario/agent"
 );
 
@@ -25,7 +25,9 @@ const CATALOG: CatalogInfo = {
 const CABE = 1024 - 2 - FOOTER.length;
 const SUSTITUTO_SUELTO = /[\uD800-\uDBFF](?![\uDC00-\uDFFF])|(?<![\uD800-\uDBFF])[\uDC00-\uDFFF]/;
 
-afterEach(() => getCatalog.mockReset());
+afterEach(() => {
+  getCatalog.mockReset();
+});
 
 describe("032 — el pie del catálogo (FR-1703, FR-1704)", () => {
   it("la frase fija es la del contrato §4b", () => {
@@ -103,5 +105,31 @@ describe("032 — sendCatalogTurn (FR-1702, FR-1705, FR-1708)", () => {
       expect(errorSpy).toHaveBeenLastCalledWith(expect.stringContaining(`[agente] catálogo: ${error}`));
     }
     errorSpy.mockRestore();
+  });
+});
+
+/**
+ * 032 — La URL del PDF nunca llega al modelo (FR-1709, SC-004). El texto de respaldo
+ * (pie + enlace) queda en el hilo tal como lo recibió el cliente, pero al armar el
+ * historial del prompt se le quita la línea del enlace que sigue a la frase fija.
+ */
+describe("032 — stripCatalogLink (FR-1709)", () => {
+  it("quita el enlace que sigue a la frase fija: el modelo ve el pie, no la URL", () => {
+    expect(stripCatalogLink(`¡Claro!\n\n${FOOTER}\n${CATALOG.url}`)).toBe(`¡Claro!\n\n${FOOTER}`);
+    expect(
+      stripCatalogLink(`${FOOTER}\nhttp://localhost:3000/api/dev/stock-mock/catalogo.pdf?v=1`)
+    ).toBe(FOOTER);
+  });
+
+  it("todo lo demás queda igual (incluido un enlace de reunión)", () => {
+    const iguales = [
+      `¡Claro!\n\n${FOOTER}`,
+      "Te espero mañana a las 10:00.\nhttps://meet.google.com/abc-defg-hij",
+      `${FOOTER}\nno es un enlace`,
+      `Mira: ${CATALOG.url}`,
+      "Playera negra (PLY-NEG): 7 pieza — $199 MXN",
+      "",
+    ];
+    for (const texto of iguales) expect(stripCatalogLink(texto), texto).toBe(texto);
   });
 });

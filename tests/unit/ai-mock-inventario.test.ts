@@ -118,3 +118,42 @@ describe("032 — ai-mock y send_catalog", () => {
     expect(run(SIN, "mándame el catálogo").action).toBe("reply");
   });
 });
+
+/**
+ * 032 — Aceptar el ofrecimiento (US2): el cierre de check_stock con más de 10 termina
+ * en «¿te lo mando?»; si el último mensaje del asistente lo ofreció y el cliente dice
+ * que sí, el siguiente turno manda el catálogo. Un «sí» a otra cosa, no.
+ */
+describe("032 — ai-mock: aceptar el catálogo que se ofreció", () => {
+  const OFRECIO = { role: "assistant", content: "Hay más modelos en nuestro catálogo, ¿te lo mando?" };
+  function conHistorial(system: string, historial: { role: string; content: string }[]) {
+    return JSON.parse(aiMockCompletion([{ role: "system", content: system }, ...historial]));
+  }
+
+  it("tras «¿te lo mando?», un sí (en sus formas) manda el catálogo", () => {
+    for (const respuesta of ["sí", "Si", "sí, mándamelo", "dale", "mándamelo", "claro"]) {
+      expect(
+        conHistorial(CON_CATALOGO, [
+          { role: "user", content: "¿tienen calcetines?" },
+          OFRECIO,
+          { role: "user", content: respuesta },
+        ]),
+        respuesta
+      ).toEqual({ action: "send_catalog", reply: "¡Claro!" });
+    }
+  });
+
+  it("un sí cuando el ÚLTIMO mensaje del asistente no ofreció el catálogo no lo manda", () => {
+    const out = conHistorial(CON_CATALOGO, [
+      OFRECIO,
+      { role: "user", content: "no, gracias" },
+      { role: "assistant", content: "Va, ¿algo más?" },
+      { role: "user", content: "sí" },
+    ]);
+    expect(out.action).not.toBe("send_catalog");
+  });
+
+  it("sin la acción en el prompt, el sí tampoco la propone", () => {
+    expect(conHistorial(CON, [OFRECIO, { role: "user", content: "sí" }]).action).not.toBe("send_catalog");
+  });
+});

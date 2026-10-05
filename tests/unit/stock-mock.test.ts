@@ -338,4 +338,42 @@ describe("032 — stock-mock: catálogo PDF", () => {
     expect((await get("catalogo.pdf")).status).toBe(404);
     expect((await setCatalog({ present: false })).status).toBe(404);
   });
+
+  /**
+   * Las dos categorías del cierre de check_stock (FR-1710): más de 10 con existencia
+   * (12 calcetines, cada uno con su foto) y de 6 a 10 (7 sudaderas, sin foto). Van al
+   * final del catálogo y no coinciden con ninguna búsqueda anterior.
+   */
+  it("«calcetines» trae 12 con existencia y foto distinta; «sudaderas» 7 sin foto; sin recorte", async () => {
+    type Pub = { sku: string; stock: number; available: boolean; image_url: string | null };
+    const cal = await (await get("v1/agent/search", { key: KEY, query: "q=calcetines&limit=25" })).json();
+    expect(cal.results.map((p: Pub) => p.sku)).toEqual(
+      Array.from({ length: 12 }, (_, i) => `CAL-${String(i + 1).padStart(2, "0")}`)
+    );
+    expect(cal.truncated).toBe(false);
+    expect(cal.results.every((p: Pub) => p.stock > 0 && p.available)).toBe(true);
+    expect(new Set(cal.results.map((p: Pub) => p.image_url)).size).toBe(12);
+    expect(cal.results[0].image_url).toBe("http://localhost:3000/icon-192.png?m=cal01");
+
+    const singular = await (await get("v1/agent/search", { key: KEY, query: "q=calcetin&limit=25" })).json();
+    expect(singular.results).toHaveLength(12);
+
+    const sud = await (await get("v1/agent/search", { key: KEY, query: "q=sudaderas&limit=25" })).json();
+    expect(sud.results.map((p: Pub) => p.sku)).toEqual(
+      Array.from({ length: 7 }, (_, i) => `SUD-0${i + 1}`)
+    );
+    expect(sud.truncated).toBe(false);
+    expect(sud.results.every((p: Pub) => p.stock > 0 && p.image_url === null)).toBe(true);
+  });
+
+  it("las categorías nuevas no se cuelan en las búsquedas de siempre", async () => {
+    const skus = async (q: string) =>
+      (await (await get("v1/agent/search", { key: KEY, query: `q=${q}&limit=25` })).json()).results.map(
+        (p: { sku: string }) => p.sku
+      );
+    expect(await skus("playera+negra")).toEqual(["PLY-NEG"]);
+    expect(await skus("pantalones")).toEqual(["PAN-AZ", "PAN-NG"]);
+    expect(await skus("gorra")).toEqual(["GOR-01"]);
+    expect(await skus("zapatos")).toEqual([]);
+  });
 });

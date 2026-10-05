@@ -107,6 +107,9 @@ export function buildAgentSystemPrompt(input: {
         "- Si el cliente menciona una talla, NO la pongas en query: ponla en size (query = nombre base, p. ej. query «playera negra», size «G»). El sistema responde con la existencia de esa talla.",
         "- Escribe el nombre en singular (playera, no playeras): el sistema busca así y responde con cada modelo que sí lo tiene.",
         "- Para preguntas generales (qué venden, qué tienen, si hay catálogo) → send_catalog; para un producto concreto → check_stock.",
+        "- Si el sistema ofreció el catálogo («¿te lo mando?») y el cliente acepta → send_catalog.",
+        "- NUNCA describas, resumas ni cites el catálogo: no lo ves. Existencia y precio solo con check_stock.",
+        "- Si lo que el cliente cita del catálogo no coincide con el inventario, manda el inventario.",
       ]
     : [];
   const agendaRules = input.agenda

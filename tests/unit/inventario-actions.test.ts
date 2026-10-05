@@ -71,6 +71,15 @@ describe("032 — la acción send_catalog", () => {
     expect(schema.safeParse({ action: "send_catalog", reply: 42 }).success).toBe(false);
   });
 
+  it("sin la bandera (US4), send_catalog no existe en el esquema: un modelo que la nombre falla el parseo", () => {
+    const schema = agentActionSchema({ agenda: false, inventario: false });
+    expect(schema.safeParse({ action: "send_catalog" }).success).toBe(false);
+    expect(schema.safeParse({ action: "send_catalog", reply: "¡Claro!" }).success).toBe(false);
+    expect(
+      agentActionSchema({ agenda: true, inventario: false }).safeParse({ action: "send_catalog" }).success
+    ).toBe(false);
+  });
+
   it("degradar send_catalog: la frase del modelo si la hay, none si no", () => {
     expect(degradeAction({ action: "send_catalog", reply: "¡Claro!" })).toEqual({
       action: "reply",

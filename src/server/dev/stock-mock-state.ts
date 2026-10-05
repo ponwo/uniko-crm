@@ -79,6 +79,18 @@ export const STOCK_MOCK_CATALOG: MockProduct[] = [
     { label: "34", stock: 3 },
     { label: "36", stock: 2 },
   ] },
+  // 032: las dos categorías del cierre de check_stock (FR-1710). Calcetines: más de 10
+  // con existencia, cada uno con su foto (URL distinta). Sudaderas: de 6 a 10, sin foto.
+  // Al final, y con nombres que ninguna búsqueda anterior toca.
+  ...["blanco", "negro", "gris", "azul", "rojo", "verde", "amarillo", "rosa", "morado", "café", "beige", "naranja"].map(
+    (color, i): MockProduct => {
+      const n = String(i + 1).padStart(2, "0");
+      return { sku: `CAL-${n}`, name: `Calcetín ${color}`, description: null, stock: 10, unit: "pieza", price: 59, currency: "MXN", active: true, imagePath: `/icon-192.png?m=cal${n}` };
+    }
+  ),
+  ...["negra", "gris", "azul", "roja", "verde", "blanca", "café"].map(
+    (color, i): MockProduct => ({ sku: `SUD-0${i + 1}`, name: `Sudadera ${color}`, description: null, stock: 3, unit: "pieza", price: 499, currency: "MXN", active: true, imagePath: null })
+  ),
 ];
 
 /**

@@ -139,13 +139,22 @@ export function aiMockCompletion(messages: InMessage[]): string {
    * ¿cuánto cuesta…?» es una consulta de precio, no un pedido del PDF. «catálogo
    * completo» devuelve una frase larguísima para que el arnés ejercite el recorte
    * del pie (FR-1704).
+   *
+   * Y la aceptación (US2): si el ÚLTIMO mensaje del asistente ofreció el catálogo
+   * («¿te lo mando?», el cierre de check_stock con más de 10) y el cliente dice que
+   * sí, se manda. Un «sí» a otra cosa no lo dispara.
    */
   if (system.includes("send_catalog")) {
     const general =
       /^¿?\s*qu[eé]\s+(?:venden|tienen|manejan)\b/i.test(lastUser.trim()) ||
       /\b(?:tienes|tienen|hay)\s+(?:un\s+|el\s+)?cat[aá]logo/i.test(lastUser) ||
       /\b(?:m[aá]nd|env[ií]|p[aá]s)\w*\s+(?:\w+\s+){0,2}(?:el\s+)?cat[aá]logo/i.test(lastUser);
-    if (general) {
+    const ultimoAsistente =
+      [...messages].reverse().find((m) => m.role === "assistant")?.content ?? "";
+    const acepta =
+      ultimoAsistente.includes("¿te lo mando?") &&
+      /^\s*(?:s[ií]|dale|m[aá]ndamelo|claro|va)(?![a-záéíóúñ])/i.test(lastUser);
+    if (general || acepta) {
       const reply = /cat[aá]logo\s+completo/i.test(lastUser)
         ? `¡Claro! ${"Te cuento todo lo que manejamos, modelo por modelo y talla por talla. ".repeat(16).trim()}`
         : "¡Claro!";
