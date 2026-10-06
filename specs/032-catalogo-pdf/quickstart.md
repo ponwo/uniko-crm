@@ -142,6 +142,25 @@ Dos hallazgos de las corridas:
   (completions del ai-mock, stock-mock, Graph del wa-mock). Sin eso, recompilarlas a
   mitad del arnés hace caer turnos fuera de la ventana.
 
+## Resultados en la instancia de pruebas (2026-10-06)
+
+- **Deploy**: PR #61 mergeada por el dueño (`51ab384`); `uniko-lanco` arrancó limpio
+  (00:15 UTC, sin migraciones nuevas) y `/api/health` respondió 10/10 con
+  `"commit":"51ab384"` antes de medir.
+- **Catálogo**: `stock.lanco.cloud` estaba vacío (la verificación de la 006 lo dejó así).
+  La llave de la instancia no se leyó: el clasificador del modo automático bloqueó
+  revelarla desde Coolify, así que el catálogo lo subió el dueño **desde el portal**, el
+  flujo real del negocio: «Catalogo Octubre 2026.pdf», 195 KB (log de MS-Stock:
+  `catalog put` a las 16:08:04 UTC).
+- **WhatsApp (SC-006)**: el dueño escribió «¿qué venden?» desde el número de pruebas y
+  recibió el PDF. MS-Stock registró `GET /v1/agent/catalog` → **200** a las 16:09:45
+  UTC (la consulta de `send_catalog`); el log de `uniko-lanco` no tiene ningún
+  `[agente] catálogo:` (el camino feliz no escribe en el log).
+- El caso de más de 10 modelos no se puede ejercitar en esta instancia (4 modelos de
+  playera); lo cubre el arnés (corrida A).
+- **No promovida a `production`**: llega a NuriaAndrea, que tiene `INVENTARIO=on`; es
+  señal aparte del dueño, con la puerta de la constitución.
+
 ## Criterio de "Hecho"
 
 Gate verde + arnés verde en ambas configuraciones + Laboratorio y bandeja revisados + MS-
