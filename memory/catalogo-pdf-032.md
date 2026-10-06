@@ -1,6 +1,6 @@
 ---
 name: catalogo-pdf-032
-description: "032 (catálogo PDF, send_catalog + cierre con más de 10): PR #61 mergeada (51ab384), desplegada en uniko-lanco y VERIFICADA EN VIVO por WhatsApp el 2026-10-06 con el catálogo real del dueño subido desde el portal de stock.lanco.cloud; NO promovida a production. Gotchas del arnés que salieron aquí."
+description: "032 (catálogo PDF, send_catalog + cierre con más de 10): PR #61 mergeada (51ab384), desplegada en uniko-lanco y VERIFICADA EN VIVO por WhatsApp el 2026-10-06 con el catálogo real del dueño subido desde el portal de stock.lanco.cloud y PROMOVIDA a production en 06cd2b0 el mismo día, flota 3/3. Gotchas del arnés que salieron aquí."
 metadata:
   type: project
 ---
@@ -12,8 +12,11 @@ contra MS-Stock local con stub S3: documento con el nombre real y, sin catálogo
 frase. **2026-10-06**: PR #61 mergeada por el dueño (`51ab384`), `uniko-lanco` 10/10 con
 ese commit; el dueño subió «Catalogo Octubre 2026.pdf» desde el portal de
 `stock.lanco.cloud` y por WhatsApp «¿qué venden?» le llegó el PDF (MS-Stock:
-`GET /v1/agent/catalog` → 200). NO promovida: llega a NuriaAndrea (`INVENTARIO=on`) y
-es señal aparte del dueño, con la puerta de la constitución.
+`GET /v1/agent/catalog` → 200). **Promovida** a `production` el mismo día con la puerta
+completa (`98a9094 → 06cd2b0`, flota 3/3 a las 17:02 UTC): NuriaAndrea (`INVENTARIO=on`)
+ya tiene `send_catalog` y su catálogo saldrá en cuanto lo suba en su portal. El push a
+`production` lo hizo el dueño mientras contestaba la puerta: revisar `origin/production`
+justo antes de empujar.
 
 Decisiones (no reabrir): el umbral del ofrecimiento es **más de 10** con existencia (de
 6 a 10, «Hay más coincidencias…» sin consultar el catálogo); el motor *ofrece* y el
@@ -43,10 +46,10 @@ Gotchas verificados en esta máquina:
 - Panel del navegador oculto ⇒ la pestaña no dibuja: `resize_window` para capturas y
   `javascript_tool` para clics que `computer` no puede dar.
 
-**Why:** la feature está cerrada de punta a punta en la instancia de pruebas; solo queda
-la promoción, que es otra señal del dueño. Los gotchas costaron una corrida cada uno.
-**How to apply:** si el dueño pide promover, seguir la puerta de la constitución
-(`uniko-promote`); al promover, NuriaAndrea empieza a mandar su catálogo en cuanto lo
-suba en su portal. Antes de una corrida completa del arnés en esta máquina, mantener
-calientes las rutas de mocks y usar base nueva. Ver también
+**Why:** la feature está cerrada de punta a punta, en producción en toda la flota. Los
+gotchas costaron una corrida cada uno.
+**How to apply:** si un negocio pregunta por qué no le llega el catálogo, revisar que lo
+haya subido en su portal de MS-Stock (sin catálogo, el agente solo deja su frase). Antes
+de una corrida completa del arnés en esta máquina, mantener calientes las rutas de mocks
+y usar base nueva. Ver también
 [[respuesta-por-talla-028-pr31]] y [[worktree-y-arneses-en-la-maquina-de-desarrollo]].

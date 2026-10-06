@@ -158,8 +158,28 @@ Dos hallazgos de las corridas:
   `[agente] catálogo:` (el camino feliz no escribe en el log).
 - El caso de más de 10 modelos no se puede ejercitar en esta instancia (4 modelos de
   playera); lo cubre el arnés (corrida A).
-- **No promovida a `production`**: llega a NuriaAndrea, que tiene `INVENTARIO=on`; es
-  señal aparte del dueño, con la puerta de la constitución.
+- Promoción a `production`: ver la sección siguiente.
+
+## Promoción a `production` (2026-10-06)
+
+Señal del dueño («promueve la 032 a production») y puerta de la constitución completa
+(`uniko-promote`):
+
+| Condición | Cómo quedó |
+|---|---|
+| CI en verde para `06cd2b0` en toda la matriz | por máquina: `default` y `completo` en `success` |
+| Corriendo en LanCo con uso real | por máquina, `uniko-lanco` en `06cd2b0`; uso real declarado por el dueño (su catálogo y el PDF por WhatsApp) |
+| Self-test del IX contra LanCo desplegado | declarado por el dueño: su prueba real por WhatsApp + los logs de MS-Stock y de `uniko-lanco` (el arnés no corre contra producción: los mocks dan 404) |
+| Ensayo del X | no aplica: sin cambios en `drizzle/` |
+| `git log production..main` | 16 commits revisados (la 032 y los docs #59, #60, #62) |
+| Reversión | volver a desplegar `98a9094` (sin migraciones, el esquema no cambia); por negocio, quitar el PDF en su portal de MS-Stock |
+
+`production` avanzó `98a9094 → 06cd2b0` (fast-forward, 16:56 UTC, push de la cuenta del
+dueño). `verify-fleet.sh 06cd2b0`: **flota 3/3** a las 17:02:38 UTC (LanCo, I Love The
+Universe y NuriaAndrea); los dos clientes arrancaron limpios (17:02, «migraciones
+aplicadas», sin migraciones nuevas). NuriaAndrea (`INVENTARIO=on`) ya tiene
+`send_catalog`: hoy no tiene catálogo, así que el agente contesta con su frase hasta que
+el negocio suba el PDF en su portal.
 
 ## Criterio de "Hecho"
 
