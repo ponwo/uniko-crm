@@ -7,6 +7,7 @@ import type {
   ConversationDto,
   FichaDto,
   FichaValue,
+  LossReason,
   StageDto,
 } from "@/lib/types";
 import { cn, formatPhone } from "@/lib/utils";
@@ -14,6 +15,7 @@ import { ContactAvatar } from "@/components/avatar";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { FichaPanel } from "@/components/ficha-panel";
+import { LossReasonDialog } from "@/components/pipeline/loss-reason-dialog";
 import { CitaPanel } from "./cita-panel";
 
 const HANDOFF_LABELS: Record<string, string> = {
@@ -46,6 +48,8 @@ export function ContactPanel({
   const [stages, setStages] = useState<StageDto[]>([]);
   const [currentStageId, setCurrentStageId] = useState<string | null>(null);
   const [leadId, setLeadId] = useState<string | null>(null);
+  /** Clic en una etapa perdida, esperando el motivo. */
+  const [pendingLossStageId, setPendingLossStageId] = useState<string | null>(null);
   // Estado global del agente: sin esto, el toggle "Respondiendo" mentiría
   // cuando el agente aún no se ha configurado/encendido.
   const [agentEnabled, setAgentEnabled] = useState(false);
@@ -109,14 +113,41 @@ export function ContactPanel({
     void refreshLive();
   }, [refreshKey, notesLoaded, refreshLive]);
 
-  async function moveToStage(stageId: string) {
+  async function moveToStage(
+    stageId: string,
+    loss?: { reason: LossReason; note: string }
+  ) {
     if (!leadId || stageId === currentStageId) return;
+    // Perder un trato exige motivo (la API responde 422 sin él). Igual que el
+    // tablero: se pregunta ANTES de mover, o el punto saltaría y regresaría
+    // solo sin decir por qué.
+    const destino = stages.find((s) => s.id === stageId);
+    if (destino?.kind === "lost" && !loss) {
+      setPendingLossStageId(stageId);
+      return;
+    }
     setCurrentStageId(stageId); // optimista
-    await fetch(`/api/pipeline/leads/${leadId}`, {
+    const res = await fetch(`/api/pipeline/leads/${leadId}`, {
       method: "PATCH",
       headers: { "content-type": "application/json" },
-      body: JSON.stringify({ stageId, position: 0 }),
+      body: JSON.stringify({
+        stageId,
+        position: 0,
+        ...(loss
+          ? { lossReason: loss.reason, ...(loss.note ? { lossNote: loss.note } : {}) }
+          : {}),
+      }),
     }).catch(() => null);
+    // La lista de etapas pudo venir desfasada (alguien cambió el tipo de una
+    // etapa en otra pestaña): si el servidor pide motivo, se pide aquí.
+    if (res && res.status === 422 && !loss) {
+      const err = (await res.json().catch(() => null)) as {
+        error?: { code?: string };
+      } | null;
+      if (err?.error?.code === "loss_reason_required") {
+        setPendingLossStageId(stageId);
+      }
+    }
     void refreshLive();
   }
 
@@ -307,6 +338,18 @@ export function ContactPanel({
               })}
             </ol>
           </section>
+        )}
+
+        {pendingLossStageId && (
+          <LossReasonDialog
+            leadName={conversation.contact.name}
+            onCancel={() => setPendingLossStageId(null)}
+            onConfirm={(reason, note) => {
+              const stageId = pendingLossStageId;
+              setPendingLossStageId(null);
+              void moveToStage(stageId, { reason, note });
+            }}
+          />
         )}
 
         {/* 030 — La cita, junto a la etapa que ella misma hace avanzar. Solo
