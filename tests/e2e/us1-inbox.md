@@ -26,18 +26,23 @@
 
 ## Envío instantáneo
 
-Automatizado en `scripts/e2e-envio-instantaneo.mjs`.
+Automatizado en `scripts/e2e-envio-instantaneo.mjs`. En el compositor, Enter
+es salto de línea y se envía con Ctrl/⌘+Enter (o el botón).
 
-8. **Enter no espera a Meta**: escribir un renglón y pulsar Enter.
+8. **Enviar no espera a Meta**: escribir un renglón y pulsar Ctrl+Enter.
    ✅ El campo queda libre de inmediato (menos de 300 ms), sin esperar el viaje
    a Meta, que tarda ~1,5 s.
    ✅ En el hilo aparece ya la burbuja con reloj de "enviando".
-9. **Dos renglones seguidos**: sin esperar, escribir el siguiente y pulsar Enter.
+9. **Dos mensajes seguidos**: sin esperar, escribir el siguiente y pulsar Ctrl+Enter.
    ✅ Salen DOS mensajes separados, no uno con todo pegado.
    ✅ Llegan a WhatsApp en el mismo orden en que se escribieron: los envíos
    salen encolados, porque dos POST simultáneos pueden llegar a Meta en desorden.
    ✅ Cuando el mensaje real llega, la burbuja provisional se retira sin dejar
    duplicado y sin parpadeo.
+   - **Varios renglones**: escribir, pulsar Enter, escribir otro renglón.
+     ✅ Enter deja el salto de línea en el campo y no envía nada.
+     ✅ Ctrl+Enter envía UN mensaje con los dos renglones, y a WhatsApp llega
+     con el salto de línea.
 
 ## Ficha del lead
 

@@ -2,7 +2,7 @@
  * Self-test E2E de comportamiento — el compositor no espera a Meta
  * (guion tests/e2e/us1-inbox.md, sección "envío instantáneo").
  *
- * Conduce la UI real con Playwright: enviar con Enter tarda ~1,5 s en el viaje
+ * Conduce la UI real con Playwright: enviar (Ctrl+Enter) tarda ~1,5 s en el viaje
  * a Meta, y durante ese rato el renglón siguiente se escribía ENCIMA del
  * anterior, así que dos frases seguidas salían como un solo mensaje.
  *
@@ -98,12 +98,12 @@ await page.getByText(NAME).first().click();
 const box = page.getByPlaceholder("Escribe una respuesta");
 await box.waitFor({ timeout: 20000 });
 
-console.log("\n== Enter entrega YA, y el renglón siguiente es otro mensaje ==");
+console.log("\n== Ctrl+Enter entrega YA, y lo siguiente es otro mensaje ==");
 const T1 = `hola ${S}`;
 const T2 = `te comparto los precios ${S}`;
 await box.click();
 await box.fill(T1);
-await box.press("Enter");
+await box.press("Control+Enter");
 
 // El bug medía ~1,5 s. Se exige que el campo quede libre en menos de 300 ms,
 // que es lo que tarda una persona en empezar el renglón siguiente.
@@ -127,7 +127,7 @@ ok(
 );
 
 await box.fill(T2);
-await box.press("Enter");
+await box.press("Control+Enter");
 
 await until(async () => (await outMsgs()).length >= 2, 25000);
 const outs = await outMsgs();
@@ -166,6 +166,35 @@ ok(
   JSON.stringify(enMeta)
 );
 
+console.log("\n== Enter es salto de línea; Ctrl+Enter envía un solo mensaje ==");
+const L1 = `primer renglón ${S}`;
+const L2 = `segundo renglón ${S}`;
+const MULTI = `${L1}\n${L2}`;
+await box.pressSequentially(L1);
+await box.press("Enter");
+await box.pressSequentially(L2);
+ok(
+  "Enter deja el salto de línea en el campo",
+  (await box.inputValue()) === MULTI,
+  JSON.stringify(await box.inputValue())
+);
+await sleep(800);
+ok("y no envía nada", (await outMsgs()).length === 2, `salieron ${(await outMsgs()).length}`);
+
+await box.press("Control+Enter");
+await until(async () => (await outMsgs()).length >= 3, 25000);
+const ultimo = (await outMsgs()).at(-1);
+ok(
+  "Ctrl+Enter envía UN mensaje con los dos renglones",
+  (await outMsgs()).length === 3 && ultimo?.text === MULTI,
+  JSON.stringify(ultimo?.text)
+);
+const outbox2 = await (await req.get(`${BASE}/api/dev/wa-mock/outbox`)).json();
+ok(
+  "a WhatsApp llegó con el salto de línea",
+  (outbox2.outbox ?? []).some((o) => o.body?.text?.body === MULTI)
+);
+
 console.log("\n== Camino infeliz: lo que no salió vuelve al compositor ==");
 await page.route("**/api/conversations/*/messages", async (route) => {
   if (route.request().method() !== "POST") return route.fallback();
@@ -177,7 +206,7 @@ await page.route("**/api/conversations/*/messages", async (route) => {
 });
 const T3 = `esto no va a salir ${S}`;
 await box.fill(T3);
-await box.press("Enter");
+await box.press("Control+Enter");
 
 const volvio = await until(async () => (await box.inputValue()).includes(T3), 8000);
 ok("el texto rechazado regresa al campo, no se pierde", volvio);
