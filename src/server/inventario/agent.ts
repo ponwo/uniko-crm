@@ -1,4 +1,9 @@
-import { lookup, type StockProduct, type StockVariant } from "@/server/inventario/client";
+import {
+  getCatalog,
+  lookup,
+  type StockProduct,
+  type StockVariant,
+} from "@/server/inventario/client";
 
 /**
  * 026 — Lo que el agente incluido puede hacer con el inventario: consultar.
@@ -20,6 +25,12 @@ import { lookup, type StockProduct, type StockVariant } from "@/server/inventari
  * mensajes en orden (`messages`), cada uno con su texto y, si el producto la
  * tiene, su foto (FR-1301..FR-1308). Con un solo producto resuelto la lista tiene
  * un elemento con el texto de siempre (FR-1302): nada de la 026 cambia ahí.
+ *
+ * 032 — Y el catálogo PDF del negocio (`send_catalog`, FR-1702..FR-1708): el modelo
+ * decide CUÁNDO mandarlo; aquí se pide a MS-Stock, se arma el pie y se devuelve qué
+ * enviar (el documento y su texto de respaldo) o `ok: false` para degradar. El
+ * modelo nunca ve el PDF ni su URL. Con más de 10 productos con existencia (o
+ * recorte), el cierre de `check_stock` ofrece el catálogo (`closingFor`, FR-1710).
  */
 
 /** Un mensaje que hay que mandar, en orden. Texto (o pie, si hay foto) y foto por URL. */
@@ -44,8 +55,14 @@ export type StockTurn = {
 export const SHOW_LIMIT = 5;
 /** Imágenes a lo sumo por turno (FR-1305): tope explícito, no una prohibición. */
 export const MAX_PHOTOS = 5;
+/**
+ * 032 — Con más productos con existencia que esto, el cierre ofrece el catálogo PDF
+ * en vez de pedir precisar (FR-1710; decisión del dueño 2026-10-04).
+ */
+export const CATALOG_OFFER_ABOVE = 10;
 
 const HAY_MAS = "Hay más coincidencias, ¿me dices cuál te interesa?";
+const OFERTA_CATALOGO = "Hay más modelos en nuestro catálogo, ¿te lo mando?";
 
 export async function checkStockTurn(input: {
   query: string;
@@ -72,12 +89,13 @@ export async function checkStockTurn(input: {
   const only = products.length === 1 ? products[0] : undefined;
   if (only) {
     const messages = [{ text: formatProduct(only, size), imageUrl: only.image_url }];
-    if (truncated) messages.push({ text: HAY_MAS, imageUrl: null });
+    const cierre = await closingFor(1, truncated);
+    if (cierre) messages.push({ text: cierre, imageUrl: null });
     return { ok: true, messages: withIntro(intro, messages) };
   }
   // Varios: solo lo que tiene existencia (en la talla pedida, si la hubo), uno por
   // mensaje con su foto; los demás no se mencionan (FR-1301, FR-1303, FR-1307).
-  const { shown, more } = selectProducts(products, size);
+  const { shown, total } = selectProducts(products, size);
   if (shown.length === 0) {
     const query = input.query.trim();
     const text = size
@@ -86,7 +104,9 @@ export async function checkStockTurn(input: {
     return { ok: true, messages: withIntro(intro, [{ text, imageUrl: null }]) };
   }
   const messages = withPhotos(shown.map((p) => ({ product: p, text: lineaDe(p, size) })));
-  if (more || truncated) messages.push({ text: HAY_MAS, imageUrl: null });
+  // El cierre va al final y nunca toca los mensajes de producto (FR-1710).
+  const cierre = await closingFor(total, truncated);
+  if (cierre) messages.push({ text: cierre, imageUrl: null });
   return { ok: true, messages: withIntro(intro, messages) };
 }
 
@@ -94,18 +114,43 @@ export async function checkStockTurn(input: {
  * Con dos o más productos resueltos, los que tienen existencia: en la talla pedida
  * (etiqueta literal o equivalencia) si la hubo; un producto sin tallas cuenta si tiene
  * existencia (es de talla única); sin talla pedida, `stock > 0`. A lo sumo
- * `SHOW_LIMIT`; `more` avisa que quedaron fuera (FR-1301, FR-1307, FR-1308).
+ * `SHOW_LIMIT`; `more` avisa que quedaron fuera (FR-1301, FR-1307, FR-1308) y `total`
+ * cuenta los que quedaron con existencia, para el cierre (032, FR-1710).
  */
 export function selectProducts(
   products: StockProduct[],
   size: string
-): { shown: StockProduct[]; more: boolean } {
+): { shown: StockProduct[]; more: boolean; total: number } {
   const conExistencia = products.filter((p) => {
     if (p.variants.length === 0) return p.stock > 0;
     if (!size) return p.stock > 0;
     return (matchVariant(p.variants, size)?.stock ?? 0) > 0;
   });
-  return { shown: conExistencia.slice(0, SHOW_LIMIT), more: conExistencia.length > SHOW_LIMIT };
+  return {
+    shown: conExistencia.slice(0, SHOW_LIMIT),
+    more: conExistencia.length > SHOW_LIMIT,
+    total: conExistencia.length,
+  };
+}
+
+/**
+ * 032 — El cierre de un turno con productos (FR-1710, deroga en parte FR-1308).
+ * `total` son los que quedan con existencia tras el filtro; `truncated`, que MS-Stock
+ * recortó la búsqueda. Hasta `SHOW_LIMIT`, sin cierre; hasta `CATALOG_OFFER_ABOVE`,
+ * «Hay más coincidencias…» sin consultar nada; con más, o con recorte, se consulta el
+ * catálogo en este mismo turno (3 s, sin reintentos) y, si existe, se ofrece. Sin
+ * catálogo o con la consulta fallando, el cierre de siempre: el turno no se pierde.
+ */
+export async function closingFor(total: number, truncated: boolean): Promise<string | null> {
+  if (!truncated && total <= SHOW_LIMIT) return null;
+  if (!truncated && total <= CATALOG_OFFER_ABOVE) return HAY_MAS;
+  const catalog = await getCatalog();
+  if (catalog.ok) return OFERTA_CATALOGO;
+  // Sin catálogo es lo normal en un negocio que no subió uno: solo un fallo va al log.
+  if (catalog.error !== "not_found") {
+    console.error(`[agente] catálogo (cierre): ${catalog.error} al consultar MS-Stock`);
+  }
+  return HAY_MAS;
 }
 
 /** La línea de un producto dentro de un conjunto: nunca "agotada" ni "no viene" (eso es para uno solo). */
@@ -235,4 +280,86 @@ function formatPrice(amount: number, currency: string): string {
     // Moneda que Intl no conoce: número y código, sin símbolo.
     return `${formatQuantity(amount)} ${currency}`;
   }
+}
+
+/* ---------- 032 — Catálogo PDF del negocio (`send_catalog`) ---------- */
+
+/**
+ * La frase fija del pie (contrato §4b de MS-Stock): el PDF enseña qué se vende; la
+ * existencia y el precio los confirma `check_stock`. Nunca se recorta (FR-1704).
+ */
+export const CATALOG_FOOTER = "Dime modelo y talla y te confirmo existencia y precio";
+/** Límite de WhatsApp para el pie de un documento. */
+export const CATALOG_CAPTION_MAX = 1024;
+
+/**
+ * Lo que hay que mandar cuando el modelo pide el catálogo: el documento por URL, tal
+ * como lo publicó MS-Stock, con su pie; y el texto de respaldo (pie + enlace) para un
+ * canal sin documentos o si Meta lo rechaza (FR-1703, FR-1705, FR-1706). `ok: false`
+ * ⇒ el pipeline degrada a la frase del modelo (FR-1708).
+ */
+export type CatalogTurn =
+  | {
+      ok: true;
+      document: { url: string; filename: string; caption: string };
+      fallbackText: string;
+    }
+  | { ok: false };
+
+/**
+ * El pie: la frase de entrada del modelo (si la hay), una línea en blanco y la frase
+ * fija, sin pasar de 1024. Si no cabe, se recorta la frase del modelo —sin partir un
+ * emoji ni dejar espacios antes de «…»—, nunca la fija (FR-1703, FR-1704). Se mide
+ * en unidades UTF-16 (`length`): lo más conservador.
+ */
+export function buildCatalogCaption(intro: string): string {
+  const frase = intro.trim();
+  const cola = `\n\n${CATALOG_FOOTER}`;
+  if (!frase) return CATALOG_FOOTER;
+  if (frase.length + cola.length <= CATALOG_CAPTION_MAX) return `${frase}${cola}`;
+  const cabe = CATALOG_CAPTION_MAX - cola.length - 1; // 1 = «…»
+  let recorte = "";
+  for (const ch of Array.from(frase)) {
+    if (recorte.length + ch.length > cabe) break;
+    recorte += ch;
+  }
+  return `${recorte.trimEnd()}…${cola}`;
+}
+
+/**
+ * La URL del PDF nunca llega al modelo (FR-1709). El texto de respaldo (pie + enlace)
+ * queda en el hilo tal como lo recibió el cliente; al armar el historial del prompt
+ * se le quita la última línea si es un enlace y la anterior es la frase fija.
+ * Cualquier otro texto —un enlace de reunión, por ejemplo— queda igual.
+ */
+export function stripCatalogLink(text: string): string {
+  const lineas = text.split("\n");
+  if (
+    lineas.length >= 2 &&
+    lineas.at(-2) === CATALOG_FOOTER &&
+    /^https?:\/\/\S+$/.test(lineas.at(-1) ?? "")
+  ) {
+    return lineas.slice(0, -1).join("\n");
+  }
+  return text;
+}
+
+/**
+ * `send_catalog`: pide el catálogo en ESTE turno —nunca se reutiliza una URL de un
+ * turno anterior: cambia con cada reemplazo— y arma lo que hay que mandar. Sin
+ * catálogo o con MS-Stock fallando, `ok: false` y el motivo tipado en el log, sin la
+ * llave (FR-1702, FR-1708).
+ */
+export async function sendCatalogTurn(input: { intro?: string }): Promise<CatalogTurn> {
+  const found = await getCatalog();
+  if (!found.ok) {
+    console.error(`[agente] catálogo: ${found.error} al consultar MS-Stock`);
+    return { ok: false };
+  }
+  const caption = buildCatalogCaption(input.intro ?? "");
+  return {
+    ok: true,
+    document: { url: found.data.url, filename: found.data.filename, caption },
+    fallbackText: `${caption}\n${found.data.url}`,
+  };
 }

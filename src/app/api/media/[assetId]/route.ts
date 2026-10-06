@@ -46,9 +46,11 @@ export const GET = withAuth(async (session, _req: Request, ctx: Params) => {
   // 026 — Imagen enviada por URL (foto del producto): no hay binario aquí ni
   // se descarga; "Ver completa" va a la misma URL pública que recibió el
   // cliente. Solo http(s): es lo único que el adaptador deja entrar.
+  // 032 — Igual el documento enviado por URL (el catálogo PDF): sin esto, un
+  // asset sin archivo local respondería 410.
   const linked = (asset.payload as { url?: unknown } | null)?.url;
   if (
-    asset.kind === "image" &&
+    (asset.kind === "image" || asset.kind === "document") &&
     typeof linked === "string" &&
     (linked.startsWith("https://") || linked.startsWith("http://"))
   ) {

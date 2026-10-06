@@ -2751,6 +2751,15 @@ async function inventarioChecks() {
       typeof r.text === "string" && r.text.includes("Respuesta de prueba"),
       JSON.stringify(r)
     );
+    // 032 (US4): sin inventario no hay catálogo: la pregunta general recibe el eco.
+    const rCatalogo = await preguntar("5214627032900", "¿qué venden?", "off.032");
+    ok(
+      "apagado: '¿qué venden?' recibe el eco de siempre, sin documento (el agente no conoce send_catalog)",
+      typeof rCatalogo.text === "string" &&
+        rCatalogo.text.includes("Respuesta de prueba") &&
+        !(await outboxDe("5214627032900")).some((o) => o.type === "document"),
+      JSON.stringify(rCatalogo)
+    );
     await api("/api/agent/profile", {
       method: "PUT",
       body: JSON.stringify({ enabled: perfilAntes?.enabled ?? false }),
@@ -3158,6 +3167,8 @@ async function inventarioChecks() {
     );
   }
   await reset();
+  // 032 — El catálogo PDF del negocio: send_catalog y el cierre con más de 10.
+  await catalogoChecks({ STOCK, coalesce, ventana, outboxDe, hiloDe, modo, reset });
   await api("/api/agent/profile", {
     method: "PUT",
     body: JSON.stringify({ enabled: perfilAntes?.enabled ?? false }),
@@ -3242,6 +3253,297 @@ async function inventarioChecks() {
     ajustesHtml.includes("Probar conexión") && ajustesHtml.includes(STOCK),
     ajustesHtml.slice(0, 120)
   );
+}
+
+/* ============================================================
+ * 032 — Catálogo PDF del negocio (tests/e2e/us-inventario.md §032)
+ *
+ * Solo con INVENTARIO=on: lo llama la mitad encendida de `inventarioChecks`, con
+ * el agente activo. El stock-mock trae «Catálogo de prueba.pdf» (`?v=1`; la URL
+ * cambia con cada `_catalog` puesto, como un reemplazo real) y, para el cierre de
+ * `check_stock`, 12 calcetines con foto y 7 sudaderas sin foto.
+ * ============================================================ */
+async function catalogoChecks({ STOCK, coalesce, ventana, outboxDe, hiloDe, modo, reset }) {
+  console.log("\n== 032: catálogo PDF (send_catalog) ==");
+  const ORIGEN = new URL(STOCK).origin;
+  const PDF = (v) => `${ORIGEN}/api/dev/stock-mock/catalogo.pdf?v=${v}`;
+  const FOOTER = "Dime modelo y talla y te confirmo existencia y precio";
+  const PIE = `¡Claro!\n\n${FOOTER}`;
+  // El agente debe responder antes de coalescencia + 5 s (SC-001, SC-002).
+  const limite = coalesce + 5000;
+  const catalogo = (body) =>
+    fetch(`${STOCK}/_catalog`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify(body),
+    });
+  const estadoStock = async () => (await fetch(`${STOCK}/_state`)).json();
+  const textoDe = (o) =>
+    o?.body?.text?.body ??
+    o?.body?.image?.caption ??
+    o?.body?.document?.caption ??
+    JSON.stringify(o?.body ?? "");
+  const resumen = (salientes) =>
+    salientes.map((o) => [
+      o.type,
+      textoDe(o).slice(0, 70),
+      o.body?.document?.link ?? o.body?.image?.link ?? null,
+    ]);
+  const nombre = (lead) => `Lead catálogo ${lead}`;
+
+  /**
+   * Un inbound del lead y sus salientes: espera `esperados` nuevos (o, sin él, 1.5 s
+   * quieto tras el primero). `ms` es lo que tardó el PRIMER saliente.
+   */
+  async function turno(lead, texto, id, esperados = 0) {
+    const antes = (await outboxDe(lead)).length;
+    const t0 = Date.now();
+    await api("/api/dev/wa-mock/inbound", {
+      method: "POST",
+      body: JSON.stringify({
+        phoneNumberId: PN,
+        from: lead,
+        name: nombre(lead),
+        text: texto,
+        waMessageId: `wamid.e2e.032.${id}`,
+      }),
+    });
+    const hasta = Date.now() + ventana;
+    let vistos = antes;
+    let quieto = 0;
+    let primero = null;
+    while (Date.now() < hasta) {
+      const ahora = (await outboxDe(lead)).length;
+      if (ahora > vistos) {
+        if (primero === null) primero = Date.now() - t0;
+        vistos = ahora;
+        quieto = Date.now();
+      }
+      if (esperados > 0 ? vistos - antes >= esperados : vistos > antes && Date.now() - quieto > 1500) {
+        break;
+      }
+      await sleep(300);
+    }
+    const todos = await outboxDe(lead);
+    return { salientes: todos.slice(antes), ms: primero ?? Date.now() - t0 };
+  }
+
+  /* ---------- US1: pregunta general → el documento ---------- */
+  await reset();
+  const L1 = "5214627032001";
+  const r1 = await turno(L1, "¿qué venden?", "1", 1);
+  const d1 = r1.salientes[0];
+  ok(
+    `«¿qué venden?»: UN documento con el link del catálogo, su nombre y el pie, en ${r1.ms} ms (< ${limite})`,
+    r1.salientes.length === 1 &&
+      d1?.type === "document" &&
+      d1.body?.document?.link === PDF(1) &&
+      d1.body?.document?.filename === "Catálogo de prueba.pdf" &&
+      d1.body?.document?.caption === PIE &&
+      r1.ms < limite,
+    JSON.stringify({ ms: r1.ms, salientes: resumen(r1.salientes) })
+  );
+  const pdf1 = await fetch(PDF(1));
+  ok(
+    "el link es un PDF público (sin llave), como lo sirve MS-Stock",
+    pdf1.ok &&
+      pdf1.headers.get("content-type") === "application/pdf" &&
+      (await pdf1.text()).startsWith("%PDF-"),
+    `status=${pdf1.status} type=${pdf1.headers.get("content-type")}`
+  );
+  await sleep(700);
+  const hilo1 = await hiloDe(nombre(L1));
+  const doc1 = hilo1.mensajes.filter((m) => m.direction === "out").at(-1);
+  ok(
+    "en el hilo: un document IA con su nombre, la URL y el pie como texto, sin failed",
+    doc1?.type === "document" &&
+      doc1?.media?.kind === "document" &&
+      doc1?.media?.fileName === "Catálogo de prueba.pdf" &&
+      doc1?.media?.payload?.url === PDF(1) &&
+      doc1?.text === PIE &&
+      doc1?.aiGenerated === true &&
+      doc1?.status !== "failed",
+    JSON.stringify(doc1)
+  );
+  if (doc1?.media?.assetId) {
+    const ver = await fetch(`${BASE}/api/media/${doc1.media.assetId}`, {
+      headers: { cookie },
+      redirect: "manual",
+    });
+    ok(
+      "/api/media del documento por URL redirige (302) al PDF, sin servir bytes",
+      ver.status === 302 && ver.headers.get("location") === PDF(1),
+      `status=${ver.status} location=${ver.headers.get("location")}`
+    );
+  }
+
+  // FR-1704: una frase de entrada larguísima se recorta; la frase fija, nunca.
+  const L2 = "5214627032002";
+  const r2 = await turno(L2, "mándame el catálogo completo", "2", 1);
+  const pie2 = r2.salientes[0]?.body?.document?.caption ?? "";
+  ok(
+    "frase larguísima: el pie no pasa de 1024, se recorta con «…» y la frase fija queda entera",
+    r2.salientes[0]?.type === "document" &&
+      pie2.length <= 1024 &&
+      pie2.startsWith("¡Claro!") &&
+      pie2.endsWith(`…\n\n${FOOTER}`),
+    JSON.stringify({ largo: pie2.length, final: pie2.slice(-70) })
+  );
+
+  // Edge case de la spec: un reemplazo entre turnos se ve en el siguiente envío.
+  await catalogo({ present: true, filename: "Catálogo Otoño 2026.pdf" });
+  const L3 = "5214627032003";
+  const r3 = await turno(L3, "¿tienes catálogo?", "3", 1);
+  ok(
+    "catálogo renombrado entre turnos: el envío trae el nombre y la URL nuevos (cada envío consulta en ese momento)",
+    r3.salientes[0]?.type === "document" &&
+      r3.salientes[0]?.body?.document?.filename === "Catálogo Otoño 2026.pdf" &&
+      r3.salientes[0]?.body?.document?.link === PDF(2),
+    JSON.stringify(resumen(r3.salientes))
+  );
+
+  /* ---------- US1: camino infeliz ---------- */
+  await catalogo({ present: false });
+  const L4 = "5214627032004";
+  const r4 = await turno(L4, "¿qué venden?", "4");
+  ok(
+    `sin catálogo: solo la frase del modelo («¡Claro!»), sin documento ni mención de un fallo (${r4.ms} ms)`,
+    r4.salientes.length === 1 &&
+      r4.salientes[0].type === "text" &&
+      textoDe(r4.salientes[0]) === "¡Claro!" &&
+      r4.ms < limite,
+    JSON.stringify({ ms: r4.ms, salientes: resumen(r4.salientes) })
+  );
+
+  await reset();
+  let k = 0;
+  for (const m of ["down", "slow"]) {
+    await modo(m);
+    const lead = `52146270320${10 + k++}`;
+    const r = await turno(lead, "¿qué venden?", `5.${m}`);
+    ok(
+      `MS-Stock ${m}: solo «¡Claro!» en ${r.ms} ms (< ${limite}), sin mencionar un fallo`,
+      r.salientes.length === 1 &&
+        r.salientes[0].type === "text" &&
+        textoDe(r.salientes[0]) === "¡Claro!" &&
+        r.ms < limite,
+      JSON.stringify({ ms: r.ms, salientes: resumen(r.salientes) })
+    );
+  }
+  await modo("ok");
+  // El mock lento (4 s) termina igual: se le deja acabar para que no contamine al siguiente.
+  await sleep(1500);
+
+  await api("/api/dev/wa-mock/media-mode", {
+    method: "POST",
+    body: JSON.stringify({ mode: "reject", link: "catalogo.pdf" }),
+  });
+  const L6 = "5214627032006";
+  const r6 = await turno(L6, "mándame el catálogo", "6", 1);
+  ok(
+    "WhatsApp rechaza el documento: sale UN texto con el pie y, en la línea siguiente, el enlace",
+    r6.salientes.length === 1 &&
+      r6.salientes[0].type === "text" &&
+      textoDe(r6.salientes[0]) === `${PIE}\n${PDF(1)}`,
+    JSON.stringify(resumen(r6.salientes))
+  );
+  await sleep(700);
+  const hilo6 = await hiloDe(nombre(L6));
+  ok(
+    "y el hilo no enseña ningún mensaje fallido",
+    hilo6.mensajes.filter((m) => m.direction === "out").length === 1 &&
+      hilo6.mensajes.every((m) => m.status !== "failed"),
+    JSON.stringify(hilo6.mensajes.map((m) => [m.direction, m.type, m.status]))
+  );
+  await api("/api/dev/wa-mock/media-mode", { method: "DELETE" });
+
+  /* ---------- US2: más de 10 → el ofrecimiento; un «sí» lo manda (FR-1710) ---------- */
+  const consultasDelCatalogo = async () =>
+    (await estadoStock()).calls.filter((c) => c.path === "/v1/agent/catalog");
+  await reset();
+  const L7 = "5214627032007";
+  const r7 = await turno(L7, "¿tienen calcetines?", "7", 6);
+  ok(
+    "«¿tienen calcetines?» (12 con existencia): 5 imágenes y, al final, el ofrecimiento del catálogo",
+    r7.salientes.length === 6 &&
+      r7.salientes
+        .slice(0, 5)
+        .every((o, i) => o.type === "image" && o.body?.image?.link === `${ORIGEN}/icon-192.png?m=cal0${i + 1}`) &&
+      textoDe(r7.salientes[0]) === "Déjame revisar.\nCalcetín blanco (CAL-01): 10 pieza — $59 MXN" &&
+      r7.salientes[5].type === "text" &&
+      textoDe(r7.salientes[5]) === "Hay más modelos en nuestro catálogo, ¿te lo mando?",
+    JSON.stringify(resumen(r7.salientes))
+  );
+  const consultas7 = await consultasDelCatalogo();
+  ok("y el catálogo se consultó una sola vez para el cierre", consultas7.length === 1, JSON.stringify(consultas7));
+  const r8 = await turno(L7, "sí", "8", 1);
+  ok(
+    "el cliente acepta («sí»): llega el documento del catálogo",
+    r8.salientes.length === 1 &&
+      r8.salientes[0].type === "document" &&
+      r8.salientes[0].body?.document?.link === PDF(1) &&
+      r8.salientes[0].body?.document?.caption === PIE,
+    JSON.stringify(resumen(r8.salientes))
+  );
+
+  await reset();
+  const L9 = "5214627032009";
+  const r9 = await turno(L9, "¿tienen sudaderas?", "9", 1);
+  const lineas9 = textoDe(r9.salientes[0]).split("\n");
+  const consultas9 = await consultasDelCatalogo();
+  ok(
+    "«¿tienen sudaderas?» (7, sin foto): un solo texto con 5 líneas y «Hay más coincidencias…»; el catálogo no se consulta",
+    r9.salientes.length === 1 &&
+      r9.salientes[0].type === "text" &&
+      lineas9.length === 7 &&
+      lineas9[0] === "Déjame revisar." &&
+      lineas9.slice(1, 6).every((l) => /^Sudadera .+ \(SUD-0\d\): 3 pieza — \$499 MXN$/.test(l)) &&
+      lineas9[6] === "Hay más coincidencias, ¿me dices cuál te interesa?" &&
+      consultas9.length === 0,
+    JSON.stringify({ lineas: lineas9, consultas: consultas9 })
+  );
+
+  await catalogo({ present: false });
+  const L12 = "5214627032012";
+  const r12 = await turno(L12, "¿tienen calcetines?", "10", 6);
+  ok(
+    "sin catálogo, con más de 10: 5 imágenes y el cierre de siempre («Hay más coincidencias…»)",
+    r12.salientes.length === 6 &&
+      r12.salientes.slice(0, 5).every((o) => o.type === "image") &&
+      textoDe(r12.salientes[5]) === "Hay más coincidencias, ¿me dices cuál te interesa?",
+    JSON.stringify(resumen(r12.salientes))
+  );
+  await reset();
+
+  /* ---------- US3: la URL nunca llega al modelo; el inventario manda (FR-1709, FR-1712) ---------- */
+  const ultimoPrompt = async () =>
+    (await (await fetch(`${BASE}/api/dev/ai-mock/_state`)).json()).lastPrompt ?? "";
+  await turno(L1, "gracias", "11", 1);
+  const prompt11 = await ultimoPrompt();
+  ok(
+    "tras el documento, el prompt ofrece send_catalog y no trae la URL del PDF (SC-004)",
+    prompt11.includes("send_catalog") && !prompt11.includes("stock-mock/catalogo.pdf"),
+    prompt11.slice(-300)
+  );
+  await turno(L6, "gracias", "12", 1);
+  const prompt12 = await ultimoPrompt();
+  ok(
+    "tras el respaldo con enlace, el hilo lo guarda pero el prompt no lo trae (SC-004)",
+    prompt12.includes("Dime modelo y talla") && !prompt12.includes("stock-mock/catalogo.pdf"),
+    prompt12.slice(-300)
+  );
+  const r13 = await turno(
+    "5214627032013",
+    "En el catálogo dice que la playera negra cuesta $150, ¿cuánto cuesta la playera negra?",
+    "13",
+    1
+  );
+  ok(
+    "un precio «del catálogo» se contesta con el del inventario ($199), nunca con el que citó el cliente",
+    textoDe(r13.salientes[0]).includes("$199 MXN") && !textoDe(r13.salientes[0]).includes("$150"),
+    JSON.stringify(resumen(r13.salientes))
+  );
+  await reset();
 }
 
 

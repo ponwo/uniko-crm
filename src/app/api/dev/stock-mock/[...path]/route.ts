@@ -1,10 +1,13 @@
 import { jwtVerify } from "jose";
+import { z } from "zod";
 import { mockGuard } from "@/lib/dev-guard";
 import {
   findActiveBySku,
   findActiveVariantBySku,
+  MOCK_CATALOG_PDF,
   resetStockMock,
   searchActive,
+  setStockMockCatalog,
   setStockMockMode,
   stockMockSnapshot,
   stockMockState,
@@ -22,11 +25,28 @@ export const dynamic = "force-dynamic";
  * el producto exacto y la entrada SSO del portal— con el mismo contrato que la
  * feature 003 de MS-Stock, y expone `_state`, `_mode` y `_reset` para que el
  * arnés afirme y para poner el servicio en un modo infeliz.
+ *
+ * 032 — Y el catálogo PDF del negocio (contrato §4b): `v1/agent/catalog` bajo la
+ * misma llave y los mismos modos infelices, el PDF público en `catalogo.pdf`, y
+ * `_catalog` para ponerlo, renombrarlo o quitarlo.
  */
 
 type Ctx = { params: Promise<{ path: string[] }> };
 
 const MODES: StockMockMode[] = ["ok", "unauthorized", "down", "slow", "garbage"];
+
+/** Donde vive este mock dentro de la app: la URL del PDF se arma con el origen de la petición. */
+const MOUNT = "/api/dev/stock-mock";
+
+const catalogBodySchema = z.object({
+  present: z.boolean(),
+  filename: z
+    .string()
+    .min(5)
+    .max(100)
+    .refine((f) => f.toLowerCase().endsWith(".pdf"))
+    .optional(),
+});
 
 function apiError(status: number, code: string, message: string): Response {
   return Response.json({ error: { code, message } }, { status });
@@ -66,6 +86,12 @@ export async function GET(req: Request, ctx: Ctx) {
 
   if (route === "_state") return Response.json(stockMockSnapshot());
 
+  // 032 — El PDF, público como lo sirve el almacenamiento de MS-Stock: sin llave ni
+  // modos infelices (esos son de la API, no del archivo).
+  if (route === "catalogo.pdf") {
+    return new Response(MOCK_CATALOG_PDF, { headers: { "content-type": "application/pdf" } });
+  }
+
   if (route === "health") {
     const bad = await unhappy();
     if (bad && bad.status === 503) return Response.json({ status: "degraded", db: "unavailable" }, { status: 503 });
@@ -82,6 +108,17 @@ export async function GET(req: Request, ctx: Ctx) {
     if (!isAuthorized) return apiError(401, "UNAUTHORIZED", "Llave inválida.");
     const bad = await unhappy();
     if (bad) return bad;
+
+    // 032 — Catálogo PDF (contrato §4b): la URL cambia con cada catálogo puesto.
+    if (route === "v1/agent/catalog") {
+      const { catalog } = stockMockState();
+      if (!catalog) return apiError(404, "NOT_FOUND", "No hay catálogo.");
+      return Response.json({
+        url: `${url.origin}${MOUNT}/catalogo.pdf?v=${catalog.version}`,
+        filename: catalog.filename,
+        updated_at: catalog.updatedAt,
+      });
+    }
 
     if (route === "v1/agent/search") {
       const q = (url.searchParams.get("q") ?? "").trim();
@@ -124,6 +161,18 @@ export async function POST(req: Request, ctx: Ctx) {
     if (!mode) return apiError(422, "VALIDATION_ERROR", `mode debe ser uno de ${MODES.join(", ")}`);
     setStockMockMode(mode);
     return Response.json({ ok: true, mode });
+  }
+  if (route === "_catalog") {
+    const parsed = catalogBodySchema.safeParse(await req.json().catch(() => null));
+    if (!parsed.success) {
+      return apiError(
+        422,
+        "VALIDATION_ERROR",
+        "present (booleano) y filename opcional de 5 a 100 caracteres que termine en .pdf"
+      );
+    }
+    setStockMockCatalog(parsed.data.present, parsed.data.filename);
+    return Response.json({ ok: true, catalog: stockMockState().catalog });
   }
   return new Response(null, { status: 404 });
 }

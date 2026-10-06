@@ -84,6 +84,15 @@ const inventarioActions = [
     size: z.string().trim().min(1).max(20).optional(),
     reply: z.string().optional(),
   }),
+  /**
+   * 032 — Mandar el catálogo PDF del negocio (FR-1701). `reply` es solo la frase de
+   * entrada y no promete el adjunto: el sistema pide el catálogo a MS-Stock, lo envía
+   * como documento y, si no hay o MS-Stock falla, esa frase sale sola (FR-1708).
+   */
+  z.object({
+    action: z.literal("send_catalog"),
+    reply: z.string().optional(),
+  }),
 ] as const;
 
 export const AgentAction = z.discriminatedUnion("action", [
@@ -127,7 +136,8 @@ export function degradeAction(action: AgentActionType): AgentActionType {
     action.action === "offer_slots" ||
     action.action === "book_slot" ||
     action.action === "move_slot" ||
-    action.action === "check_stock"
+    action.action === "check_stock" ||
+    action.action === "send_catalog"
   ) {
     return action.reply
       ? { action: "reply", text: action.reply }

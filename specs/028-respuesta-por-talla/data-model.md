@@ -42,7 +42,9 @@ Sea `P` la lista de productos resueltos (SKU exacto ⇒ `P = [uno]`; búsqueda �
      ahora no tengo q con existencia." }]`.
    - si no: un mensaje por `p ∈ shown` con `text = lineaDe(p, size)` y `imageUrl` según
      la regla de fotos; y si `filtrados.length > SHOW_LIMIT || truncated`, un mensaje
-     final `{ text: "Hay más coincidencias, ¿me dices cuál te interesa?" }`.
+     final `{ text: "Hay más coincidencias, ¿me dices cuál te interesa?" }`. (032:
+     FR-1710 — con más de 10 o `truncated` y catálogo PDF, el cierre es «Hay más modelos
+     en nuestro catálogo, ¿te lo mando?»; ver `closingFor`.)
 4. **Frase de entrada** (`intro` no vacía) → se antepone con `\n` al `text` del primer
    mensaje. Nunca genera un mensaje propio.
 

@@ -1,5 +1,10 @@
-import { afterEach, describe, expect, it, vi } from "vitest";
-import type { StockProduct, StockResult, StockVariant } from "@/server/inventario/client";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import type {
+  CatalogInfo,
+  StockProduct,
+  StockResult,
+  StockVariant,
+} from "@/server/inventario/client";
 
 /**
  * 026 — El sistema pega los datos (FR-1111): formato pequeño y determinista;
@@ -14,9 +19,14 @@ import type { StockProduct, StockResult, StockVariant } from "@/server/inventari
 
 type Lookup = StockResult<{ products: StockProduct[]; truncated: boolean }>;
 const lookup = vi.fn<(q: string) => Promise<Lookup>>();
-vi.mock("@/server/inventario/client", () => ({ lookup: (q: string) => lookup(q) }));
+/** 032 — El catálogo que consulta el cierre; por defecto no hay (el cierre de siempre). */
+const getCatalog = vi.fn<() => Promise<StockResult<CatalogInfo>>>();
+vi.mock("@/server/inventario/client", () => ({
+  lookup: (q: string) => lookup(q),
+  getCatalog: () => getCatalog(),
+}));
 
-const { checkStockTurn } = await import("@/server/inventario/agent");
+const { checkStockTurn, selectProducts } = await import("@/server/inventario/agent");
 type Turn = Awaited<ReturnType<typeof checkStockTurn>>;
 /** Todo el texto del turno, en orden, como lo leería el cliente. */
 const textOf = (turn: Turn) => turn.messages.map((m) => m.text).join("\n");
@@ -90,7 +100,15 @@ function con(products: StockProduct[], truncated = false) {
   lookup.mockResolvedValue({ ok: true, data: { products, truncated } });
 }
 
-afterEach(() => lookup.mockReset());
+// Con llaves a propósito: una función devuelta por `beforeEach` es un teardown y Vitest
+// la llama al terminar cada test — devolver el espía lo invocaría (y contaría) de más.
+beforeEach(() => {
+  getCatalog.mockResolvedValue({ ok: false, error: "not_found" });
+});
+afterEach(() => {
+  lookup.mockReset();
+  getCatalog.mockReset();
+});
 
 describe("026 — checkStockTurn", () => {
   it("un producto: una línea con existencia, unidad y precio con moneda", async () => {
@@ -134,6 +152,8 @@ describe("026 — checkStockTurn", () => {
     }
   });
 
+  // 032 (FR-1710): sin catálogo —el mock por defecto— el recorte sigue cerrando con «Hay
+  // más coincidencias…»; con catálogo, ofrece el catálogo (ver el bloque 032 al final).
   it("truncado: máximo 5 productos y pide precisar (028: un mensaje por producto, el cierre aparte)", async () => {
     const many = Array.from({ length: 5 }, (_, i) => ({
       ...negra,
@@ -359,7 +379,7 @@ describe("028 — talla pedida con varios modelos", () => {
   });
 });
 
-/* ---------- 028 · US3: sin talla, varios modelos (FR-1305, FR-1307, FR-1308) ---------- */
+/* ---------- 028 · US3: sin talla, varios modelos (FR-1305, FR-1307, FR-1308; cierre con más de 10: FR-1710 de la 032) ---------- */
 
 describe("028 — sin talla pedida con varios modelos", () => {
   it("solo los con existencia, la línea vigente de cada uno (tallas o simple), su foto; agotados omitidos; tope 5 + cierre", async () => {
@@ -415,5 +435,125 @@ describe("028 — sin talla pedida con varios modelos", () => {
     });
     con([blanca]);
     expect(textOf(await checkStockTurn({ query: "playera blanca" }))).toBe("Playera blanca (PLY-BLA): agotado — $199 MXN");
+  });
+});
+
+/**
+ * 032 — El cierre de check_stock (FR-1710, deroga en parte FR-1308). Se cuentan los
+ * productos con existencia que quedan tras el filtro: de 6 a 10, «Hay más
+ * coincidencias…» sin consultar el catálogo; con más de 10, o si MS-Stock recortó, se
+ * consulta y, si hay catálogo, se ofrece. Los productos mostrados, sus fotos y su
+ * orden no cambian por esto.
+ */
+describe("032 — el cierre de check_stock y el catálogo", () => {
+  const HAY_MAS = "Hay más coincidencias, ¿me dices cuál te interesa?";
+  const OFERTA = "Hay más modelos en nuestro catálogo, ¿te lo mando?";
+  const CATALOGO = {
+    ok: true as const,
+    data: {
+      url: "https://img.stock.example/catalog/ab12.pdf",
+      filename: "Catálogo.pdf",
+      updated_at: "2026-10-04T18:00:00Z",
+    },
+  };
+  /** `n` productos con existencia, cada uno con su foto. */
+  const varios = (n: number): StockProduct[] =>
+    Array.from({ length: n }, (_, i) => ({
+      ...negra,
+      sku: `CAL-${String(i + 1).padStart(2, "0")}`,
+      name: `Calcetín ${i + 1}`,
+      image_url: `https://img.stock.example/cal${i + 1}.jpg`,
+    }));
+
+  it("5 con existencia: los 5, sin cierre y sin consultar el catálogo", async () => {
+    getCatalog.mockResolvedValue(CATALOGO);
+    con(varios(5));
+    const turn = await checkStockTurn({ query: "calcetín" });
+    expect(turn.messages).toHaveLength(5);
+    expect(getCatalog).not.toHaveBeenCalled();
+  });
+
+  it("de 6 a 10: 5 + «Hay más coincidencias…», sin consultar el catálogo aunque lo haya", async () => {
+    getCatalog.mockResolvedValue(CATALOGO);
+    for (const n of [6, 10]) {
+      con(varios(n));
+      const turn = await checkStockTurn({ query: "calcetín" });
+      expect(turn.messages, `${n}`).toHaveLength(6);
+      expect(turn.messages[5]).toEqual({ text: HAY_MAS, imageUrl: null });
+    }
+    expect(getCatalog).not.toHaveBeenCalled();
+  });
+
+  it("más de 10 con catálogo: 5 + el ofrecimiento, con una sola consulta", async () => {
+    getCatalog.mockResolvedValue(CATALOGO);
+    for (const n of [11, 12]) {
+      getCatalog.mockClear();
+      con(varios(n));
+      const turn = await checkStockTurn({ query: "calcetín" });
+      expect(turn.messages, `${n}`).toHaveLength(6);
+      expect(turn.messages[5]).toEqual({ text: OFERTA, imageUrl: null });
+      expect(getCatalog).toHaveBeenCalledTimes(1);
+    }
+  });
+
+  it("más de 10 sin catálogo, o con MS-Stock fallando en esa consulta: el cierre de siempre", async () => {
+    for (const error of ["not_found", "timeout", "unavailable"] as const) {
+      getCatalog.mockResolvedValue({ ok: false, error });
+      con(varios(11));
+      const turn = await checkStockTurn({ query: "calcetín" });
+      expect(turn.ok, error).toBe(true);
+      expect(turn.messages, error).toHaveLength(6);
+      expect(turn.messages[5], error).toEqual({ text: HAY_MAS, imageUrl: null });
+    }
+  });
+
+  it("recorte de MS-Stock: con catálogo se ofrece aunque queden pocos; sin él, el de siempre", async () => {
+    getCatalog.mockResolvedValue(CATALOGO);
+    con(varios(2), true);
+    expect((await checkStockTurn({ query: "calcetín" })).messages.at(-1)?.text).toBe(OFERTA);
+    con([negra], true);
+    expect(textOf(await checkStockTurn({ query: "playera negra" })).split("\n")).toEqual([
+      "Playera negra (PLY-NEG): 7 pieza — $199 MXN",
+      OFERTA,
+    ]);
+    getCatalog.mockResolvedValue({ ok: false, error: "not_found" });
+    con(varios(2), true);
+    expect((await checkStockTurn({ query: "calcetín" })).messages.at(-1)?.text).toBe(HAY_MAS);
+  });
+
+  it("se cuenta tras el filtro: 12 agotados ⇒ la frase; 12 con 3 en la talla ⇒ 3, sin cierre ni consulta", async () => {
+    getCatalog.mockResolvedValue(CATALOGO);
+    con(varios(12).map((p) => ({ ...p, stock: 0, available: false })));
+    expect(textOf(await checkStockTurn({ query: "calcetines" }))).toBe(
+      "Por ahora no tengo calcetines con existencia."
+    );
+    const conTallas = varios(12).map((p, i) => ({
+      ...p,
+      variants: [talla(p.sku, "G", i < 3 ? 2 : 0), talla(p.sku, "M", 5)],
+    }));
+    con(conTallas);
+    const enG = await checkStockTurn({ query: "calcetín", size: "G" });
+    expect(enG.messages).toHaveLength(3);
+    expect(getCatalog).not.toHaveBeenCalled();
+  });
+
+  it("los 5 mensajes de producto (texto, foto y orden) son idénticos con y sin catálogo", async () => {
+    getCatalog.mockResolvedValue(CATALOGO);
+    con(varios(12));
+    const conCatalogo = await checkStockTurn({ query: "calcetín", intro: "Déjame revisar." });
+    getCatalog.mockResolvedValue({ ok: false, error: "not_found" });
+    con(varios(12));
+    const sinCatalogo = await checkStockTurn({ query: "calcetín", intro: "Déjame revisar." });
+    expect(conCatalogo.messages.slice(0, 5)).toEqual(sinCatalogo.messages.slice(0, 5));
+    expect(conCatalogo.messages[0]?.text.startsWith("Déjame revisar.\n")).toBe(true);
+    expect(conCatalogo.messages.slice(0, 5).every((m) => m.imageUrl !== null)).toBe(true);
+  });
+
+  it("selectProducts cuenta el total tras el filtro, no solo los mostrados", () => {
+    const r = selectProducts(varios(12), "");
+    expect(r.shown).toHaveLength(5);
+    expect(r.total).toBe(12);
+    expect(r.more).toBe(true);
+    expect(selectProducts(varios(3), "").total).toBe(3);
   });
 });

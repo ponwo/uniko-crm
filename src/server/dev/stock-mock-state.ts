@@ -79,6 +79,18 @@ export const STOCK_MOCK_CATALOG: MockProduct[] = [
     { label: "34", stock: 3 },
     { label: "36", stock: 2 },
   ] },
+  // 032: las dos categorías del cierre de check_stock (FR-1710). Calcetines: más de 10
+  // con existencia, cada uno con su foto (URL distinta). Sudaderas: de 6 a 10, sin foto.
+  // Al final, y con nombres que ninguna búsqueda anterior toca.
+  ...["blanco", "negro", "gris", "azul", "rojo", "verde", "amarillo", "rosa", "morado", "café", "beige", "naranja"].map(
+    (color, i): MockProduct => {
+      const n = String(i + 1).padStart(2, "0");
+      return { sku: `CAL-${n}`, name: `Calcetín ${color}`, description: null, stock: 10, unit: "pieza", price: 59, currency: "MXN", active: true, imagePath: `/icon-192.png?m=cal${n}` };
+    }
+  ),
+  ...["negra", "gris", "azul", "roja", "verde", "blanca", "café"].map(
+    (color, i): MockProduct => ({ sku: `SUD-0${i + 1}`, name: `Sudadera ${color}`, description: null, stock: 3, unit: "pieza", price: 499, currency: "MXN", active: true, imagePath: null })
+  ),
 ];
 
 /**
@@ -118,19 +130,50 @@ export type LastSso = {
   iat: number;
 };
 
+/**
+ * 032 — El catálogo PDF del negocio (contrato §4b de MS-Stock). `version` viaja en la
+ * URL (`catalogo.pdf?v=<n>`) y sube cada vez que se pone un catálogo: como en
+ * MS-Stock, un reemplazo cambia la URL y el motor nunca debe mandar la vieja.
+ */
+export type MockCatalog = { filename: string; updatedAt: string; version: number };
+
+export const MOCK_CATALOG_FILENAME = "Catálogo de prueba.pdf";
+const MOCK_CATALOG_UPDATED_AT = "2026-10-04T18:00:00.000Z";
+
 type MockState = {
   mode: StockMockMode;
   lastSso: LastSso | null;
   calls: { path: string; authorized: boolean }[];
+  /** 032 — `null` ⇒ «no hay catálogo» (404, como MS-Stock). */
+  catalog: MockCatalog | null;
+  /** La última versión entregada: un catálogo puesto otra vez nunca repite URL. */
+  catalogVersion: number;
 };
 
 const globalForMock = globalThis as unknown as { __stockMock?: MockState };
 
+function defaultCatalog(): MockCatalog {
+  return { filename: MOCK_CATALOG_FILENAME, updatedAt: MOCK_CATALOG_UPDATED_AT, version: 1 };
+}
+
 export function stockMockState(): MockState {
   if (!globalForMock.__stockMock) {
-    globalForMock.__stockMock = { mode: "ok", lastSso: null, calls: [] };
+    globalForMock.__stockMock = {
+      mode: "ok",
+      lastSso: null,
+      calls: [],
+      catalog: defaultCatalog(),
+      catalogVersion: 1,
+    };
   }
-  return globalForMock.__stockMock;
+  // Un estado creado antes de la 032 (recarga en caliente de `next dev`) no trae el
+  // catálogo: se completa en vez de fallar.
+  const s = globalForMock.__stockMock as MockState & { catalogVersion?: number };
+  if (s.catalogVersion === undefined) {
+    s.catalog = defaultCatalog();
+    s.catalogVersion = 1;
+  }
+  return s;
 }
 
 export function resetStockMock(): void {
@@ -138,16 +181,68 @@ export function resetStockMock(): void {
   s.mode = "ok";
   s.lastSso = null;
   s.calls.length = 0;
+  s.catalog = defaultCatalog();
+  s.catalogVersion = 1;
 }
 
 export function setStockMockMode(mode: StockMockMode): void {
   stockMockState().mode = mode;
 }
 
+/** 032 — Pone el catálogo (con el nombre dado, o el que ya tenía) o lo quita. */
+export function setStockMockCatalog(present: boolean, filename?: string): void {
+  const s = stockMockState();
+  if (!present) {
+    s.catalog = null;
+    return;
+  }
+  s.catalogVersion += 1;
+  s.catalog = {
+    filename: filename ?? s.catalog?.filename ?? MOCK_CATALOG_FILENAME,
+    updatedAt: new Date().toISOString(),
+    version: s.catalogVersion,
+  };
+}
+
 export function stockMockSnapshot(): MockState {
   const s = stockMockState();
-  return { mode: s.mode, lastSso: s.lastSso, calls: [...s.calls] };
+  return {
+    mode: s.mode,
+    lastSso: s.lastSso,
+    calls: [...s.calls],
+    catalog: s.catalog,
+    catalogVersion: s.catalogVersion,
+  };
 }
+
+/**
+ * 032 — Un PDF mínimo pero válido (una página), con los offsets de `xref`
+ * calculados para que el visor del navegador lo abra desde la bandeja. Solo ASCII:
+ * cada carácter es un byte, así que `length` es el offset.
+ */
+function buildMockCatalogPdf(): string {
+  const content = "BT /F1 24 Tf 72 760 Td (Catalogo de prueba - Uniko, entorno de pruebas) Tj ET";
+  const objects = [
+    "<< /Type /Catalog /Pages 2 0 R >>",
+    "<< /Type /Pages /Kids [3 0 R] /Count 1 >>",
+    "<< /Type /Page /Parent 2 0 R /MediaBox [0 0 595 842] /Resources << /Font << /F1 4 0 R >> >> /Contents 5 0 R >>",
+    "<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>",
+    `<< /Length ${content.length} >>\nstream\n${content}\nendstream`,
+  ];
+  let pdf = "%PDF-1.4\n";
+  const offsets: number[] = [];
+  objects.forEach((body, i) => {
+    offsets.push(pdf.length);
+    pdf += `${i + 1} 0 obj\n${body}\nendobj\n`;
+  });
+  const xref = pdf.length;
+  pdf += `xref\n0 ${objects.length + 1}\n0000000000 65535 f \n`;
+  for (const offset of offsets) pdf += `${String(offset).padStart(10, "0")} 00000 n \n`;
+  pdf += `trailer\n<< /Size ${objects.length + 1} /Root 1 0 R >>\nstartxref\n${xref}\n%%EOF\n`;
+  return pdf;
+}
+
+export const MOCK_CATALOG_PDF = buildMockCatalogPdf();
 
 /** Misma normalización que MS-Stock: sin acentos, sin mayúsculas. */
 export function normalize(text: string): string {

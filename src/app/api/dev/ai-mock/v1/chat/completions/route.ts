@@ -14,7 +14,8 @@ export async function POST(req: Request) {
   };
   // 015 — Se anota el modelo pedido: es lo que le permite al arnés comprobar
   // que `AGENDA_MODEL` entra SOLO en los turnos de elegir horario.
-  recordAiMockCall(body.model);
+  // 032 — Y el prompt: así el arnés comprueba que la URL del catálogo no llega al modelo.
+  recordAiMockCall(body.model, body.messages);
   const content = aiMockCompletion(body.messages ?? []);
   return Response.json({
     id: "aimock",

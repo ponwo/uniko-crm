@@ -402,6 +402,53 @@ if (inventarioOn) {
     outboxTrasFoto === outboxAntesFoto,
     `${outboxAntesFoto} → ${outboxTrasFoto}`
   );
+
+  // ── 032 (catálogo PDF): send_catalog dentro del sandbox ────────────────
+  //
+  // Una pregunta general manda el catálogo como documento. En el Laboratorio se
+  // persiste como lo vería el cliente SIN tocar la API, y el transcript lo muestra
+  // con su nombre antes del pie (el Laboratorio enseña transcripts, no hilos).
+  console.log("\n== 032: send_catalog dentro del Laboratorio (sandbox) ==");
+  const STOCK = (process.env.STOCK_BASE_URL ?? "").replace(/\/+$/, "");
+  await fetch(`${STOCK}/_reset`, { method: "POST" });
+  const altaCatalogo = await api("/api/lab/scenarios", {
+    method: "POST",
+    data: {
+      escenarios: [
+        {
+          label: "Pregunta qué venden",
+          description: "Pregunta general: el agente manda el catálogo PDF",
+          script: ["hola, buenas", "¿qué venden?"],
+        },
+      ],
+    },
+  });
+  ok("el escenario que pide el catálogo se guarda", altaCatalogo.status === 201, `status ${altaCatalogo.status}`);
+  const outboxAntesCatalogo = await outboxLen();
+  const inicio5 = await api("/api/lab/runs", { method: "POST" });
+  const reporte5 = await esperarCorrida(inicio5.json?.runId);
+  const casoCatalogo = (reporte5?.cases ?? []).find((c) => c.personaLabel === "Pregunta qué venden");
+  const agenteCatalogo = (casoCatalogo?.transcript ?? []).filter((t) => t.role === "agente");
+  ok(
+    "el transcript muestra el documento con su nombre y el pie",
+    agenteCatalogo.at(-1)?.text ===
+      "[Documento: Catálogo de prueba.pdf]\n¡Claro!\n\nDime modelo y talla y te confirmo existencia y precio",
+    JSON.stringify(casoCatalogo?.transcript ?? reporte5?.run)
+  );
+  ok(
+    "la URL del PDF no se cuela en el transcript",
+    agenteCatalogo.length > 0 && agenteCatalogo.every((t) => !t.text.includes("stock-mock/catalogo.pdf"))
+  );
+  const outboxTrasCatalogo = await outboxLen();
+  ok(
+    "y el sandbox sigue intacto: ningún documento salió por la API",
+    outboxTrasCatalogo === outboxAntesCatalogo,
+    `${outboxAntesCatalogo} → ${outboxTrasCatalogo}`
+  );
+  // Se borra para que la siguiente corrida del arnés mida lo mismo.
+  const guardadosCatalogo = (await api("/api/lab/scenarios")).json?.escenarios ?? [];
+  const escenarioCatalogo = guardadosCatalogo.find((e) => e.label === "Pregunta qué venden");
+  if (escenarioCatalogo) await api(`/api/lab/scenarios/${escenarioCatalogo.id}`, { method: "DELETE" });
 } else {
   console.log("\n  (conector de inventario apagado: el escenario con foto no aplica)");
 }

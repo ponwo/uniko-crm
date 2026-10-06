@@ -42,7 +42,9 @@ vi.mock("@/lib/db", () => ({
       origin: "origin",
       organizationId: "organizationId",
       waMessageId: "waMessageId",
+      mediaAssetId: "mediaAssetId",
     },
+    mediaAsset: { id: "id", organizationId: "organizationId", payload: "payload" },
   },
 }));
 
@@ -109,6 +111,88 @@ describe("026 — failed tardío de la foto ⇒ el pie sale como texto", () => {
       applyStatusUpdate("org_1", { id: "wamid.foto.1", status: "failed" } as never)
     ).resolves.toBeUndefined();
     expect(errorSpy).toHaveBeenCalledWith(expect.stringContaining("[agente] foto"));
+    errorSpy.mockRestore();
+  });
+});
+
+/**
+ * 032 — Lo mismo con el catálogo PDF (FR-1706): Meta acepta el documento por URL y
+ * después puede reportarlo `failed` (no pudo descargarlo). El cliente se quedaría
+ * sin nada, así que sale el texto de respaldo —el pie y, en la línea siguiente, el
+ * enlace del PDF, que sale del asset— una sola vez.
+ */
+const PIE_CATALOGO = "¡Claro!\n\nDime modelo y talla y te confirmo existencia y precio";
+const URL_PDF = "https://img.stock.example/catalog/ab12.pdf";
+
+function catalogoDelAgente(status = "pending") {
+  return {
+    id: "msg_9",
+    conversationId: "cv_1",
+    status,
+    type: "document",
+    text: PIE_CATALOGO,
+    origin: "ai",
+    mediaAssetId: "ma_9",
+  };
+}
+
+describe("032 — failed tardío del catálogo ⇒ el pie y el enlace salen como texto", () => {
+  beforeEach(() => {
+    sendText.mockReset();
+    publish.mockReset();
+    selectRows.length = 0;
+    updates.length = 0;
+  });
+
+  it("documento del agente → failed: texto = pie + salto + URL del asset, generado por IA", async () => {
+    selectRows.push([catalogoDelAgente()], [{ payload: { url: URL_PDF } }]);
+    sendText.mockResolvedValue({ messageId: "msg_10" });
+    const { applyStatusUpdate } = await import("@/server/inbox/status");
+    await applyStatusUpdate("org_1", {
+      id: "wamid.doc.1",
+      status: "failed",
+      errors: [{ code: 131053, message: "Media upload error" }],
+    } as never);
+    expect(updates[0]).toMatchObject({ status: "failed" });
+    expect(sendText).toHaveBeenCalledTimes(1);
+    expect(sendText).toHaveBeenCalledWith({
+      conversationId: "cv_1",
+      organizationId: "org_1",
+      text: `${PIE_CATALOGO}\n${URL_PDF}`,
+      aiGenerated: true,
+    });
+  });
+
+  it("un failed repetido no lo manda dos veces; un documento del operador no tiene respaldo", async () => {
+    const { applyStatusUpdate } = await import("@/server/inbox/status");
+    selectRows.push([catalogoDelAgente("failed")]);
+    await applyStatusUpdate("org_1", { id: "wamid.doc.1", status: "failed" } as never);
+    selectRows.push([{ ...catalogoDelAgente(), origin: "operator" }]);
+    await applyStatusUpdate("org_1", { id: "wamid.doc.op", status: "failed" } as never);
+    expect(sendText).not.toHaveBeenCalled();
+  });
+
+  it("asset sin URL http(s) (o sin asset): sale el pie solo", async () => {
+    const { applyStatusUpdate } = await import("@/server/inbox/status");
+    selectRows.push([catalogoDelAgente()], [{ payload: { url: "javascript:alert(1)" } }]);
+    await applyStatusUpdate("org_1", { id: "wamid.doc.2", status: "failed" } as never);
+    selectRows.push([catalogoDelAgente()], []);
+    await applyStatusUpdate("org_1", { id: "wamid.doc.3", status: "failed" } as never);
+    expect(sendText.mock.calls.map(([input]) => (input as { text: string }).text)).toEqual([
+      PIE_CATALOGO,
+      PIE_CATALOGO,
+    ]);
+  });
+
+  it("si el respaldo también falla, el webhook no revienta (queda en el log)", async () => {
+    selectRows.push([catalogoDelAgente()], [{ payload: { url: URL_PDF } }]);
+    sendText.mockRejectedValue(new Error("Meta no está disponible ahora"));
+    const errorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+    const { applyStatusUpdate } = await import("@/server/inbox/status");
+    await expect(
+      applyStatusUpdate("org_1", { id: "wamid.doc.4", status: "failed" } as never)
+    ).resolves.toBeUndefined();
+    expect(errorSpy).toHaveBeenCalledWith(expect.stringContaining("[agente] catálogo"));
     errorSpy.mockRestore();
   });
 });

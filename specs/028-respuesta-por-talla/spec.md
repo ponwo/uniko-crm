@@ -22,7 +22,7 @@ modelos que tienen existencia en ella, cada uno con su precio y **su foto**; (2)
 modelos agotados en esa talla y los que no la traen **se omiten del todo** ("con 4
 modelos es funcional; con 20 se vuelve invasivo y sin utilidad"); (3) **tope de 5 fotos
 por turno** como paso inicial; (4) el catálogo general en PDF (para las preguntas
-generales) es otra feature, posterior (029), y no condiciona esta.
+generales) es otra feature, posterior (032), y no condiciona esta.
 
 ## Contexto de negocio
 
@@ -140,7 +140,7 @@ un mensaje por modelo con existencia —foto y, como pie, la línea vigente del 
 con sus tallas— hasta el tope; los modelos sin ninguna existencia no aparecen.
 
 **Why this priority**: da consistencia (la foto acompaña al producto del que se habla,
-no "al primero") mientras no exista el catálogo en PDF de la 029, que será la
+no "al primero") mientras no exista el catálogo en PDF de la 032, que será la
 respuesta a las preguntas generales.
 
 **Independent Test**: preguntar "¿qué playeras tienen?" con los cuatro modelos y
@@ -154,7 +154,9 @@ comprobar cuatro mensajes de imagen con el pie de cada modelo.
    XG 7`), y la frase de entrada del modelo en el primero.
 2. **Given** más de cinco modelos con existencia, **When** el cliente pregunta,
    **Then** recibe cinco y, al final, un mensaje de texto `Hay más coincidencias, ¿me
-   dices cuál te interesa?`.
+   dices cuál te interesa?`. (032: así de 6 a 10; con más de 10, o si MS-Stock recortó,
+   y catálogo PDF cargado, el cierre es «Hay más modelos en nuestro catálogo, ¿te lo
+   mando?» — FR-1710.)
 3. **Given** un modelo con todas sus tallas agotadas, **When** aparece entre los
    resultados de una pregunta sin talla con varios modelos, **Then** no se menciona.
 
@@ -265,10 +267,18 @@ termina dentro del límite.
 
 - **FR-1308**: Para poder filtrar por talla del lado Uniko, la búsqueda a MS-Stock MUST
   pedir hasta **25** resultados (su máximo) cuando `check_stock` trae `size` y también
-  cuando no la trae; la respuesta al cliente MUST mostrar a lo sumo **5** productos y
+  cuando no la trae; la respuesta al cliente MUST mostrar a lo sumo **5** productos ~~y
   cerrar con `Hay más coincidencias, ¿me dices cuál te interesa?` si quedaron más con
-  existencia o si MS-Stock avisó que recortó. El resto del contrato de consulta
+  existencia o si MS-Stock avisó que recortó~~. El resto del contrato de consulta
   (SKU exacto primero, 3 s, sin reintentos, solo lectura) no cambia.
+  **DEROGADO** (parcial, 032 `032-catalogo-pdf`, PR #61): el cierre único «Hay más
+  coincidencias…» para todo lo que pase de 5 o venga recortado. Lo sustituye FR-1710 de
+  la 032: de 6 a 10 con existencia y sin recorte, el mismo «Hay más coincidencias, ¿me
+  dices cuál te interesa?», sin consultar el catálogo; con más de 10, o si MS-Stock
+  recortó, se consulta el catálogo PDF y, si existe, «Hay más modelos en nuestro
+  catálogo, ¿te lo mando?»; sin catálogo o con fallo, el cierre de siempre (decisión del
+  dueño 2026-10-04: el umbral es más de 10). Sigue vigente: 25 pedidos, 5 mostrados,
+  SKU exacto primero, 3 s, sin reintentos, solo lectura.
 - **FR-1309**: El prompt del agente MUST pedir el nombre base del producto **en
   singular** en `query` ("playera", no "playeras") además de lo vigente (sin la talla;
   la talla en `size`; el SKU tal cual). El plural que aun así llegue lo tolera la
@@ -412,9 +422,11 @@ estado retrasado más que el tope, el turno sigue igual y termina dentro del lí
   búsqueda del repo hermano (mismo endpoint, mismo contrato, se ejercita con su propio
   gate); aquí solo se ajusta el prompt (FR-1309). Si MS-Stock aún no lo tuviera, el
   escenario 5 de US1 depende de que el modelo de lenguaje ponga el singular.
-- **Catálogo PDF (029) fuera de alcance**: las preguntas generales ("¿qué venden?") y
+- **Catálogo PDF (032) fuera de alcance**: las preguntas generales ("¿qué venden?") y
   la sustitución de "Hay más coincidencias…" por ofrecer el PDF se especifican en la
-  029, cuando MS-Stock exponga el catálogo. Esta feature no la presupone.
+  032, cuando MS-Stock exponga el catálogo. Esta feature no la presupone. (Corrección
+  2026-10-05: aquí decía «029»; ese número lo tomó «Google por link» y el catálogo
+  quedó en la 032, `032-catalogo-pdf`.)
 - **Sin variables, migración ni pantalla nuevas**: todo vive en el motor del turno y
   en el adaptador existente; el Laboratorio muestra los mensajes como ya lo hace.
 - **Ráfaga acotada a propósito**: los 5 mensajes de imagen salen porque el cliente los

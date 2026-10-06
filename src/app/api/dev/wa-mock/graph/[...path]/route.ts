@@ -406,15 +406,20 @@ export async function POST(req: Request, ctx: Params) {
     // reproduce a Meta rechazando el link o tardando más de lo que el motor
     // espera. Como Meta, en `slow` el mensaje SÍ queda registrado aunque el
     // CRM ya haya cortado la espera.
-    const link = (body.image as { link?: unknown } | undefined)?.link;
-    if (body.type === "image" && typeof link === "string") {
-      // 028: con `mediaLink`, el modo infeliz aplica solo a la imagen que coincide.
+    // 032 — Lo mismo con el documento por link (el catálogo PDF, FR-1706).
+    const medio =
+      body.type === "image" || body.type === "document"
+        ? (body[body.type] as { link?: unknown } | undefined)
+        : undefined;
+    const link = medio?.link;
+    if (typeof link === "string") {
+      // 028: con `mediaLink`, el modo infeliz aplica solo al medio que coincide.
       const modo = mediaModeFor(link);
       if (modo === "reject") {
         return Response.json(
           {
             error: {
-              message: "(#100) Param image['link'] is not a valid URL",
+              message: `(#100) Param ${String(body.type)}['link'] is not a valid URL`,
               type: "OAuthException",
               code: 100,
               fbtrace_id: "mock",
@@ -439,7 +444,8 @@ export async function POST(req: Request, ctx: Params) {
       at: new Date().toISOString(),
     });
     // 028 (FR-1315): como Meta, la imagen por URL pasa a `sent` poco después.
-    if (body.type === "image" && typeof link === "string") scheduleSentStatus(waMessageId);
+    // 032: y el documento por URL también.
+    if (typeof link === "string") scheduleSentStatus(waMessageId);
     return Response.json({
       messaging_product: "whatsapp",
       contacts: [{ input: body.to, wa_id: body.to }],

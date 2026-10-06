@@ -505,6 +505,78 @@ export async function sendImageLink(input: {
   return { messageId };
 }
 
+/**
+ * 032 — Documento por URL (el catálogo PDF del negocio, contrato §4b de MS-Stock),
+ * espejo de `sendImageLink`: el binario NO pasa por Uniko —Meta descarga `link` por su
+ * cuenta— y el cliente lo recibe con `filename` y el pie. Se persiste como cualquier
+ * salida (asset `document` con `payload.url`, sin archivo local; el pie como `text`
+ * del mensaje, que es lo único que ve el historial del agente: la URL nunca llega al
+ * modelo). Si Graph rechaza, no se persiste nada: quien llama decide el respaldo.
+ */
+export async function sendDocumentLink(input: {
+  conversationId: string;
+  organizationId: string;
+  link: string;
+  filename: string;
+  caption?: string;
+  aiGenerated?: boolean;
+  /** Límite de espera de quien llama: el documento nunca retrasa la respuesta. */
+  signal?: AbortSignal;
+}): Promise<SendResult> {
+  const target = await prepareSend(input.conversationId, input.organizationId);
+  const caps = capabilitiesFor(target.conversation.channel);
+  // Solo WhatsApp manda documentos por link hoy; en los demás canales quien llama
+  // manda el texto con el enlace.
+  if (!caps.outboundMedia || !target.credentials) {
+    throw new SendError(
+      "meta_error",
+      `Todavía no se pueden enviar documentos por ${caps.label}; manda el texto`
+    );
+  }
+
+  const document: Record<string, unknown> = { link: input.link, filename: input.filename };
+  if (input.caption) document.caption = input.caption;
+  const waMessageId = await callGraphSend(
+    target.credentials,
+    {
+      messaging_product: "whatsapp",
+      to: target.recipient,
+      type: "document",
+      document,
+    },
+    input.signal
+  );
+
+  const db = getDb();
+  const assetRows = await db
+    .insert(schema.mediaAsset)
+    .values({
+      id: newId("mediaAsset"),
+      organizationId: input.organizationId,
+      kind: "document",
+      fileName: input.filename,
+      caption: input.caption ?? null,
+      payload: { url: input.link },
+      fetchStatus: "available",
+    })
+    .returning();
+  const asset = assetRows[0]!;
+
+  const messageId = await persistOutbound({
+    organizationId: input.organizationId,
+    conversationId: input.conversationId,
+    waMessageId,
+    type: "document",
+    text: input.caption ?? null,
+    status: caps.deliveryReceipts ? "pending" : "sent",
+    aiGenerated: input.aiGenerated,
+    origin: input.aiGenerated ? "ai" : "operator",
+    mediaAssetId: asset.id,
+    media: asset,
+  });
+  return { messageId };
+}
+
 export type LocationInput = {
   latitude: number;
   longitude: number;

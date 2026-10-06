@@ -23,7 +23,11 @@ opcionales ([ADR-001](adr-001-canales-opcionales.md), Principio II).
   (nombre, SKU, existencia con unidad, precio con moneda). El modelo solo aporta
   la frase de entrada; los datos los pega el sistema, así que **no puede
   inventar existencias**. Si no hay coincidencias lo dice; si hay más de cinco,
-  pide precisar.
+  enseña cinco y pide precisar (con más de diez, ofrece el catálogo PDF).
+- **`send_catalog` en el agente** (032): ante una pregunta general («¿qué
+  venden?», «mándame el catálogo») manda el **catálogo PDF** que el negocio subió
+  en el portal de MS-Stock, como documento de WhatsApp. Ver
+  [Catálogo PDF](#catálogo-pdf-032).
 - **Ajustes → Inventario**: a qué instancia apunta y "Probar conexión"
   (Conectado / Llave rechazada / Servicio no disponible).
 
@@ -97,9 +101,11 @@ playeras), el agente ya no enumera cada modelo ni manda la foto del primero:
 - **Sin talla pedida**: un mensaje por modelo con existencia, con la línea de sus
   tallas y su foto; los agotados no aparecen. Ninguno con existencia: `Por ahora no
   tengo playera con existencia.`
-- **Tope**: se muestran 5 (la búsqueda pide hasta 25 a MS-Stock para poder filtrar);
-  si quedan más, o MS-Stock recortó, cierra con `Hay más coincidencias, ¿me dices
-  cuál te interesa?`. Nunca más de 5 imágenes por turno ni la misma foto dos veces.
+- **Tope**: se muestran 5 (la búsqueda pide hasta 25 a MS-Stock para poder filtrar).
+  Si quedan de 6 a 10 con existencia, cierra con `Hay más coincidencias, ¿me dices
+  cuál te interesa?`; con más de 10, o si MS-Stock recortó, ofrece el catálogo PDF si
+  el negocio lo subió (032, ver abajo). Nunca más de 5 imágenes por turno ni la misma
+  foto dos veces.
 - **Entrega**: los mensajes salen en orden, uno tras otro; la frase de entrada del
   modelo va en el primero. Como Meta entrega cada imagen por URL cuando termina de
   descargarla (y dos fotos seguidas podían llegar invertidas), el motor espera el
@@ -114,6 +120,47 @@ playeras), el agente ya no enumera cada modelo ni manda la foto del primero:
 
 Con un solo modelo resuelto nada cambia respecto a la sección anterior. Detalle y
 derogaciones de la 026: `specs/028-respuesta-por-talla/`.
+
+## Catálogo PDF (032)
+
+El negocio diseña su catálogo (en Canva, con un diseñador) y lo sube en el portal de
+MS-Stock (feature 006 de MS-Stock, contrato §4b). Ni Uniko ni MS-Stock lo generan ni
+leen: el PDF enseña qué se vende, y la existencia y el precio los confirma
+`check_stock`.
+
+- **Pregunta general → el documento**: ante «¿qué venden?», «¿tienen catálogo?» o
+  «mándame el catálogo», el agente pide `send_catalog`. El sistema consulta
+  `GET /v1/agent/catalog` (3 s, sin reintentos y sin caché: la URL cambia con cada
+  reemplazo) y manda **un** mensaje de documento por URL, con el nombre que eligió el
+  negocio y como pie la frase de entrada del agente (si la hay), una línea en blanco y
+  «Dime modelo y talla y te confirmo existencia y precio». El pie no pasa de 1024
+  caracteres: si no cabe, se recorta la frase del agente con «…», nunca la frase fija.
+  El PDF no pasa por Uniko (WhatsApp lo descarga de la URL) y la URL nunca llega al
+  modelo.
+- **Más de 10 modelos → el ofrecimiento**: en `check_stock` con varios modelos, de 6
+  a 10 con existencia el cierre sigue siendo «Hay más coincidencias, ¿me dices cuál te
+  interesa?», sin consultar el catálogo. Con más de 10, o si MS-Stock recortó la
+  búsqueda, se consulta el catálogo y, si existe, el cierre es «Hay más modelos en
+  nuestro catálogo, ¿te lo mando?»; un «sí» del cliente lo manda en el turno
+  siguiente. Los cinco productos y sus fotos no cambian.
+- **El agente no describe el catálogo**: no lo ve. El prompt le prohíbe resumirlo o
+  citarlo; existencia y precio, solo con `check_stock`, y si el cliente cita algo del
+  PDF que no coincide con el inventario, manda el inventario.
+
+| Situación | Lo que recibe el cliente |
+|---|---|
+| WhatsApp | un documento con el nombre y el pie |
+| WhatsApp rechaza el documento o tarda más de 5 s | un texto: el pie y, en la línea siguiente, el enlace |
+| WhatsApp lo acepta y después lo reporta `failed` | ese mismo texto, una sola vez |
+| Instagram o Messenger (sin documentos) | ese mismo texto |
+| Ventana de 24 h cerrada | escala a humano, como cualquier envío del agente |
+| Sin catálogo (404), o MS-Stock caído, lento o con una respuesta rara | solo la frase del agente (que no promete el adjunto) o nada |
+| Laboratorio | el documento persistido sin tocar la API; el reporte lo muestra como `[Documento: <nombre>]` y el pie |
+
+Cada fallo deja en el log `[agente] catálogo: <motivo>`. En la bandeja, el documento
+se abre desde su URL. Subir, reemplazar, renombrar o quitar el catálogo se hace en el
+portal de MS-Stock; Uniko lo pide en cada turno que lo necesita. Detalle:
+`specs/032-catalogo-pdf/`.
 
 ## Qué pasa cuando MS-Stock falla
 
@@ -157,9 +204,17 @@ STOCK_API_KEY=desarrollo-local-stock-key-0123456789abcdef
 STOCK_SSO_SECRET=desarrollo-local-sso-secret-0123456789abcdef
 ```
 
+Para el catálogo PDF (032), el stock-mock trae «Catálogo de prueba.pdf»
+(`GET /api/dev/stock-mock/v1/agent/catalog`; el PDF en
+`/api/dev/stock-mock/catalogo.pdf`). `POST /api/dev/stock-mock/_catalog` con
+`{"present":false}` lo quita, y con `{"present":true,"filename":"…"}` lo pone o lo
+renombra (la URL cambia, como en un reemplazo real). Para el cierre de `check_stock`
+hay 12 calcetines con foto y 7 sudaderas sin foto. El modo de medios del wa-mock
+aplica también al documento (`{"mode":"reject","link":"catalogo.pdf"}`).
+
 `pnpm test:e2e` conduce el guion [`tests/e2e/us-inventario.md`](../tests/e2e/us-inventario.md):
-el botón con su pase, el agente consultando (feliz e infeliz) y Ajustes. Con la
-bandera apagada corre la otra mitad: que nada de esto existe.
+el botón con su pase, el agente consultando (feliz e infeliz), el catálogo PDF y
+Ajustes. Con la bandera apagada corre la otra mitad: que nada de esto existe.
 
 ## Contra MS-Stock de verdad
 
@@ -167,7 +222,8 @@ Con el repo hermano corriendo en local (`uv run uvicorn app.main:create_app
 --factory --port 8000` en `../MS-Sotck`, con su `UNIKO_SSO_SECRET` igual a tu
 `STOCK_SSO_SECRET`), apunta `STOCK_BASE_URL=http://127.0.0.1:8000` y usa su
 `STOCK_API_KEY`. El botón aterriza en el portal real y el agente responde con
-productos reales.
+productos reales. Para el catálogo, sube un PDF desde el portal (Catálogo) o con
+`PUT /v1/catalog?filename=…` y su llave.
 
 ## El contrato manda allá
 
@@ -180,6 +236,8 @@ Uniko. El único módulo que conoce HTTP de MS-Stock es
 ## Lo que NO hace (a propósito)
 
 - No registra ventas ni reserva existencias: `check_stock` es solo lectura.
+- No genera, lee, describe ni cachea el catálogo PDF: lo manda tal como lo publicó
+  el negocio cuando se lo piden, o lo ofrece cuando hay más de 10 modelos.
 - No muestra el inventario dentro de Uniko: para eso está el portal de MS-Stock.
 - No se configura desde Ajustes (las variables viven en el despliegue).
 - No restringe el botón por rol: todo miembro con sesión puede entrar.
