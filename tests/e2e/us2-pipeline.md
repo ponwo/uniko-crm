@@ -127,6 +127,16 @@ cubren `e2e-monto-pipeline`, `e2e-prioridad`, `e2e-bitacora-etapas` y
     arrastre, no una segunda regla que se puede olvidar.
     ✅ Mover a la etapa perdida abre el diálogo de motivo por encima del cajón.
     ✅ Si se cancela, el lead se queda donde estaba y el cajón sigue abierto.
+25. **Y desde la conversación.** La etapa del panel de Detalles de la bandeja
+    es el tercer camino a la misma puerta. Antes mandaba el movimiento sin
+    motivo: la API lo rechazaba con 422 y el punto regresaba solo, sin decir
+    por qué.
+    ✅ Clic en la etapa perdida abre el diálogo de motivo; con motivo, el lead
+    queda en Perdido y el tablero lo refleja.
+    ✅ Si se cancela, el punto ni se mueve.
+    ✅ Si la lista de etapas venía desfasada y el servidor responde
+    `loss_reason_required`, el panel abre el diálogo en vez de tragarse el
+    rechazo.
 
 ## Contactos (FR-013)
 
