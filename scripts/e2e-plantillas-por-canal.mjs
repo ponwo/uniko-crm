@@ -269,7 +269,7 @@ async function sinPlantillas(c, plantilla) {
 
   const texto = `Sí, aquí seguimos (${c.canal} ${RUN})`;
   await caja.fill(texto);
-  await caja.press("Enter");
+  await caja.press("Control+Enter");
   await page.getByText(texto).first().waitFor({ timeout: 15000 });
   // La burbuja «enviando» sale antes que la respuesta del servidor: lo que
   // cuenta es que el envío llegue a Zernio.
@@ -318,7 +318,7 @@ async function caminoInfeliz(c) {
   const tarde = `Perdón la demora (${RUN})`;
   const antes = (await zernioSent()).length;
   await caja.fill(tarde);
-  await caja.press("Enter");
+  await caja.press("Control+Enter");
   const error = page.getByText(/ya no acepta respuestas/);
   await error.waitFor({ timeout: 15000 });
   const textoError = await error.first().innerText();

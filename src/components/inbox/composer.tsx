@@ -675,7 +675,14 @@ export function Composer({
             addFiles(files);
           }}
           onKeyDown={(e) => {
-            if (e.key === "Enter" && !e.shiftKey) {
+            // Enter solo es salto de línea (mensajes de varios renglones);
+            // enviar es Ctrl/⌘+Enter o el botón. Durante una composición de
+            // IME el Enter confirma la palabra, no envía.
+            if (
+              e.key === "Enter" &&
+              (e.ctrlKey || e.metaKey) &&
+              !e.nativeEvent.isComposing
+            ) {
               e.preventDefault();
               void submit();
             }
@@ -686,6 +693,7 @@ export function Composer({
           onClick={() => void submit()}
           disabled={sending || !canSubmit}
           aria-label="Enviar"
+          title="Enviar (Ctrl+Enter)"
           className={cn(
             "flex h-[32px] w-[32px] shrink-0 items-center justify-center rounded-full bg-brand text-brand-fg transition-[opacity,background-color] hover:bg-brand-hover",
             (sending || !canSubmit) && "opacity-40"

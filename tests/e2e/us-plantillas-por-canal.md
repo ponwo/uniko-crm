@@ -31,7 +31,7 @@ Se corre una vez por canal encendido.
 | La conversación viaja SIN plantilla obligatoria | "ventana cerrada, pero SIN plantilla obligatoria" |
 | La Bandeja enseña la caja de siempre, sin aviso ni selector | "la caja de texto está ahí" + "sin el aviso de plantilla" + "sin selector de plantillas" |
 | El pie dice que sale como agente humano, y el porqué al pasar el cursor | "el pie dice que sale como agente humano" + "y el porqué (7 días)…" |
-| Escribir y Enter: sale por Zernio a su hilo, con `HUMAN_AGENT`, y queda `sent` | "salió por Zernio a su hilo" + "con la etiqueta de agente humano" + "queda en el hilo como enviado" |
+| Escribir y Ctrl+Enter: sale por Zernio a su hilo, con `HUMAN_AGENT`, y queda `sent` | "salió por Zernio a su hilo" + "con la etiqueta de agente humano" + "queda en el hilo como enviado" |
 | Una plantilla a esa conversación se rechaza sin tocar WhatsApp | "plantilla a la conversación → 409 channel_without_templates" + "el outbox de WhatsApp no se movió" |
 | *Escribir primero* a ese contacto se rechaza y no abre otra conversación | "«Escribir primero» a este contacto → 409…" + "y no le abrió otra conversación" |
 | Contactos no le ofrece *Escribir primero* | "al de Instagram no" / "al de Messenger no" |
