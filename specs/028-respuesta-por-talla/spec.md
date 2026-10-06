@@ -271,7 +271,7 @@ termina dentro del límite.
   cerrar con `Hay más coincidencias, ¿me dices cuál te interesa?` si quedaron más con
   existencia o si MS-Stock avisó que recortó~~. El resto del contrato de consulta
   (SKU exacto primero, 3 s, sin reintentos, solo lectura) no cambia.
-  **DEROGADO** (parcial, 032 `032-catalogo-pdf`, PR #<n>): el cierre único «Hay más
+  **DEROGADO** (parcial, 032 `032-catalogo-pdf`, PR #61): el cierre único «Hay más
   coincidencias…» para todo lo que pase de 5 o venga recortado. Lo sustituye FR-1710 de
   la 032: de 6 a 10 con existencia y sin recorte, el mismo «Hay más coincidencias, ¿me
   dices cuál te interesa?», sin consultar el catálogo; con más de 10, o si MS-Stock
