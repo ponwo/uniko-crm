@@ -9,6 +9,7 @@ import {
   renderKb,
 } from "@/server/ai/prompts";
 import { validarGuion, type Propuesta } from "@/server/lab/guion";
+import { conocimientoCompleto, conocimientoVigente } from "@/server/kb/vigencia";
 
 /**
  * 021 Entrega 3 — Generación de escenarios desde el conocimiento del negocio
@@ -47,7 +48,7 @@ export type ResultadoGeneracion =
     }
   | {
       ok: false;
-      motivo: "sin_proveedor" | "kb_vacia" | "generacion_fallida";
+      motivo: "sin_proveedor" | "kb_vacia" | "kb_vencida" | "generacion_fallida";
       detalle: string;
     };
 
@@ -70,13 +71,30 @@ export async function generarEscenarios(
     };
   }
 
-  const db = getDb();
-  const entradas = await db
-    .select()
-    .from(schema.kbEntry)
-    .where(scoped(schema.kbEntry.organizationId, organizationId));
+  /*
+   * 033 (FR-1841) — Se genera SOLO desde lo vigente. Un escenario escrito a
+   * partir de un dato vencido nace obsoleto: preguntaría por la promoción que ya
+   * terminó, el agente contestaría —bien— que no cuenta con esa información, y
+   * el juez lo marcaría `fuera_de_kb`. El score bajaría sin que nada empeorara.
+   */
+  const entradas = await conocimientoVigente(organizationId);
 
   if (entradas.length === 0) {
+    /*
+     * «Nunca cargaste nada» y «todo lo tuyo venció» no son lo mismo: en el
+     * segundo el dueño SÍ tiene conocimiento escrito, y decirle «carga tu base»
+     * lo mandaría a escribir de nuevo lo que ya tiene, cuando lo que necesita es
+     * renovar fechas. La consulta extra solo ocurre en este camino, el vacío.
+     */
+    const { entradas: todas } = await conocimientoCompleto(organizationId);
+    if (todas.length > 0) {
+      return {
+        ok: false,
+        motivo: "kb_vencida",
+        detalle:
+          "Todo tu conocimiento tiene la vigencia vencida, así que no hay nada de lo que generar escenarios. Renueva la fecha de las entradas que sigan siendo verdad y vuelve a intentarlo.",
+      };
+    }
     // FR-630 — el Laboratorio sigue corriendo; lo que se apaga es generar.
     return {
       ok: false,
@@ -88,6 +106,7 @@ export async function generarEscenarios(
 
   const { texto: kbText, recortado } = recortarConocimiento(entradas);
 
+  const db = getDb();
   const perfiles = await db
     .select()
     .from(schema.agentProfile)

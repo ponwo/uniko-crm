@@ -29,6 +29,7 @@ externas: el trabajo en segundo plano (agente, Laboratorio) es in-process.
 |---|---|
 | El cerebro/proveedor LLM | `src/lib/ai/` (adaptador OpenRouter-compatible, `chatJson<T>`) |
 | El comportamiento/prompt del agente | `src/server/ai/prompts.ts` |
+| Qué conocimiento sigue vigente («vigente hasta», 033) | `src/server/kb/vigencia.ts` — la ÚNICA puerta de lectura de `kb_entry` (un guard escanea `src/` y lo exige; el corte va en código, no en SQL) · qué día es «hoy» para el negocio: `src/server/negocio/zona.ts` (la zona de la agenda o México) |
 | Las acciones que puede tomar el agente | `src/server/ai/actions.ts` + ejecución en `src/server/ai/pipeline.ts` |
 | Las personas o el juez del Laboratorio | `src/server/lab/personas.ts` · `src/server/lab/judge.ts` |
 | El canal WhatsApp (Graph API) | `src/lib/meta/` (cliente único) + `src/server/whatsapp/` |

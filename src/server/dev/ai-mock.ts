@@ -121,6 +121,35 @@ export function aiMockCompletion(messages: InMessage[]): string {
     return JSON.stringify({ veredicto: "verde", hallazgos: [] });
   }
 
+  /**
+   * 033 — El agente responde SEGÚN EL CONOCIMIENTO QUE SE LE ENTREGÓ.
+   *
+   * Sin esto, el mock hace eco del mensaje y contesta igual sepa o no sepa: una
+   * prueba de «el dato vencido deja de afirmarse» pasaría siempre, midiendo
+   * nada. Kosmo cayó exactamente en esto con la misma feature y lo encontró su
+   * arnés.
+   *
+   * Se modela lo que hace un modelo real, no un atajo: se busca el tema
+   * preguntado SOLO en la sección del conocimiento del system prompt (no en el
+   * historial: lo dicho antes no es conocimiento) y se responde en consecuencia.
+   * El mock tiene que saber decir que NO sabe, que es lo que la 033 comprueba.
+   * El gancho es un token (`KBTOK-…`) para no cambiar ninguna respuesta que los
+   * demás arneses esperan: nadie más lo manda.
+   */
+  const tema = lastUser.match(/KBTOK-[A-Z0-9]+/i)?.[0];
+  if (tema) {
+    const conocimiento =
+      system.split("CONOCIMIENTO DEL NEGOCIO")[1]?.split("Etapas del pipeline")[0] ?? "";
+    return JSON.stringify(
+      conocimiento.toUpperCase().includes(tema.toUpperCase())
+        ? { action: "reply", text: `SI_CONOZCO ${tema}` }
+        : {
+            action: "reply",
+            text: `NO_CONOZCO ${tema}: no cuento con esa información, la confirmo con el equipo.`,
+          }
+    );
+  }
+
   const text = lastUser.toLowerCase();
 
   // Persona pide_humano (el regex de respaldo captura la frase canónica; esta

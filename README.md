@@ -66,7 +66,10 @@ cuando detecta intención de compra.
 ### 🤖 Agente de IA con TU conocimiento
 
 Configura nombre, tono, instrucciones y reglas de escalado; dale conocimiento
-en pares pregunta/respuesta y bloques libres. Responde SOLO con lo que sabe,
+en pares pregunta/respuesta y bloques libres. Cada entrada puede llevar una
+fecha **«vigente hasta»**: una promoción o unas inscripciones dejan de afirmarse
+solas al día siguiente, sin borrarse (quedan en «Conocimiento obsoleto» para
+renovarlas), y el agente siempre sabe qué día es. Responde SOLO con lo que sabe,
 agrupa ráfagas de mensajes en una respuesta, escala a humano cuando el cliente
 lo pide (con detección de respaldo), cuando él lo decide o cuando algo falla.
 Proveedor LLM por adaptador OpenRouter-compatible: usa el modelo que quieras.

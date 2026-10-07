@@ -6,6 +6,7 @@ import { scoped } from "@/lib/db/tenant";
 import { publish } from "@/server/events/bus";
 import { runAgentTurn } from "@/server/ai/pipeline";
 import { renderKb } from "@/server/ai/prompts";
+import { conocimientoVigente } from "@/server/kb/vigencia";
 import { bookedInConversation } from "@/server/agenda/agent";
 import { agendaEnabled } from "@/server/agenda/flag";
 import { computeScore, judgeCase } from "@/server/lab/judge";
@@ -58,6 +59,7 @@ export async function startRun(organizationId: string): Promise<string> {
   const sello = selloDeConjunto(escenarios);
 
   let runId: string;
+  let startedAt: Date;
   try {
     const inserted = await db
       .insert(schema.agentTestRun)
@@ -70,6 +72,7 @@ export async function startRun(organizationId: string): Promise<string> {
       })
       .returning();
     runId = inserted[0]!.id;
+    startedAt = inserted[0]!.startedAt;
   } catch (err) {
     // Violación del índice parcial UNIQUE → ya hay una corrida activa.
     if (isUniqueViolation(err)) {
@@ -89,7 +92,7 @@ export async function startRun(organizationId: string): Promise<string> {
   );
 
   // Fire-and-forget in-process: el POST regresa ya; el progreso va por SSE.
-  void executeRun(runId, organizationId, escenarios.length).catch(async (err) => {
+  void executeRun(runId, organizationId, escenarios.length, startedAt).catch(async (err) => {
     console.error("[lab] corrida falló:", err);
     await failRun(runId, organizationId, String(err));
   });
@@ -114,11 +117,12 @@ export async function startRun(organizationId: string): Promise<string> {
 async function executeRun(
   runId: string,
   organizationId: string,
-  casos: number
+  casos: number,
+  startedAt: Date
 ): Promise<void> {
   const deadline = Date.now() + presupuestoDeCorrida(casos);
   try {
-    await runAllCases(runId, organizationId, deadline);
+    await runAllCases(runId, organizationId, deadline, startedAt);
   } catch (err) {
     await failRun(runId, organizationId, String(err));
   }
@@ -127,7 +131,8 @@ async function executeRun(
 async function runAllCases(
   runId: string,
   organizationId: string,
-  deadline: number
+  deadline: number,
+  startedAt: Date
 ): Promise<void> {
   const db = getDb();
   const cases = await db
@@ -136,10 +141,20 @@ async function runAllCases(
     .where(eq(schema.agentTestCase.runId, runId))
     .orderBy(asc(schema.agentTestCase.createdAt));
 
-  const kbEntries = await db
-    .select()
-    .from(schema.kbEntry)
-    .where(eq(schema.kbEntry.organizationId, organizationId));
+  /*
+   * 033 (FR-1840) — El conocimiento de la corrida se resuelve UNA vez, contra
+   * el instante en que la corrida empezó, y ese mismo instante lo usa el agente
+   * en cada turno (`runConversation` se lo pasa).
+   *
+   * Si el agente tomara su propio reloj —como hacía Kosmo, de donde viene este
+   * diseño—, una corrida que cruza la medianoche le daría al agente el
+   * conocimiento de un día y al juez el del otro: el juez marcaría `fuera_de_kb`
+   * respuestas correctas. Rojos fabricados por el propio sistema.
+   *
+   * El instante es el `started_at` de la corrida, que ya se guarda: el registro
+   * de «contra qué fecha se evaluó» existe por construcción, sin columna nueva.
+   */
+  const kbEntries = await conocimientoVigente(organizationId, { ahora: startedAt });
   const kbText = renderKb(kbEntries);
 
   const profileRows = await db
@@ -183,7 +198,8 @@ async function runAllCases(
 
     const { transcript, conversationId, handoff } = await runConversation(
       organizationId,
-      persona
+      persona,
+      startedAt
     );
 
     // 015 (FR-024) — La agenda como hecho para el juez: existe, y si en esta
@@ -251,10 +267,14 @@ async function runAllCases(
   publishProgress(organizationId, runId, estado, done, total, score);
 }
 
-/** Conversa el guion completo contra el agente real; corta al primer handoff. */
+/**
+ * Conversa el guion completo contra el agente real; corta al primer handoff.
+ * `ahora` es el instante de la corrida (033): el agente lo usa en cada turno.
+ */
 async function runConversation(
   organizationId: string,
-  persona: Persona
+  persona: Persona,
+  ahora: Date
 ): Promise<{
   transcript: { role: "cliente" | "agente"; text: string }[];
   conversationId: string;
@@ -301,8 +321,9 @@ async function runConversation(
       .set({ lastInboundAt: now, lastMessageAt: now, updatedAt: now })
       .where(eq(schema.conversation.id, convId));
 
-    // Turno REAL del agente, secuencial y sin debounce (FR-030).
-    await runAgentTurn(convId);
+    // Turno REAL del agente, secuencial y sin debounce (FR-030), con el reloj
+    // de la corrida: el mismo contra el que el juez ve el conocimiento (033).
+    await runAgentTurn(convId, { ahora });
 
     const convRows = await db
       .select({

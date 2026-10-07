@@ -19,9 +19,10 @@ import { matchesHandoffIntent } from "@/server/ai/handoff";
 import { avisarDeEscalacion } from "@/server/push/avisar";
 import { buildAgentSystemPrompt } from "@/server/ai/prompts";
 import { agendaEnabled, modelForTurn } from "@/server/agenda/flag";
-import { getSettings } from "@/server/agenda/settings";
 import { nowLabelInTz } from "@/lib/time/slots";
 import { withDayMarkers } from "@/server/ai/history";
+import { conocimientoVigente } from "@/server/kb/vigencia";
+import { zonaDelNegocio } from "@/server/negocio/zona";
 import {
   bookedInConversation,
   bookSlot,
@@ -109,8 +110,16 @@ async function executeTurn(conversationId: string): Promise<void> {
 /**
  * Ejecuta UN turno del agente ahora (el Laboratorio lo llama directo, con
  * debounce 0 y sin pasar por el coalesce).
+ *
+ * 033 — `ahora` fija el reloj del turno. Sin él, el reloj real. El Laboratorio
+ * pasa el instante en que empezó la corrida: es contra el que el juez evalúa el
+ * conocimiento, y si el agente tomara su propio reloj, una corrida que cruza la
+ * medianoche le daría al agente el conocimiento de un día y al juez el del otro.
  */
-export async function runAgentTurn(conversationId: string): Promise<void> {
+export async function runAgentTurn(
+  conversationId: string,
+  opts: { ahora?: Date } = {}
+): Promise<void> {
   if (!isAiConfigured()) return;
 
   const db = getDb();
@@ -159,11 +168,30 @@ export async function runAgentTurn(conversationId: string): Promise<void> {
     return;
   }
 
-  const kb = await db
-    .select()
-    .from(schema.kbEntry)
-    .where(eq(schema.kbEntry.organizationId, organizationId))
-    .orderBy(asc(schema.kbEntry.createdAt));
+  /*
+   * 015 (ajuste 2026-09-26) y 033 — En qué día vive el agente.
+   *
+   * Encontrado en producción: una conversación retomada dos días después
+   * arrastraba «tu cita quedó agendada para mañana jueves», y el agente lo
+   * repitió como vigente. En el hilo que ve el modelo no hay ninguna marca de
+   * tiempo, y en su prompt tampoco había fecha: el «mañana» de hace dos días
+   * seguía pareciendo mañana.
+   *
+   * Hasta la 033 esto solo existía con la agenda encendida, porque la zona
+   * horaria salía de la agenda: los negocios sin agenda tenían un agente que no
+   * sabía qué día era, y ninguna promoción «hasta el 15» podía vencer para él.
+   * Ahora la zona la resuelve `zonaDelNegocio()` (la de la agenda si está
+   * encendida; si no, México), y el MISMO instante y la MISMA zona deciden la
+   * fecha del prompt, los separadores del historial y qué conocimiento sigue
+   * vigente: un turno no puede hablar de dos «hoy».
+   */
+  const ahoraDate = opts.ahora ?? new Date();
+  const tz = await zonaDelNegocio(organizationId);
+  const ahora = nowLabelInTz(ahoraDate, tz);
+
+  // 033 (FR-1810, FR-1813) — Solo lo vigente, resuelto en CADA turno: una
+  // conversación dura días, y la entrada que valía ayer puede no valer hoy.
+  const kb = await conocimientoVigente(organizationId, { ahora: ahoraDate, zona: tz });
   const stages = await db
     .select({ id: schema.pipelineStage.id, name: schema.pipelineStage.name })
     .from(schema.pipelineStage)
@@ -182,23 +210,6 @@ export async function runAgentTurn(conversationId: string): Promise<void> {
   const citaActual = agenda
     ? await bookedInConversation({ organizationId, conversationId })
     : null;
-  /*
-   * 015 (ajuste 2026-09-26) — En qué día vive el agente.
-   *
-   * Encontrado en producción: una conversación retomada dos días después
-   * arrastraba «tu cita quedó agendada para mañana jueves», y el agente lo
-   * repitió como vigente. En el hilo que ve el modelo no hay ninguna marca de
-   * tiempo, y en su prompt tampoco había fecha: el «mañana» de hace dos días
-   * seguía pareciendo mañana.
-   *
-   * La zona horaria es la de la agenda, así que esto solo se hace con la
-   * bandera encendida. Si alguna vez hace falta sin agenda, lo que toca no es
-   * leer aquí la tabla del módulo: es darle a la organización una zona horaria
-   * propia.
-   */
-  const ahoraDate = new Date();
-  const tz = agenda ? (await getSettings(organizationId)).timezone : null;
-  const ahora = tz ? nowLabelInTz(ahoraDate, tz) : null;
   const messages: ChatMessage[] = [
     {
       role: "system",
@@ -223,11 +234,9 @@ export async function runAgentTurn(conversationId: string): Promise<void> {
           content: m.direction === "in" ? m.text! : stripCatalogLink(m.text!),
           at: m.createdAt,
         }));
-      // Con la agenda apagada no hay zona horaria del negocio de dónde tirar,
-      // así que el hilo va tal cual, como siempre.
-      return tz
-        ? withDayMarkers(hilo, { timezone: tz, now: ahoraDate })
-        : hilo.map((m) => ({ role: m.role, content: m.content }));
+      // 033 (FR-1821) — Los separadores de día van siempre, con o sin agenda:
+      // son lo que le deja al modelo saber qué se dijo en días ANTERIORES.
+      return withDayMarkers(hilo, { timezone: tz, now: ahoraDate });
     })(),
   ];
 
