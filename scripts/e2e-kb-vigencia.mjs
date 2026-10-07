@@ -341,8 +341,14 @@ ok(
 await fila(tok("S")).getByRole("button", { name: "Editar entrada" }).click();
 await fila(tok("S")).getByLabel("Respuesta").fill(`Promo ${tok("S")} corregida desde la pantalla.`);
 await fila(tok("S")).getByRole("button", { name: "Guardar", exact: true }).click();
-await page.getByText("corregida desde la pantalla").waitFor({ timeout: 15000 }).catch(() => {});
-const sTrasEditar = (await listar()).entries.find((e) => e.id === S.json?.entry?.id);
+// Se espera al SERVIDOR, no a la pantalla: el área de edición ya enseña el texto
+// nuevo antes de guardarlo, así que esperar a verlo leía la base antes del PATCH.
+let sTrasEditar;
+for (let i = 0; i < 40; i++) {
+  sTrasEditar = (await listar()).entries.find((e) => e.id === S.json?.entry?.id);
+  if (sTrasEditar?.answer?.includes("corregida desde la pantalla")) break;
+  await sleep(250);
+}
 ok(
   "editar el texto desde la pantalla conserva la fecha",
   sTrasEditar?.answer?.includes("corregida desde la pantalla") && sTrasEditar?.validUntil === EN_5,

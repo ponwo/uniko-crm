@@ -73,6 +73,31 @@ restaurados (en `C:\G\gApps\LanCo\BackUps\<cliente>\`). Nunca contra una instanc
 Reversión declarada: redesplegar el commit anterior. La columna queda sin uso: el código
 viejo no la nombra y un `select()` de todas las columnas solo trae un campo de más.
 
+### Registro del ensayo (2026-10-07, antes de `main`)
+
+Postgres 16 local, bases desechables `ensayo_033_iltu` y `ensayo_033_nuria`, con los
+volcados «Back up now» del 2026-10-01 (`pg-dump-uniko-1790863580.dmp`, ILTU, y
+`pg-dump-uniko-1790863669.dmp`, NuriaAndrea). Son anteriores a la `0017`, así que el
+ensayo aplicó **dos** migraciones (`0017` + `0018`), más de lo que la flota aplicará
+(solo la `0018`).
+
+| | ILTU | NuriaAndrea |
+|---|---|---|
+| `pg_restore` | exit 0, sin errores | exit 0, sin errores |
+| Migraciones registradas | 17 → 19 | 17 → 19 |
+| `kb_entry.valid_until` | `date`, nullable | `date`, nullable |
+| Filas por tabla (34 tablas) | idénticas | idénticas |
+| Entradas con fecha tras migrar | 0 de 7 | 0 de 9 |
+| Re-ejecutar las migraciones | sin cambios | sin cambios |
+| Conocimiento vigente hoy | 7 de 7 | 9 de 9 |
+| La app arranca contra la base (`/api/health`) | 200 | 200 |
+| `/api/bot/profile` (la puerta sobre las filas reales) | 2251 caracteres = las 7 filas completas | 884 caracteres = las 9 filas completas |
+
+El paso 6 se hizo por la API del cerebro externo y no abriendo `/agent`: entrar a la
+pantalla pediría las contraseñas de los clientes. El conteo compara el largo que
+devuelve la puerta con el de todas las filas renderizadas; sin imprimir contenido.
+Bases de ensayo borradas al terminar.
+
 ## 5. Tras el merge (instancia de pruebas, `uniko-lanco`)
 
 - `/api/health` con el commit nuevo y `[migrate] migraciones aplicadas` en el log.
