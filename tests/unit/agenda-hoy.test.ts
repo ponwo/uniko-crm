@@ -134,4 +134,19 @@ describe("015 — el hilo lleva marcado dónde empieza lo de hoy", () => {
   it("sin mensajes, sin marcas", () => {
     expect(withDayMarkers([], { timezone: TZ, now: AHORA })).toEqual([]);
   });
+
+  it("033 — un mensaje POSTERIOR al reloj cuenta como de hoy, no como «anterior»", () => {
+    // El Laboratorio fija el reloj al inicio de la corrida: si la corrida cruza
+    // la medianoche, los mensajes nuevos son del día siguiente a ese reloj y
+    // siguen siendo de ESTA conversación.
+    const despuesDeMedianoche = new Date("2026-09-26T06:10:00.000Z"); // 26 sep, 00:10
+    const out = withDayMarkers(
+      [
+        { role: "user", content: "hola", at: deHoy },
+        { role: "assistant", content: "¡hola!", at: despuesDeMedianoche },
+      ],
+      { timezone: TZ, now: AHORA }
+    );
+    expect(out.every((m) => m.role !== "system")).toBe(true);
+  });
 });

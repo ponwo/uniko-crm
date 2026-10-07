@@ -1,8 +1,9 @@
-import { asc, eq } from "drizzle-orm";
+import { eq } from "drizzle-orm";
 import { getDb, schema } from "@/lib/db";
 import { apiError } from "@/lib/api";
 import { requireBotKey, resolveInstanceOrg } from "@/server/bot/auth";
 import { serializeBotProfile } from "@/server/bot/profile";
+import { conocimientoVigente } from "@/server/kb/vigencia";
 
 export const dynamic = "force-dynamic";
 
@@ -33,11 +34,11 @@ export async function GET(req: Request) {
     return apiError(404, "no_profile", "La instancia no tiene perfil de agente");
   }
 
-  const kb = await db
-    .select()
-    .from(schema.kbEntry)
-    .where(eq(schema.kbEntry.organizationId, organizationId))
-    .orderBy(asc(schema.kbEntry.createdAt));
+  // 033 (FR-1811) — Solo lo vigente: un cerebro externo conduce conversaciones
+  // igual que el agente de Uniko, y tiene que ver la misma verdad. La fecha de
+  // vigencia no viaja: no necesita saber cuándo vence lo que ya no recibe, y
+  // mandarla invitaría a reimplementar el filtro por su lado.
+  const kb = await conocimientoVigente(organizationId);
 
   return Response.json(serializeBotProfile(profile, kb));
 }

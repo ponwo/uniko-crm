@@ -1,6 +1,7 @@
 import {
   boolean,
   check,
+  date,
   index,
   integer,
   jsonb,
@@ -606,6 +607,19 @@ export const kbEntry = pgTable(
     question: text("question"),
     answer: text("answer"),
     content: text("content"),
+    /**
+     * 033 — Último día en que la entrada es VERDAD, inclusivo. `null` = permanente.
+     *
+     * Un DÍA y no un instante: «la promoción es hasta el 15» no tiene hora, y
+     * pedirla sería precisión falsa. Modo `string` para que viaje como
+     * `AAAA-MM-DD` sin pasar por `Date`, que le colaría una zona horaria.
+     *
+     * Nullable a propósito: `null` es el comportamiento de antes de la 033, así
+     * que todas las entradas existentes siguen igual. Si una entrada vale o no
+     * HOY no se guarda en ningún lado: lo decide `src/server/kb/vigencia.ts` en
+     * cada lectura, y es la única puerta por la que se lee esta tabla.
+     */
+    validUntil: date("valid_until", { mode: "string" }),
     createdAt: timestamp("created_at").notNull().defaultNow(),
     updatedAt: timestamp("updated_at").notNull().defaultNow(),
   },

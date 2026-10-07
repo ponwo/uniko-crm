@@ -86,8 +86,9 @@ export function buildAgentSystemPrompt(input: {
         ].join("\n")
       : "HORARIOS OFRECIDOS EN ESTA CONVERSACIÓN: ninguno todavía. Para agendar, primero offer_slots."
     : null;
+  // 033 — Desde la 033 llega en todos los turnos, con o sin agenda (FR-1820).
   const ahoraBlock = input.ahora
-    ? `AHORA ES: ${input.ahora} (hora del negocio). Úsalo para entender «hoy», «mañana», «el lunes» — y para saber qué fechas del historial YA PASARON.`
+    ? `AHORA ES: ${input.ahora} (hora del negocio). Úsalo para entender «hoy», «mañana», «el lunes» — y para saber qué fechas del historial YA PASARON (también las que mencione el conocimiento del negocio).`
     : null;
   const citaBlock =
     input.agenda && input.citaActual
@@ -149,6 +150,9 @@ export function buildAgentSystemPrompt(input: {
       "Reglas duras:",
       "- Si el cliente pide hablar con una persona/humano/asesor → handoff.",
       "- Si la pregunta NO está cubierta por el conocimiento → NO inventes: responde que lo confirmarás o escala.",
+      // 033 (FR-1822) — Ocultar una entrada vencida no basta si el agente la
+      // encuentra en su propio mensaje de hace tres días: ese texto sigue en el hilo.
+      "- El historial puede traer mensajes de días ANTERIORES. Lo que se dijo ahí sobre promociones, precios, fechas, cupos o inscripciones pudo cambiar: NUNCA lo repitas como vigente solo porque está en el historial. Lo vigente es lo que diga HOY el conocimiento del negocio (o lo que el sistema consulte hoy); si ya no aparece ahí, di que lo confirmas con el equipo.",
       "- Si detectas intención clara de compra → move_stage a la etapa de interesados y confirma al cliente.",
       ...agendaRules,
       ...inventarioRules,

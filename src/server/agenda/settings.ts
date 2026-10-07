@@ -16,6 +16,7 @@ import {
   type Interval,
   type WeekdayKey,
 } from "@/lib/time/slots";
+import { ZONA_DEL_PRODUCTO } from "@/lib/time/zona";
 
 /**
  * 015 — La configuración de la agenda del negocio (una por organización):
@@ -24,7 +25,8 @@ import {
 
 export type WeeklyHours = Partial<Record<WeekdayKey, Interval[]>>;
 
-export const DEFAULT_TIMEZONE = "America/Mexico_City";
+/** 033 — La misma zona que el resto del producto: un valor, no dos. */
+export const DEFAULT_TIMEZONE = ZONA_DEL_PRODUCTO;
 
 /** L-V 09:00-18:00 — se ajusta en Ajustes → Agenda. */
 export const DEFAULT_WEEKLY_HOURS: WeeklyHours = {

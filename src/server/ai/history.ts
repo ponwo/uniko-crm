@@ -20,6 +20,12 @@ import { dayIsoInTz, dayLabelInTz } from "@/lib/time/slots";
  * que deducirlo. Se marca con mensajes `system` y no con prefijos dentro del
  * texto porque un prefijo se imita: el agente acabaría escribiéndole «(23 sep)»
  * al cliente.
+ *
+ * 033 — «Anterior» es de un día ANTES de hoy, no «de un día distinto». El
+ * Laboratorio fija el reloj al inicio de la corrida (el agente y el juez tienen
+ * que ver el mismo conocimiento), así que en una corrida que cruza la medianoche
+ * los mensajes nuevos son del día SIGUIENTE a ese reloj: siguen siendo de esta
+ * conversación, no de una anterior.
  */
 
 export type HistoryMessage = {
@@ -34,10 +40,10 @@ export function withDayMarkers(
 ): ChatMessage[] {
   if (messages.length === 0) return [];
   const hoy = dayIsoInTz(opts.now, opts.timezone);
+  // Fechas AAAA-MM-DD: compararlas como cadenas es compararlas en el calendario.
+  const esAnterior = (m: HistoryMessage) => dayIsoInTz(m.at, opts.timezone) < hoy;
 
-  const viejos = messages.filter(
-    (m) => dayIsoInTz(m.at, opts.timezone) !== hoy
-  );
+  const viejos = messages.filter(esAnterior);
   // Todo es de hoy: el hilo se lee solo, no hace falta marcar nada.
   if (viejos.length === 0) {
     return messages.map((m) => ({ role: m.role, content: m.content }));
@@ -46,7 +52,7 @@ export function withDayMarkers(
   const out: ChatMessage[] = [];
   let marcadoHoy = false;
   for (const [i, m] of messages.entries()) {
-    const esDeHoy = dayIsoInTz(m.at, opts.timezone) === hoy;
+    const esDeHoy = !esAnterior(m);
     if (i === 0 && !esDeHoy) {
       out.push({
         role: "system",

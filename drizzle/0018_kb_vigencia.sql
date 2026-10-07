@@ -1,0 +1,13 @@
+-- 033 (conocimiento temporal, 2026-10-07) — «Vigente hasta» en cada entrada del
+-- conocimiento del agente.
+--
+-- SOLO AGREGA una columna (Constitución X): nada se borra ni se reescribe. Nace
+-- null en todas las filas, y null = permanente = exactamente lo que toda entrada
+-- era antes, así que desplegar esto no cambia el conocimiento de nadie hasta que
+-- el dueño le ponga fecha a una entrada. Sin backfill y sin índice (la lectura
+-- va siempre por organización, y el corte se decide en código).
+-- Reversión: redesplegar el commit anterior; el código viejo ignora la columna.
+--
+-- Editada a mano sobre la generada para ser RE-EJECUTABLE (Constitución IV),
+-- como la 0009, la 0016 y la 0017: IF NOT EXISTS.
+ALTER TABLE "kb_entry" ADD COLUMN IF NOT EXISTS "valid_until" date;

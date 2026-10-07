@@ -127,6 +127,13 @@
       "when": 1790816398821,
       "tag": "0017_agenda_modalidad",
       "breakpoints": true
+    },
+    {
+      "idx": 18,
+      "version": "7",
+      "when": 1791409843699,
+      "tag": "0018_kb_vigencia",
+      "breakpoints": true
     }
   ]
 }
