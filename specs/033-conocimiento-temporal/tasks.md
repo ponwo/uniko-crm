@@ -74,4 +74,4 @@ vencido no se afirma), US2 (reloj y regla del historial), US3 (pantalla del due�
 - [x] T061 Rojos demostrados (quickstart §3): guard, corte en UTC, lector sin filtro.
 - [x] T062 Arnés en vivo: `e2e-kb-vigencia.mjs` verde en base fresca, sin agenda y con agenda; `e2e-selftest.mjs` y `e2e-lab.mjs` siguen verdes.
 - [x] T063 Ensayo X (quickstart §4) con los respaldos de ILTU y NuriaAndrea; registrar el resultado en el PR.
-- [ ] T064 PR con plan de reversión, aviso del cambio observable en `/api/bot/profile` y lo pendiente en la instancia de pruebas.
+- [x] T064 PR con plan de reversión, aviso del cambio observable en `/api/bot/profile` y lo pendiente en la instancia de pruebas: [ponwo/uniko-crm#66](https://github.com/ponwo/uniko-crm/pull/66).
