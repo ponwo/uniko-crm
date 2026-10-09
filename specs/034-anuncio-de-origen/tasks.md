@@ -34,8 +34,9 @@ Uniko (ver [plan.md](plan.md), Desvíos del puerto).
 - [x] T017 Guion de navegador con capturas (llaves de Uniko)
 - [x] T018 `flag.ts`, `docs/atribucion-capi.md`, `tests/e2e/us-atribucion.md`, `.env.example`, `README.md`, `CLAUDE.md`, enmienda en FR-001 de 016, `specs/README.md`
 - [x] T019 Gate técnico, `pnpm test:e2e` con la bandera apagada y encendida, guion de navegador
-- [ ] T020 PR con el registro del ensayo X y el plan de reversión
-- [ ] T021 (dueño) Merge → `uniko-lanco`; promoción con la puerta completa; en ILTU, las conversaciones de anuncio con su tarjeta (SC-006)
+- [x] T020 PR con el registro del ensayo X y el plan de reversión ([PR #68](https://github.com/ponwo/uniko-crm/pull/68))
+- [x] T021 (dueño) Merge → `uniko-lanco`
+- [ ] T022 (dueño) Promoción con la puerta completa; en ILTU, las conversaciones de anuncio con su tarjeta (SC-006)
 
 ## Verificación (2026-10-09, local, Postgres 16 y `next dev`, base nueva por corrida)
 
@@ -51,3 +52,12 @@ Uniko (ver [plan.md](plan.md), Desvíos del puerto).
 - `scripts/e2e-anuncio-origen-ui.mjs`: 32/32 apagada y 32/32 encendida, claro y oscuro,
   1440 y 390 px.
 - Ensayo del Principio X: quickstart §4.
+
+## Tras el merge (2026-10-09)
+
+- PR #68 mergeado por el dueño a las 23:43 UTC (`5e6c38c`). CI en verde en las dos
+  configuraciones de la matriz (`completo` y `default`), en el PR y en `main`.
+- `uniko-lanco`: `/api/health` con `commit: 5e6c38c` (3/3) y `[migrate] migraciones
+  aplicadas` en el log del contenedor nuevo: la `0019` está aplicada. Sin conversaciones de
+  anuncio en esa instancia: la tarjeta aparecerá con el primer clic de un anuncio.
+- No promovida: `production` sigue sin la 034 (T022).
