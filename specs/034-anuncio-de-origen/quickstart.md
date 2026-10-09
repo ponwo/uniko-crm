@@ -60,6 +60,46 @@ instancia viva.
 Reversión declarada: redesplegar el commit anterior. La columna, su clave y su índice
 quedan sin uso; el código viejo no los nombra.
 
+### Registro del ensayo (2026-10-09, antes de `main`)
+
+Postgres 16 local, tres bases desechables con volcados reales:
+
+- `ensayo_034_iltu`: ILTU, «Back up now» del 2026-10-01 (`pg-dump-uniko-1790863580.dmp`).
+- `ensayo_034_nuria`: NuriaAndrea, «Back up now» del 2026-10-01 (`pg-dump-uniko-1790863669.dmp`).
+- `ensayo_034_d1006`: respaldo programado del 2026-10-06 03:00 UTC
+  (`pg-dump-uniko-1791255607.dmp`), con una organización que no es ni la de ILTU ni la
+  de NuriaAndrea: por descarte, la instancia de pruebas (`uniko-lanco`).
+
+| | ILTU | NuriaAndrea | uniko-lanco |
+|---|---|---|---|
+| `pg_restore` | exit 0 | exit 0 | exit 0 |
+| Migraciones registradas | 17 → 20 | 17 → 20 | 18 → 20 |
+| Tablas / filas por tabla | 34, idénticas | 34, idénticas | 34, idénticas |
+| Filas de `ad_attribution` (con `ctwa_clid`) | 0 | 2 (2) | 0 |
+| Huella de `ad_attribution` (`id`, `ctwa_clid`, `raw`) | igual | igual | igual |
+| `image_asset_id` | `text`, nullable, todas nulas | ídem | ídem |
+| Clave foránea / índice | `SET NULL` / `ad_attribution_org_source_idx` | ídem | ídem |
+| Re-ejecutar las migraciones | sin cambios | sin cambios | sin cambios |
+| La build de producción arranca (`/api/health`) | 200 | 200 | 200 |
+
+- El SQL de la `0019` corrido **a mano dos veces más** sobre la base de NuriaAndrea: exit
+  0 con los avisos «ya existe, omitiendo»; una sola clave y un solo índice.
+- **Paso 6, con las 2 filas reales de NuriaAndrea** (el código de la rama corriendo en
+  proceso contra la base restaurada): la lista trae 2 de 84 conversaciones como anuncio;
+  el detalle, con titular, enlace https, tipo `ad` y medio `image`; `hasCtwaClid` es
+  `true` con la bandera y `false` sin ella; el valor del `ctwa_clid` no aparece en nada
+  de lo serializado. Las URLs de imagen que Meta mandó son de
+  `scontent.*.fna.fbcdn.net` y **pasan** el filtro de hosts; la descarga sale
+  `permanente` porque Meta ya las caducó (son de septiembre): esas dos tarjetas quedan
+  sin imagen, como prevé la spec.
+- Dato de la flota que salió aquí: **NuriaAndrea también atribuye** (sus 2 filas traen
+  `ctwa_clid`).
+- El respaldo de ILTU es anterior a sus anuncios (empezaron el 2 de octubre): sus filas
+  reales no entraron al ensayo. Sus conversaciones de anuncio tienen la misma forma que
+  las de NuriaAndrea (mismo webhook, mismo `raw`).
+
+Bases de ensayo borradas al terminar.
+
 ## 5. Tras el merge
 
 - `uniko-lanco`: `/api/health` con el commit nuevo y `[migrate] migraciones aplicadas`.
