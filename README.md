@@ -143,6 +143,11 @@ bot. Si Meta se cae, el lead se mueve igual: una conversión jamás vale un
 movimiento bloqueado. Los gotchas de Meta que cuesta descubrir solo están en
 [`docs/atribucion-capi.md`](docs/atribucion-capi.md).
 
+Lo que **no** necesita la bandera: saber de qué anuncio llegó cada
+conversación. La bandeja lo marca («Anuncio · titular», con su filtro) y el
+panel del contacto y el cajón del trato enseñan el creativo, el texto y el
+enlace del anuncio, en cualquier instancia que reciba un clic de un anuncio.
+
 ### 📦 Inventario con existencias reales (opcional, apagada por defecto)
 
 Un agente que dice "sí, tenemos" por intuición pierde la venta o la confianza.

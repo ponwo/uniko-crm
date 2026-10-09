@@ -72,6 +72,13 @@ type MockReferralInput = {
   ctwaClid?: string;
   adHeadline?: string;
   adSourceId?: string;
+  /**
+   * 034 — El `referral` tal cual lo mandaría Meta. Gana sobre los campos de
+   * arriba y se pasa entero, no campo por campo, para poder probar también las
+   * formas raras (sin `source_id`, cadenas gigantes, tipos equivocados) y la
+   * URL del creativo.
+   */
+  referral?: Record<string, unknown>;
 };
 
 export function buildInboundPayload(input: {
@@ -101,7 +108,9 @@ export function buildInboundPayload(input: {
   // 016 — El referral solo viaja cuando la conversación nació de un anuncio, y
   // normalmente solo en el primer mensaje. Se arma igual que el real para que
   // la ingesta no sepa que habla con un mock.
-  if (input.ctwaClid || input.adHeadline || input.adSourceId) {
+  if (input.referral) {
+    message.referral = input.referral;
+  } else if (input.ctwaClid || input.adHeadline || input.adSourceId) {
     message.referral = {
       source_type: "ad",
       source_id: input.adSourceId ?? "1200000000000",
