@@ -3,6 +3,9 @@ import { getDb, schema } from "@/lib/db";
 import { newId } from "@/lib/db/ids";
 import { decryptSecret, encryptSecret } from "@/lib/crypto";
 import { scoped } from "@/lib/db/tenant";
+import { obtainWabaDataset } from "@/lib/meta/capi";
+import { MetaApiError } from "@/lib/meta/client";
+import { getCredentialsByOrg } from "@/server/whatsapp/credentials";
 
 /**
  * 016 — La conexión del negocio con su dataset de Meta.
@@ -26,6 +29,101 @@ export type CapiSettingsView = {
   tokenLast4: string;
   qualifiedStageId: string | null;
 };
+
+/**
+ * Por qué un ID NO puede ser el del dataset, o null si no se le ve problema.
+ *
+ * Existe porque el error real fue este: en la pantalla se pegaron, uno tras
+ * otro, el ID de la cuenta de WhatsApp, el del número de teléfono y una cadena
+ * que no era un ID. Los tres se guardaron sin queja y cada venta reportada
+ * después falló en Meta con un 400 opaco ("Object with ID … does not exist").
+ * Como cada evento se intenta UNA sola vez, una configuración mala cuesta las
+ * conversiones que ocurran mientras dure: hay que pararla al guardar.
+ *
+ * El camino bueno es no teclearlo: `datasetFromMeta` se lo pide a Meta. Esto
+ * es la red para quien lo pega a mano: el dataset de mensajería tiene un ID
+ * PROPIO, así que los dos IDs que la conexión de WhatsApp tiene a la vista se
+ * descartan sin hablar con nadie.
+ */
+export function datasetIdProblem(
+  datasetId: string,
+  whatsapp: { wabaId: string; phoneNumberId: string } | null
+): string | null {
+  if (!/^\d+$/.test(datasetId)) {
+    return "El ID del dataset es solo números: usa «Obtener de Meta»";
+  }
+  if (whatsapp && datasetId === whatsapp.wabaId) {
+    return "Ese es el ID de tu cuenta de WhatsApp, no el de su dataset: usa «Obtener de Meta»";
+  }
+  if (whatsapp && datasetId === whatsapp.phoneNumberId) {
+    return "Ese es el ID de tu número de WhatsApp, no el del dataset: usa «Obtener de Meta»";
+  }
+  return null;
+}
+
+export type DatasetFromMeta =
+  | { ok: true; datasetId: string; displayPhoneNumber: string | null }
+  | { ok: false; status: number; code: string; message: string };
+
+/** Lo que tarda de más Meta antes de que el botón se rinda. */
+const DATASET_TIMEOUT_MS = 20_000;
+
+/**
+ * Le pide a Meta el dataset de la cuenta de WhatsApp conectada, con el token
+ * que ya está guardado. NO guarda nada: la pantalla lo coloca en el campo y el
+ * negocio lo confirma con «Guardar», junto con su etapa de calificado.
+ */
+export async function datasetFromMeta(
+  organizationId: string
+): Promise<DatasetFromMeta> {
+  const credentials = await getCredentialsByOrg(organizationId);
+  if (!credentials) {
+    return {
+      ok: false,
+      status: 409,
+      code: "sin_whatsapp",
+      message:
+        "Conecta WhatsApp primero: el dataset se le pide a Meta con esa cuenta",
+    };
+  }
+  try {
+    const datasetId = await obtainWabaDataset({
+      wabaId: credentials.wabaId,
+      token: credentials.token,
+      signal: AbortSignal.timeout(DATASET_TIMEOUT_MS),
+    });
+    return {
+      ok: true,
+      datasetId,
+      displayPhoneNumber: credentials.displayPhoneNumber,
+    };
+  } catch (err) {
+    if (err instanceof MetaApiError && (err.status === 0 || err.status >= 500)) {
+      return {
+        ok: false,
+        status: 503,
+        code: "meta_no_disponible",
+        message: "No se pudo contactar a Meta; intenta de nuevo",
+      };
+    }
+    if (err instanceof MetaApiError) {
+      // Lo más probable: el token no tiene `whatsapp_business_management`.
+      // Se muestra lo que dijo Meta, tal cual: es lo que hay que corregir.
+      return {
+        ok: false,
+        status: 422,
+        code: "meta_rechazo",
+        message: `Meta no entregó el dataset: ${err.explanation}`,
+      };
+    }
+    return {
+      ok: false,
+      status: 502,
+      code: "meta_respuesta_inesperada",
+      message: err instanceof Error ? err.message : String(err),
+    };
+  }
+}
 
 export async function getCapiSettings(
   organizationId: string

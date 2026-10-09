@@ -71,6 +71,14 @@ export function AdsClient() {
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // «Obtener de Meta»: lo que Meta dijo que es el dataset de la cuenta, para
+  // poder decir de dónde salió el número del campo (y si ya es el guardado).
+  const [fetching, setFetching] = useState(false);
+  const [fromMeta, setFromMeta] = useState<{
+    datasetId: string;
+    displayPhoneNumber: string | null;
+  } | null>(null);
+  const [datasetError, setDatasetError] = useState<string | null>(null);
 
   const loadActivity = useCallback(async () => {
     const res = await fetch("/api/settings/capi/events").catch(() => null);
@@ -130,6 +138,44 @@ export function AdsClient() {
     }
   }
 
+  /**
+   * Teclear el ID salió caro (se guardaron el de la cuenta, el del número y
+   * otro conjunto del portafolio): aquí se le pide a Meta con la cuenta de
+   * WhatsApp conectada. Solo coloca el número; guardar sigue siendo del negocio.
+   */
+  async function fetchFromMeta() {
+    setFetching(true);
+    setDatasetError(null);
+    setFromMeta(null);
+    setSaved(false);
+    const res = await fetch("/api/settings/capi/dataset", {
+      method: "POST",
+    }).catch(() => null);
+    const body = (await res?.json().catch(() => null)) as {
+      datasetId?: string;
+      displayPhoneNumber?: string | null;
+      error?: { message?: string };
+    } | null;
+    setFetching(false);
+    if (!res?.ok || !body?.datasetId) {
+      setDatasetError(body?.error?.message ?? "No se pudo consultar a Meta");
+      return;
+    }
+    setDatasetId(body.datasetId);
+    setFromMeta({
+      datasetId: body.datasetId,
+      displayPhoneNumber: body.displayPhoneNumber ?? null,
+    });
+  }
+
+  // El aviso de Meta vale mientras el campo diga lo que Meta respondió: si
+  // alguien lo edita después, ya no es «el de tu cuenta».
+  const metaNote =
+    fromMeta && datasetId.trim() === fromMeta.datasetId ? fromMeta : null;
+  const cuenta = metaNote?.displayPhoneNumber
+    ? `tu cuenta de WhatsApp (${metaNote.displayPhoneNumber})`
+    : "tu cuenta de WhatsApp";
+
   async function disconnect() {
     setSaving(true);
     await fetch("/api/settings/capi", { method: "DELETE" }).catch(() => null);
@@ -139,6 +185,8 @@ export function AdsClient() {
     setToken("");
     setQualifiedStageId("");
     setSaved(false);
+    setFromMeta(null);
+    setDatasetError(null);
   }
 
   return (
@@ -165,17 +213,43 @@ export function AdsClient() {
           ) : null}
 
           <div className="space-y-1.5">
-            <Label htmlFor="capi-dataset">ID del dataset</Label>
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <Label htmlFor="capi-dataset">ID del dataset</Label>
+              <Button
+                type="button"
+                size="sm"
+                variant="outline"
+                onClick={() => void fetchFromMeta()}
+                disabled={fetching || saving}
+              >
+                {fetching ? "Consultando a Meta…" : "Obtener de Meta"}
+              </Button>
+            </div>
             <Input
               id="capi-dataset"
               value={datasetId}
               onChange={(e) => setDatasetId(e.target.value)}
               placeholder="1708105527110154"
             />
-            <p className="text-xs text-muted-foreground">
-              Administrador de eventos de Meta → tu conjunto de datos. Suele ser
-              el de tu propia cuenta de WhatsApp.
-            </p>
+            {datasetError ? (
+              <p className="text-xs text-danger-text" role="alert">
+                {datasetError}
+              </p>
+            ) : metaNote ? (
+              <p className="text-xs text-success-text" aria-live="polite">
+                {capi?.datasetId === metaNote.datasetId
+                  ? `Es el dataset de ${cuenta} y ya es el que tienes guardado.`
+                  : capi
+                    ? `Es el dataset de ${cuenta}. Es distinto del guardado (${capi.datasetId}): da «Guardar» para usarlo.`
+                    : `Es el dataset de ${cuenta}. Da «Guardar» para conectarlo.`}
+              </p>
+            ) : (
+              <p className="text-xs text-muted-foreground">
+                Usa «Obtener de Meta»: el CRM se lo pide a Meta con tu cuenta de
+                WhatsApp. Si lo pegas a mano, es un número propio: no es el ID de
+                la cuenta ni el del número de teléfono.
+              </p>
+            )}
           </div>
 
           <div className="space-y-1.5">

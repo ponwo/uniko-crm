@@ -19,9 +19,11 @@ para que el mismo presupuesto empiece a comprar clientes en vez de chats.
 
 1. `ATRIBUCION=on` en el entorno (en Coolify: variable de runtime, y
    **redeploy** — reiniciar no basta).
-2. Ajustes → **Anuncios**: pega el **ID de tu dataset** y guarda. Si ya
-   conectaste WhatsApp, **no necesitas pegar token**: se reusa el del negocio,
-   que es el mismo que autoriza publicar en el dataset.
+2. Ajustes → **Anuncios**: da clic en **Obtener de Meta** (junto a "ID del
+   dataset") y guarda. El CRM le pide a Meta el dataset de tu cuenta de
+   WhatsApp con la conexión que ya tiene: no hay nada que copiar. Tampoco
+   necesitas pegar token: se reusa el del negocio, que es el mismo que autoriza
+   publicar en el dataset.
 3. Elige **qué etapa de tu pipeline significa "lead calificado"**. La venta no
    se configura: se reporta sola cuando el trato entra a tu etapa ganada.
 
@@ -30,10 +32,25 @@ tablero se le reporta a Meta.
 
 ### De dónde sale el ID del dataset
 
-Administrador de eventos de Meta → tu conjunto de datos → el número largo. En
-la práctica, el dataset de mensajería **es el de tu propia cuenta de WhatsApp**:
-`POST {waba_id}/dataset` en la Graph API devuelve ese mismo id, y es idempotente
-(repetirlo devuelve el existente).
+El dataset de mensajería **le pertenece a tu cuenta de WhatsApp, pero su ID es
+otro número**: no es el ID de la cuenta (WABA) ni el del número de teléfono.
+**Obtener de Meta** hace por ti lo único seguro, que es pedírselo a Meta:
+`POST {waba_id}/dataset` con el token de WhatsApp. Si la cuenta aún no tiene
+dataset, Meta lo crea; si ya tiene, devuelve el mismo, así que pedirlo dos veces
+no crea dos. (`GET {waba_id}/dataset` no sirve para esto: con una cuenta sin
+dataset devuelve una lista vacía.) El botón solo coloca el número: queda
+conectado cuando das **Guardar**, y la pantalla avisa si es distinto del que ya
+tenías guardado.
+
+Si Meta lo niega, la pantalla muestra su motivo tal cual. Lo más probable es que
+el token no tenga el permiso `whatsapp_business_management`.
+
+Si lo pegas a mano, Uniko rechaza al guardar el ID de la cuenta, el del número y
+lo que no sea numérico. Ojo con el Administrador de eventos: el portafolio puede
+tener otros conjuntos de datos (por ejemplo, uno llamado *WhatsApp Marketing
+Message Event Sharing*) que **no** son el de la cuenta. Con uno equivocado, Meta
+rechaza cada evento con *"Object with ID … does not exist"*, y como cada evento
+se intenta **una sola vez**, esas conversiones ya no se reportan.
 
 ## Qué se reporta, exactamente
 

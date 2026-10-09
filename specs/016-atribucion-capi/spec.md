@@ -4,7 +4,7 @@
 
 **Created**: 2026-08-28
 
-**Status**: Implementada y verificada en vivo (2026-08-28) — arnés E2E en verde en las dos configuraciones de la bandera
+**Status**: Implementada y verificada en vivo (2026-08-28) — arnés E2E en verde en las dos configuraciones de la bandera. **Enmienda 2026-10-09**: «Obtener de Meta» y validación del ID del dataset (ver al final).
 
 **Input**: Decisión del dueño 2026-08-28: llevar a Uniko raíz, **en modo
 bandera** (como la multicanalidad de IG y el motor de agenda), lo que el fork de
@@ -206,13 +206,23 @@ Esta feature tiene historia y conviene decirla completa:
 - **FR-015**: Cero dependencias de runtime nuevas; misma frontera de salida
   (`lib/meta/client`) que el resto del CRM.
 - **FR-016**: El arnés E2E cubre la feature **encendida y apagada**.
+- **FR-017** *(enmienda 2026-10-09)*: La pantalla obtiene el ID del dataset de
+  Meta con un botón («Obtener de Meta»): `POST {waba}/dataset` con la cuenta y
+  el token de WhatsApp ya conectados (lo crea si no existe; si existe, devuelve
+  el mismo). No guarda: coloca el ID, dice de dónde salió y si difiere del
+  guardado; el negocio confirma con «Guardar». Si Meta lo niega, se muestra su
+  motivo tal cual y el campo sigue editable.
+- **FR-018** *(enmienda 2026-10-09)*: Guardar rechaza con `422 dataset_invalido`
+  un ID no numérico o igual al de la cuenta o al del número de WhatsApp
+  conectados. Cada evento se sigue intentando **una sola vez** (FR-009 sin
+  cambios, por decisión del dueño): por eso la configuración mala se para antes.
 
 ## Criterios de éxito
 
 - **SC-001**: Con la bandera apagada, las rutas dan 404, la pestaña no se pinta y
   un inbound con `referral` no deja rastro (verificado en el arnés).
-- **SC-002**: Conectar el dataset toma un campo y un clic para quien ya conectó
-  WhatsApp.
+- **SC-002**: Conectar el dataset toma dos clics («Obtener de Meta» y
+  «Guardar») para quien ya conectó WhatsApp, sin teclear ningún ID.
 - **SC-003**: Mover un lead a la etapa calificada deja, en menos de 2 s, una fila
   `sent` con `fbtrace_id` en la actividad.
 - **SC-004**: Con Meta devolviendo error, el lead se mueve igual: cero
@@ -231,7 +241,31 @@ Esta feature tiene historia y conviene decirla completa:
 ## Supuestos
 
 - El dataset de `business_messaging` es el de la propia cuenta de WhatsApp del
-  negocio (en la práctica, `POST {waba_id}/dataset` devuelve ese mismo id), y el
-  token del negocio ya conectado tiene permiso para publicar en él.
+  negocio, pero **con un ID propio** (no el de la cuenta ni el del número):
+  `POST {waba_id}/dataset` lo devuelve, creándolo si hace falta. El token del
+  negocio ya conectado tiene permiso para publicar en él y, con
+  `whatsapp_business_management`, para pedirlo. *(Corregido 2026-10-09: decía
+  que el dataset "es el de la cuenta", y se leyó como "el mismo ID".)*
 - Los nombres `QualifiedLead` y `Purchase` pertenecen al catálogo cerrado de Meta
   para `business_messaging` y se guardan tal cual: sin traducción interna.
+
+## Enmienda 2026-10-09 — el ID del dataset no se teclea
+
+**Qué pasó.** Al encender la atribución en ILTU, el ID del dataset se tecleó.
+Se guardaron, uno tras otro, el ID de la cuenta de WhatsApp, el del número de
+teléfono y una cadena que no era un ID; los tres se aceptaron y las ventas
+movidas a la etapa ganada fallaron en Meta con *"Object with ID … does not
+exist"*. Después se guardó otro conjunto del portafolio (*WhatsApp Marketing
+Message Event Sharing*), que tampoco era el de la cuenta. El correcto salió de
+`POST {waba}/dataset` en el Graph API Explorer, y el primer `QualifiedLead` real
+llegó como **Enviado**. La ayuda de la pantalla ("suele ser el de tu propia
+cuenta de WhatsApp") empujaba justo hacia el primer error.
+
+**Decisión del dueño.** Cada evento se sigue intentando **una sola vez**: no se
+reintentan fallidos ni omitidos (Meta, además, no deduplica los eventos de
+mensajería, así que un reintento tras un corte de red podría duplicar una
+venta). En lugar de eso, se elimina el riesgo en la puerta: el botón «Obtener de
+Meta» (FR-017) y la validación al guardar (FR-018).
+
+**Fuera de alcance de la enmienda.** Las ventas que ya fallaron u omitieron no
+se recuperan.

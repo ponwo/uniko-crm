@@ -60,6 +60,10 @@ function bot(path, opts = {}) {
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 const PN = "PN-E2E-1";
+// 016 — Datasets del arnés: numéricos como los reales (la pantalla rechaza
+// otra cosa). El wa-mock descarta los eventos de los que terminan en "0000".
+const DS_E2E = "990000000000001";
+const DS_E2E_FAIL = "990000000000000";
 
 async function main() {
   if (!BOT_KEY || BOT_KEY.length < 16) {
@@ -3581,12 +3585,19 @@ async function atribucionChecks() {
     }
     const put = await api("/api/settings/capi", {
       method: "PUT",
-      body: JSON.stringify({ datasetId: "ds-e2e" }),
+      body: JSON.stringify({ datasetId: DS_E2E }),
     });
     ok(
       "PUT /api/settings/capi → 404 con la atribución apagada",
       put.res.status === 404,
       `status=${put.res.status}`
+    );
+    // «Obtener de Meta» tampoco existe.
+    const obtener = await api("/api/settings/capi/dataset", { method: "POST" });
+    ok(
+      "POST /api/settings/capi/dataset → 404 con la atribución apagada",
+      obtener.res.status === 404,
+      `status=${obtener.res.status}`
     );
     const page = await fetch(`${BASE}/settings/ads`, { headers: { cookie } });
     ok(
@@ -3643,7 +3654,7 @@ async function atribucionChecks() {
   const etapaAjena = await api("/api/settings/capi", {
     method: "PUT",
     body: JSON.stringify({
-      datasetId: "ds-e2e",
+      datasetId: DS_E2E,
       qualifiedStageId: "stg_de_otro_negocio",
     }),
   });
@@ -3654,10 +3665,52 @@ async function atribucionChecks() {
     `status=${etapaAjena.res.status} ${JSON.stringify(etapaAjena.json)}`
   );
 
+  // Lo que de verdad pasó en producción: se pegaron IDs que no eran del
+  // dataset, se guardaron sin queja y cada venta falló después en Meta.
+  for (const [motivo, datasetId] of [
+    ["un ID que no es numérico", "ds-de-prueba"],
+    ["el ID de la cuenta de WhatsApp", "WABA-E2E"],
+    ["el ID del número de teléfono", PN],
+  ]) {
+    const malo = await api("/api/settings/capi", {
+      method: "PUT",
+      body: JSON.stringify({ datasetId }),
+    });
+    ok(
+      `${motivo} como dataset se rechaza al guardar (422 dataset_invalido)`,
+      malo.res.status === 422 && malo.json?.error?.code === "dataset_invalido",
+      `status=${malo.res.status} ${JSON.stringify(malo.json)}`
+    );
+  }
+  ok(
+    "y no queda nada guardado",
+    (await api("/api/settings/capi")).json?.capi === null
+  );
+
+  // «Obtener de Meta»: el ID no se teclea, se le pide a Meta con la cuenta de
+  // WhatsApp conectada (POST {waba}/dataset en el wa-mock).
+  const obtenido = await api("/api/settings/capi/dataset", { method: "POST" });
+  const dsCuenta = obtenido.json?.datasetId;
+  ok(
+    "«Obtener de Meta» devuelve el dataset de la cuenta: un ID numérico",
+    obtenido.res.ok && /^\d+$/.test(dsCuenta ?? ""),
+    `status=${obtenido.res.status} ${JSON.stringify(obtenido.json)}`
+  );
+  const otraVez = await api("/api/settings/capi/dataset", { method: "POST" });
+  ok(
+    "pedirlo otra vez devuelve EL MISMO (Meta no crea un segundo)",
+    otraVez.json?.datasetId === dsCuenta,
+    JSON.stringify(otraVez.json)
+  );
+  ok(
+    "obtenerlo no guarda nada: eso lo confirma el negocio con «Guardar»",
+    (await api("/api/settings/capi")).json?.capi === null
+  );
+
   const guardado = await api("/api/settings/capi", {
     method: "PUT",
     body: JSON.stringify({
-      datasetId: "ds-e2e",
+      datasetId: dsCuenta,
       qualifiedStageId: etapaCalificado.id,
     }),
   });
@@ -3670,7 +3723,7 @@ async function atribucionChecks() {
   const cfg = (await api("/api/settings/capi")).json?.capi;
   ok(
     "reusó el token de WhatsApp y solo muestra sus últimos 4",
-    cfg?.datasetId === "ds-e2e" && cfg?.tokenLast4 === "-e2e",
+    cfg?.datasetId === dsCuenta && cfg?.tokenLast4 === "-e2e",
     JSON.stringify(cfg)
   );
   ok(
@@ -3862,7 +3915,7 @@ async function atribucionChecks() {
   await api("/api/settings/capi", {
     method: "PUT",
     body: JSON.stringify({
-      datasetId: "ds-e2e-fail",
+      datasetId: DS_E2E_FAIL,
       qualifiedStageId: etapaCalificado.id,
     }),
   });
