@@ -134,6 +134,13 @@
       "when": 1791409843699,
       "tag": "0018_kb_vigencia",
       "breakpoints": true
+    },
+    {
+      "idx": 19,
+      "version": "7",
+      "when": 1791583873424,
+      "tag": "0019_anuncio_de_origen",
+      "breakpoints": true
     }
   ]
 }
