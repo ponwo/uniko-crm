@@ -1,8 +1,9 @@
 # E2E — Atribución de anuncios y Conversions API (016)
 
 Guion de comportamiento observable. Automatizado en la sección `016` de
-`scripts/e2e-selftest.mjs`: con la app viva y los mocks encendidos,
-`pnpm test:e2e` lo conduce y sale distinto de cero si algo falla.
+`scripts/e2e-selftest.mjs` y, la pantalla de «Obtener de Meta», en
+`scripts/e2e-dataset-desde-meta.mjs` (navegador): con la app viva y los mocks
+encendidos, `pnpm test:e2e` los conduce y sale distinto de cero si algo falla.
 
 **Preparación**: app en `localhost` con `WA_MOCK_ENABLED=true`,
 `META_GRAPH_BASE_URL` → wa-mock, `BOT_API_KEY` y la BD migrada. La bandera
@@ -21,8 +22,9 @@ exigencia del clid, y el **200 que descarta el evento**.
 
 Con `ATRIBUCION` ausente:
 
-1. `GET`/`PUT`/`DELETE /api/settings/capi` y `GET /api/settings/capi/events`
-   responden **404** (no 403: aquí ese endpoint no existe).
+1. `GET`/`PUT`/`DELETE /api/settings/capi`, `GET /api/settings/capi/events` y
+   `POST /api/settings/capi/dataset` responden **404** (no 403: aquí ese
+   endpoint no existe).
 2. La pantalla `/settings/ads` responde 404 y Ajustes no la menciona.
 3. Un mensaje que **sí** viene de un anuncio se atiende como cualquier otro: la
    conversación se crea, el mensaje se ve, y no se guarda ninguna atribución.
@@ -37,7 +39,23 @@ Con `ATRIBUCION=on`, las mismas rutas responden con normalidad.
    muestra solo los **últimos 4** y el token completo no aparece por ningún lado.
 3. Una `qualifiedStageId` que no es de este negocio se rechaza con
    **`422 etapa_invalida`**.
-4. Desconectar borra la configuración pero **no** los eventos ya reportados: eso
+4. Un ID que no puede ser el del dataset se rechaza al guardar con
+   **`422 dataset_invalido`** y no queda nada guardado: uno no numérico, el de
+   la cuenta de WhatsApp o el del número de teléfono. Fue el error real en
+   producción: los tres se guardaban y cada venta fallaba después en Meta.
+5. **Obtener de Meta** (`POST /api/settings/capi/dataset`) devuelve el dataset
+   de la cuenta de WhatsApp conectada: un ID numérico, **el mismo** si se pide
+   otra vez, y **sin guardar nada**; guardarlo después lo conecta.
+6. En la pantalla: el clic llena el campo y dice de dónde salió («Da «Guardar»
+   para conectarlo»); con ese ya guardado dice que ya es el guardado; con otro
+   guardado avisa que es distinto y cuál era. Editar el campo retira el aviso, y
+   un ID tecleado mal muestra el motivo del `422` sin cambiar lo guardado.
+7. Camino infeliz: si Meta niega el dataset (el wa-mock lo hace con los WABA
+   terminados en `-sin-permiso`, como a un token sin
+   `whatsapp_business_management`), la pantalla muestra el motivo de Meta tal
+   cual, el campo no cambia y el botón vuelve a estar disponible. En un
+   teléfono (375 px) la fila del botón cabe sin scroll horizontal.
+8. Desconectar borra la configuración pero **no** los eventos ya reportados: eso
    ya se le dijo a Meta y sigue siendo cierto.
 
 ## US3 — Capturar el anuncio
@@ -67,7 +85,7 @@ Con `ATRIBUCION=on`, las mismas rutas responden con normalidad.
 
 1. **Lead sin anuncio**: la fila queda **omitida** con el motivo escrito
    (`sin ctwa_clid…`) y nada falla.
-2. **Meta rechazando** (dataset `-fail`, que responde 200 con
+2. **Meta rechazando** (un dataset terminado en `0000`, que responde 200 con
    `events_received: 0`): el lead **se mueve igual** y se queda en su etapa
    nueva; la fila queda **fallida** con lo que dijo Meta. Ninguna conversión
    vale un movimiento de lead bloqueado.

@@ -129,8 +129,9 @@ Si anuncias con **Click-to-WhatsApp**, Meta sabe qué conversaciones empezaron
 desde un anuncio, pero no cuáles sirvieron: sin nadie que se lo diga, optimiza
 hacia el público más barato de hacer escribir, que rara vez es el que compra.
 
-Enciéndela con `ATRIBUCION=on`, pega tu dataset en Ajustes → Anuncios (el token
-lo reusa de tu conexión de WhatsApp) y di qué etapa de TU pipeline significa
+Enciéndela con `ATRIBUCION=on`, da clic en **Obtener de Meta** en Ajustes →
+Anuncios (el CRM le pide a Meta el dataset de tu cuenta de WhatsApp y reusa su
+token: no hay nada que copiar) y di qué etapa de TU pipeline significa
 "lead calificado". A partir de ahí el CRM le reporta a Meta el lead calificado y
 la venta cerrada —con su importe— por la **Conversions API**, y una tabla de
 actividad te dice qué se envió, con qué acuse y, cuando no salió, por qué.

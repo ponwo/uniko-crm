@@ -72,6 +72,11 @@ type WaMockState = {
    */
   templates: Record<string, MockTemplate[]>;
   capiEvents: CapiMockEvent[];
+  /**
+   * 016 — El dataset de mensajería de cada WABA (`POST {waba}/dataset`). Como
+   * en Meta: el primero lo crea y los siguientes devuelven el mismo.
+   */
+  datasets: Record<string, string>;
   counter: number;
   mediaMode: MediaMode;
   /**
@@ -90,6 +95,7 @@ export function getWaMockState(): WaMockState {
       outbox: [],
       templates: {},
       capiEvents: [],
+      datasets: {},
       counter: 0,
       mediaMode: "ok",
     };
@@ -109,9 +115,26 @@ export function resetWaMockState(): void {
     outbox: [],
     templates: {},
     capiEvents: [],
+    datasets: {},
     counter: 0,
     mediaMode: "ok",
   };
+}
+
+/**
+ * 016 — El dataset de un WABA, creándolo si es el primero (idempotente como
+ * `POST {waba}/dataset` en Meta). Numérico y SIN terminar en "0000": esos son
+ * los que el mock usa para descartar eventos.
+ */
+export function datasetOf(wabaId: string): string {
+  // `??=` y no la propiedad a secas: en dev el estado sobrevive a la recarga
+  // de módulos y puede venir de antes de que existiera este campo.
+  const datasets = (getWaMockState().datasets ??= {});
+  const existente = datasets[wabaId];
+  if (existente) return existente;
+  const nuevo = String(770_000_000_000_000 + Object.keys(datasets).length + 1);
+  datasets[wabaId] = nuevo;
+  return nuevo;
 }
 
 /**

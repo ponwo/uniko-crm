@@ -2,6 +2,7 @@ import { mockGuard } from "@/lib/dev-guard";
 import { scheduleSentStatus } from "@/server/dev/wa-mock-inbound";
 import {
   allMockTemplates,
+  datasetOf,
   getWaMockState,
   mediaModeFor,
   nextN,
@@ -295,11 +296,35 @@ export async function POST(req: Request, ctx: Params) {
 
   const body = (await req.json().catch(() => ({}))) as Record<string, unknown>;
 
+  // 016 — POST {waba}/dataset: el dataset de mensajería de la cuenta («Obtener
+  // de Meta»). Crea el primero y devuelve el mismo después, como Meta. Un WABA
+  // terminado en "-sin-permiso" reproduce el rechazo más probable en la vida
+  // real: un token sin `whatsapp_business_management`.
+  if (path.length === 2 && path[1] === "dataset") {
+    const wabaId = path[0]!;
+    if (wabaId.endsWith("-sin-permiso")) {
+      return Response.json(
+        {
+          error: {
+            message:
+              "(#200) Requires whatsapp_business_management permission to manage the object",
+            type: "OAuthException",
+            code: 200,
+            fbtrace_id: "mock-dataset-permiso",
+          },
+        },
+        { status: 403 }
+      );
+    }
+    return Response.json({ id: datasetOf(wabaId) });
+  }
+
   // 016 — POST {datasetId}/events: Conversions API. Imita las tres cosas que
   // de verdad importan del endpoint real: el catálogo cerrado de nombres, la
   // exigencia del ctwa_clid, y —sobre todo— que Meta puede responder 200
-  // DESCARTANDO el evento. Los datasets terminados en "-fail" reproducen eso
-  // último, que es el modo de fallo que nadie ve venir.
+  // DESCARTANDO el evento. Los datasets terminados en "0000" reproducen eso
+  // último, que es el modo de fallo que nadie ve venir. (Numéricos, como los
+  // reales: la pantalla rechaza al guardar un ID que no lo es.)
   if (path.length === 2 && path[1] === "events") {
     const state = getWaMockState();
     const events = Array.isArray(body.data)
@@ -351,7 +376,7 @@ export async function POST(req: Request, ctx: Params) {
     });
 
     // El 200 mentiroso: recibido por HTTP, descartado por Meta.
-    const received = datasetId.endsWith("-fail") ? 0 : 1;
+    const received = datasetId.endsWith("0000") ? 0 : 1;
     return Response.json({
       events_received: received,
       messages: [],

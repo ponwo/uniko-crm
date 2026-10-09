@@ -5,6 +5,7 @@ import {
   atribucionEnabled,
 } from "@/server/attribution/flag";
 import {
+  datasetIdProblem,
   deleteCapiSettings,
   getCapiSettingsView,
   saveCapiSettings,
@@ -45,9 +46,12 @@ export const PUT = withAuth(async (session, req: Request) => {
   const body = await parseBody(req, putSchema);
   if (!body.ok) return body.response;
 
+  const credentials = await getCredentialsByOrg(session.organizationId);
+  const problem = datasetIdProblem(body.data.datasetId, credentials);
+  if (problem) return apiError(422, "dataset_invalido", problem);
+
   let token = body.data.token;
   if (!token) {
-    const credentials = await getCredentialsByOrg(session.organizationId);
     if (!credentials) {
       return apiError(
         409,

@@ -122,6 +122,35 @@ export async function sendBusinessMessagingEvent(input: {
 }
 
 /**
+ * El ID del dataset de mensajería de una cuenta de WhatsApp, pedido a Meta.
+ *
+ * `POST {waba}/dataset` lo CREA si la cuenta aún no tiene y, si ya tiene,
+ * devuelve el mismo: pedirlo dos veces no crea dos. Por eso es POST aunque casi
+ * siempre solo lea. (`GET` no sirve para esto: con una cuenta sin dataset
+ * responde una lista vacía, que fue justo el caso real.)
+ *
+ * Existe porque teclear el ID salió caro: se guardaron el de la cuenta, el del
+ * número y otro conjunto del portafolio, y cada venta falló después en Meta.
+ */
+export async function obtainWabaDataset(input: {
+  wabaId: string;
+  token: string;
+  signal?: AbortSignal;
+}): Promise<string> {
+  const res = await graphRequest<{ id?: string | number }>(
+    `${input.wabaId}/dataset`,
+    { method: "POST", token: input.token, signal: input.signal }
+  );
+  const id = res?.id === undefined ? "" : String(res.id);
+  if (!/^\d+$/.test(id)) {
+    throw new Error(
+      `Meta no devolvió el ID del dataset (respondió ${JSON.stringify(res)})`
+    );
+  }
+  return id;
+}
+
+/**
  * Arma el body de `POST {dataset}/events`. Separada y exportada para poder
  * fijar la FORMA del payload en un test: el modo de fallar de este endpoint es
  * un 200 con `events_received: 0`, donde un campo mal puesto se ve exactamente

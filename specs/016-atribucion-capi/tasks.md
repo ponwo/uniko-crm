@@ -121,3 +121,45 @@ una omitida (lead sin anuncio) y una fallida (Meta descartando con
 
 La migración `0010` se aplicó dos veces seguidas sobre la misma base sin error
 (solo avisos de "ya existe"): re-ejecutable como exige la Constitución IV.
+
+---
+
+## Enmienda 2026-10-09 — «Obtener de Meta» (FR-017, FR-018)
+
+Origen: en ILTU se tecleó el ID del dataset y se guardaron el de la cuenta, el
+del número y otro conjunto del portafolio; las ventas fallaron en Meta. Ver la
+sección «Enmienda» de la spec. Sin migración.
+
+- [x] **T032** `obtainWabaDataset` en `src/lib/meta/capi.ts`: `POST {waba}/dataset`
+      por la frontera única (`graphRequest`), exige un ID numérico en la respuesta.
+- [x] **T033** `datasetFromMeta` en `src/server/attribution/settings.ts`: cuenta y
+      token de WhatsApp ya conectados, tope de 20 s, errores traducidos
+      (`sin_whatsapp` 409 · `meta_rechazo` 422 con el motivo de Meta ·
+      `meta_no_disponible` 503 · `meta_respuesta_inesperada` 502). No guarda.
+- [x] **T034** `POST /api/settings/capi/dataset` (404 sin la bandera).
+- [x] **T035** `datasetIdProblem` + `422 dataset_invalido` en el `PUT`: no
+      numérico, el ID de la cuenta o el del número.
+- [x] **T036** Pantalla: botón «Obtener de Meta» junto a "ID del dataset"; coloca
+      el ID, dice de dónde salió y si difiere del guardado; el aviso se retira si
+      se edita el campo; el error de Meta se ve tal cual. Ayuda corregida.
+- [x] **T037** wa-mock: `POST {waba}/dataset` idempotente por WABA; los WABA
+      `…-sin-permiso` reproducen el rechazo por permiso. Datasets del arnés
+      numéricos (los que terminan en `0000` descartan eventos).
+- [x] **T038** Pruebas: unitarias (`tests/unit/capi-settings.test.ts`), sección
+      016 del self-test (obtener, idempotencia, no guarda, rechazos, 404 sin la
+      bandera) y `scripts/e2e-dataset-desde-meta.mjs` en el navegador (en la
+      cadena `test:e2e`).
+- [x] **T039** Contrato `settings-capi.md`, guía, README, `CLAUDE.md` y guion
+      `tests/e2e/us-atribucion.md`.
+
+### Verificación (2026-10-09)
+
+Gate técnico: `pnpm typecheck` · `pnpm lint` · `pnpm build` · `pnpm test`
+(**1050 unit**) — en verde.
+
+Arnés E2E contra la app viva con mocks, base nueva por configuración:
+
+| Configuración | `e2e-selftest.mjs` | `e2e-dataset-desde-meta.mjs` |
+|---|---|---|
+| `ATRIBUCION=on` | **213/213** | **20/20** |
+| sin la bandera | **190/190** (la ruta nueva da 404) | **2/2** (ruta y pantalla, 404) |

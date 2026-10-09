@@ -33,7 +33,7 @@ Conecta o actualiza. Cuerpo:
 
 ```jsonc
 {
-  "datasetId": "1708105527110154",  // requerido, no vacío
+  "datasetId": "1708105527110154",  // requerido: solo dígitos
   "token": "EAAG…",                 // OPCIONAL — omitirlo reusa el token de WhatsApp
   "qualifiedStageId": "stg_…"       // opcional; null lo desactiva
 }
@@ -42,6 +42,7 @@ Conecta o actualiza. Cuerpo:
 | Caso | Respuesta |
 |---|---|
 | OK | `200 { "ok": true }` |
+| `datasetId` no numérico, o igual al ID de la cuenta o del número de WhatsApp conectados | `422 dataset_invalido` (nada se guarda) |
 | Sin `token` y sin conexión de WhatsApp | `409 sin_whatsapp` |
 | `qualifiedStageId` que no es de esta organización | `422 etapa_invalida` |
 | Cuerpo inválido | `422 invalid_body` |
@@ -49,6 +50,32 @@ Conecta o actualiza. Cuerpo:
 **Por qué se reusa el token**: el token del negocio que ya autoriza mensajería es
 el mismo que autoriza publicar en su dataset. Pedirlo otra vez solo consigue que
 alguien pegue un secreto en un chat.
+
+**Por qué `dataset_invalido`** (enmienda 2026-10-09): en producción se guardaron
+el ID de la cuenta, el del número y una cadena cualquiera, y cada venta falló
+después en Meta. Como cada evento se intenta una sola vez, se para al guardar.
+
+## `POST /api/settings/capi/dataset`
+
+«Obtener de Meta» (enmienda 2026-10-09). Le pide a Meta el dataset de mensajería
+de la cuenta de WhatsApp conectada, con su propio token: `POST {waba}/dataset`,
+que lo crea si la cuenta no tiene y devuelve el mismo si ya existe. Sin cuerpo.
+**No guarda nada**: la pantalla coloca el ID y el negocio lo confirma con el
+`PUT` de arriba.
+
+```jsonc
+{ "datasetId": "1079757714868238", "displayPhoneNumber": "+52 1 33 1470 3151" }
+```
+
+| Caso | Respuesta |
+|---|---|
+| OK | `200` con el cuerpo de arriba (`displayPhoneNumber` puede ser `null`) |
+| Sin conexión de WhatsApp | `409 sin_whatsapp` |
+| Meta lo niega (p. ej. token sin `whatsapp_business_management`) | `422 meta_rechazo`, con el motivo de Meta en `message` |
+| Meta caído, sin respuesta o tarda más de 20 s | `503 meta_no_disponible` |
+| Meta responde sin un ID numérico | `502 meta_respuesta_inesperada` |
+
+`POST` y no `GET` porque puede crear el dataset en Meta.
 
 ## `DELETE /api/settings/capi`
 
