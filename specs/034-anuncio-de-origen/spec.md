@@ -4,7 +4,7 @@
 
 **Created**: 2026-10-09
 
-**Status**: En `main` (`5e6c38c`, PR #68) y desplegada en `uniko-lanco` el 2026-10-09; no promovida a `production`
+**Status**: En `production` (`f9605f2`) desde el 2026-10-10, flota 3/3 con la `0019` aplicada (PR #68 y docs #69); falta la verificación en vivo en ILTU (SC-006)
 
 **Carril (Principio VI)**: **ciclo completo**; banda FR-19xx. Toca el modelo de datos (`drizzle/`:
 una columna, su clave foránea y un índice en `ad_attribution`, migración `0019`) y

@@ -36,7 +36,8 @@ Uniko (ver [plan.md](plan.md), Desvíos del puerto).
 - [x] T019 Gate técnico, `pnpm test:e2e` con la bandera apagada y encendida, guion de navegador
 - [x] T020 PR con el registro del ensayo X y el plan de reversión ([PR #68](https://github.com/ponwo/uniko-crm/pull/68))
 - [x] T021 (dueño) Merge → `uniko-lanco`
-- [ ] T022 (dueño) Promoción con la puerta completa; en ILTU, las conversaciones de anuncio con su tarjeta (SC-006)
+- [x] T022 (dueño) Promoción con la puerta completa (`f9605f2`, 2026-10-10)
+- [ ] T023 (dueño) En vivo en ILTU: las conversaciones de anuncio con su tarjeta y el filtro «Anuncios» (SC-006)
 
 ## Verificación (2026-10-09, local, Postgres 16 y `next dev`, base nueva por corrida)
 
@@ -61,3 +62,30 @@ Uniko (ver [plan.md](plan.md), Desvíos del puerto).
   aplicadas` en el log del contenedor nuevo: la `0019` está aplicada. Sin conversaciones de
   anuncio en esa instancia: la tarjeta aparecerá con el primer clic de un anuncio.
 - No promovida: `production` sigue sin la 034 (T022).
+
+## Promoción (2026-10-10)
+
+Señal del dueño: «promueve la 034 a production»; puerta con `/uniko-promote`.
+
+- **Condiciones mecanizables** (`promote-gate.sh`, `MECANIZABLES_OK` para `f9605f2`):
+  LanCo corre `f9605f2` igual que `main` (la primera corrida cerró porque el merge del
+  #69 aún se desplegaba en LanCo; con 10 lecturas seguidas del commit nuevo, abrió); CI
+  en verde para ese commit en toda la matriz (`completo` y `default`); viajan 11
+  commits, todos de la 034; toca `drizzle/` (la `0019`).
+- **Ensayo del Principio X**: registro en quickstart §4 (respaldos de ILTU y
+  NuriaAndrea del 2026-10-01 y de uniko-lanco del 2026-10-06), presentado como
+  evidencia. Matiz declarado: el respaldo de ILTU es anterior a sus anuncios.
+- **Uso real en LanCo**: declarado por el dueño («sí»).
+- **Self-test contra LanCo desplegado**: el dueño lo dio por cumplido con el arnés
+  local en las dos posiciones de la bandera, el código contra las filas reales de
+  NuriaAndrea en el ensayo X y LanCo sirviendo la 034 sin errores (los mocks dan 404
+  allá y LanCo no tiene conversaciones de anuncio), como con la agenda.
+- **Plan de reversión** (contingencia, declarado en el PR #68): revertir el merge en
+  `main`, verificar en LanCo y volver a promover; la columna queda sin uso.
+- **Disparo** («sí, hazlo tú»): `git push origin main:production`, fast-forward
+  `672cf0a..f9605f2` a las 01:16 UTC.
+- **Flota**: ILTU y NuriaAndrea con su despliegue `finished` a las 01:24 UTC (~7½ min),
+  `[migrate] migraciones aplicadas` en el log de los dos contenedores nuevos, y
+  `verify-fleet.sh` 3/3 en `f9605f2`.
+- Pendiente (T023): ver en vivo en ILTU sus conversaciones de anuncio con la tarjeta (la
+  imagen solo si Meta no caducó la URL) y un clic nuevo con su creativo.

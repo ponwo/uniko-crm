@@ -1,6 +1,6 @@
 ---
 name: anuncio-de-origen-034
-description: "034 (de qué anuncio llegó cada conversación, puerto de la 018 de Vocero): PR #68 MERGEADA (5e6c38c) y desplegada en uniko-lanco el 2026-10-09, 0019 aplicada; NO promovida (promoción = señal del dueño). Cómo se portó desde Vocero y gotchas que salieron."
+description: "034 (de qué anuncio llegó cada conversación, puerto de la 018 de Vocero): PR #68 + docs #69, PROMOVIDA a production en f9605f2 el 2026-10-10, flota 3/3 con la 0019 aplicada; falta verla en vivo en ILTU. Cómo se portó desde Vocero y gotchas que salieron."
 metadata:
   type: project
 ---
@@ -11,9 +11,10 @@ con el creativo en el panel y en el cajón del trato. Nació de la pregunta del 
 sigue sin salir por API** (decisión D2 heredada): para verlo hay que leer
 `ad_attribution.ctwa_clid` en la base (respaldo restaurado en local). Migración `0019`.
 Estado: **PR #68 mergeada** por el dueño el 2026-10-09 (`5e6c38c`, CI verde) y
-desplegada en `uniko-lanco` (`/api/health` con el commit, `[migrate] migraciones
-aplicadas`); **no promovida**. `uniko-lanco` no tiene conversaciones de anuncio: la
-tarjeta se verá en vivo hasta un clic real o, tras la promoción, en ILTU.
+**PROMOVIDA a production en `f9605f2` el 2026-10-10** (01:16 UTC, fast-forward desde
+`672cf0a`): ILTU y NuriaAndrea `finished` ~7½ min después, `[migrate] migraciones
+aplicadas` en los dos, `verify-fleet.sh` 3/3. Falta verla en vivo en ILTU (T023):
+`uniko-lanco` no tiene conversaciones de anuncio, ILTU y NuriaAndrea sí.
 
 Cómo se portó (sirve para traer más cosas de Vocero, `ponwo/vocero-crm`): clonar Vocero
 en el scratchpad, `git fetch <clon> <rama>` desde el worktree de Uniko (solo trae los
