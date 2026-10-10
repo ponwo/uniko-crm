@@ -4,7 +4,7 @@
 
 **Created**: 2026-10-09
 
-**Status**: Implementada en la rama; pendiente de merge
+**Status**: En `main` (`5e6c38c`, PR #68) y desplegada en `uniko-lanco` el 2026-10-09; no promovida a `production`
 
 **Carril (Principio VI)**: **ciclo completo**; banda FR-19xx. Toca el modelo de datos (`drizzle/`:
 una columna, su clave foránea y un índice en `ad_attribution`, migración `0019`) y

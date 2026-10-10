@@ -1,6 +1,6 @@
 ---
 name: anuncio-de-origen-034
-description: "034 (de qué anuncio llegó cada conversación, puerto de la 018 de Vocero): PR #68 abierta el 2026-10-09 con gate, arnés en las dos posiciones de ATRIBUCION y ensayo X; merge y promoción = señal del dueño. Cómo se portó desde Vocero y gotchas que salieron."
+description: "034 (de qué anuncio llegó cada conversación, puerto de la 018 de Vocero): PR #68 MERGEADA (5e6c38c) y desplegada en uniko-lanco el 2026-10-09, 0019 aplicada; NO promovida (promoción = señal del dueño). Cómo se portó desde Vocero y gotchas que salieron."
 metadata:
   type: project
 ---
@@ -10,7 +10,10 @@ con el creativo en el panel y en el cajón del trato. Nació de la pregunta del 
 «¿cómo sabemos el `ctwa_clid` de un mensaje?» (2026-10-09). **El valor del `ctwa_clid`
 sigue sin salir por API** (decisión D2 heredada): para verlo hay que leer
 `ad_attribution.ctwa_clid` en la base (respaldo restaurado en local). Migración `0019`.
-Estado: **PR #68** (`034-anuncio-de-origen`), verde en local; sin merge.
+Estado: **PR #68 mergeada** por el dueño el 2026-10-09 (`5e6c38c`, CI verde) y
+desplegada en `uniko-lanco` (`/api/health` con el commit, `[migrate] migraciones
+aplicadas`); **no promovida**. `uniko-lanco` no tiene conversaciones de anuncio: la
+tarjeta se verá en vivo hasta un clic real o, tras la promoción, en ILTU.
 
 Cómo se portó (sirve para traer más cosas de Vocero, `ponwo/vocero-crm`): clonar Vocero
 en el scratchpad, `git fetch <clon> <rama>` desde el worktree de Uniko (solo trae los
