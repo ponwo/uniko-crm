@@ -15,6 +15,7 @@ import { ConversationList } from "./conversation-list";
 import { MessageThread } from "./message-thread";
 import { Composer } from "./composer";
 import { ContactPanel } from "./contact-panel";
+import { useDraftStore } from "./drafts";
 
 /**
  * Texto que ya salió del compositor pero cuyo POST todavía viaja. Existe solo
@@ -37,8 +38,16 @@ const PANEL_MEDIA_QUERY = "(min-width: 1280px)";
 const isWideEnoughForPanel = () =>
   typeof window !== "undefined" && window.matchMedia(PANEL_MEDIA_QUERY).matches;
 
-export function InboxClient({ channels }: { channels: readonly Channel[] }) {
+export function InboxClient({
+  channels,
+  userId,
+}: {
+  channels: readonly Channel[];
+  /** Dueño de los borradores del compositor en este navegador. */
+  userId: string;
+}) {
   const multiChannel = channels.length > 1;
+  const drafts = useDraftStore(userId);
   const [conversations, setConversations] = useState<ConversationDto[] | null>(
     null
   );
@@ -330,6 +339,7 @@ export function InboxClient({ channels }: { channels: readonly Channel[] }) {
           channels={channels}
           selectedId={selectedId}
           onSelect={select}
+          drafts={drafts}
         />
       </section>
 
@@ -393,6 +403,7 @@ export function InboxClient({ channels }: { channels: readonly Channel[] }) {
             <MessageThread messages={thread} />
             <Composer
               conversation={selected}
+              drafts={drafts}
               dropZoneRef={threadPaneRef}
               onSend={sendText}
               onSent={() => {

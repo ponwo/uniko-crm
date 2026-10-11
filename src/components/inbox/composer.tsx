@@ -3,6 +3,7 @@
 import {
   useCallback,
   useEffect,
+  useLayoutEffect,
   useRef,
   useState,
   type RefObject,
@@ -23,6 +24,7 @@ import { CHANNEL_LABEL } from "@/lib/channels";
 import { esEnviable } from "@/lib/templates";
 import { cn } from "@/lib/utils";
 import { formatBytes, formatRemaining } from "./helpers";
+import { useDraft, type DraftStore } from "./drafts";
 import { TemplateSender } from "./template-sender";
 
 /** 008 — Panel secundario del clip: formulario de ubicación o contacto. */
@@ -70,11 +72,14 @@ function dragHasFiles(e: DragEvent): boolean {
 
 export function Composer({
   conversation,
+  drafts,
   onSend,
   onSent,
   dropZoneRef,
 }: {
   conversation: ConversationDto;
+  /** Borradores por conversación: la caja muestra el de la abierta. */
+  drafts: DraftStore;
   onSend: (text: string) => Promise<string | null>;
   onSent: () => void;
   /**
@@ -84,7 +89,10 @@ export function Composer({
    */
   dropZoneRef?: RefObject<HTMLElement | null>;
 }) {
-  const [text, setText] = useState("");
+  // El texto ES el borrador de la conversación abierta: cambiar de hilo
+  // cambia de borrador, y lo escrito para un contacto no viaja a otro.
+  const text = useDraft(drafts, conversation.id);
+  const setText = (value: string) => drafts.write(conversation.id, value);
   const [sending, setSending] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [templates, setTemplates] = useState<TemplateDto[]>([]);
@@ -107,6 +115,10 @@ export function Composer({
   const sendingRef = useRef(false);
   const templateRequiredRef = useRef(conversation.templateRequired);
   templateRequiredRef.current = conversation.templateRequired;
+  // La conversación abierta AHORA, para los envíos que terminan después de
+  // haber cambiado de hilo.
+  const openIdRef = useRef(conversation.id);
+  openIdRef.current = conversation.id;
 
   useEffect(() => {
     let cancelled = false;
@@ -162,8 +174,14 @@ export function Composer({
 
   // Los adjuntos elegidos son de ESTA conversación: al cambiar de hilo se
   // descartan (como hace WhatsApp Web), salvo que estén saliendo en ese
-  // momento — el lote ya va a la conversación correcta y se retira solo.
+  // momento — el lote ya va a la conversación correcta y se retira solo. Los
+  // formularios de ubicación y contacto también son de ella: se cierran.
   useEffect(() => {
+    setPanel(null);
+    setCoordsRaw("");
+    setPlaceName("");
+    setContactName("");
+    setContactPhone("");
     if (sendingRef.current) return;
     if (attachmentsRef.current.length > 0) clearAttachments();
     setError(null);
@@ -259,17 +277,15 @@ export function Composer({
     };
   }, [dropZoneRef, addFiles]);
 
-  function autogrow() {
+  // La altura sigue al texto venga de donde venga: lo tecleado, el borrador
+  // de la conversación a la que se acaba de entrar o uno que regresó. También
+  // cuando la caja reaparece al abrirse la ventana con un borrador guardado.
+  useLayoutEffect(() => {
     const el = taRef.current;
     if (!el) return;
     el.style.height = "auto";
     el.style.height = `${Math.min(el.scrollHeight, 120)}px`;
-  }
-
-  function resetText() {
-    setText("");
-    if (taRef.current) taRef.current.style.height = "auto";
-  }
+  }, [text, conversation.templateRequired]);
 
   async function apiSend(path: string, init: RequestInit): Promise<string | null> {
     const res = await fetch(path, init).catch(() => null);
@@ -285,6 +301,9 @@ export function Composer({
 
   async function submit() {
     setError(null);
+    // El envío es de la conversación donde se pidió, aunque termine con otra
+    // abierta: lo que limpie o devuelva va a SU borrador.
+    const origin = conversation;
 
     if (attachmentsRef.current.length > 0) {
       // El lote sí espera: cada archivo se sube y confirma antes del
@@ -303,7 +322,7 @@ export function Composer({
         // es un mensaje propio y el pie acompaña al que abre la serie.
         if (i === 0 && caption) form.set("caption", caption);
         const err = await apiSend(
-          `/api/conversations/${conversation.id}/messages/media`,
+          `/api/conversations/${origin.id}/messages/media`,
           { method: "POST", body: form }
         );
         if (err) {
@@ -312,7 +331,7 @@ export function Composer({
           setError(batch.length > 1 ? `${att.file.name}: ${err}` : err);
           break;
         }
-        if (i === 0) resetText();
+        if (i === 0) drafts.write(origin.id, "");
         removeAttachment(att.id);
         setProgress({ done: i + 1, total: batch.length });
         onSent();
@@ -329,15 +348,24 @@ export function Composer({
     // durante ese rato el renglón siguiente se escribía encima del anterior y
     // salía todo como un solo mensaje. El campo se limpia ya; la burbuja
     // "enviando" del hilo es la que informa el estado real.
-    resetText();
+    drafts.write(origin.id, "");
     const err = await onSend(value);
     if (err) {
-      setError(err);
-      // Lo que no salió vuelve al campo. Si ya empezaste a escribir otra cosa
-      // se antepone en vez de pisarte: nada se pierde en silencio.
-      setText((actual) => (actual ? `${value}\n${actual}` : value));
-      taRef.current?.focus();
-      setTimeout(autogrow, 0);
+      // Lo que no salió vuelve al borrador de SU conversación. Si ya empezaste
+      // a escribir otra cosa ahí se antepone en vez de pisarte: nada se
+      // pierde en silencio.
+      const actual = drafts.read(origin.id);
+      drafts.write(origin.id, actual ? `${value}\n${actual}` : value);
+      if (openIdRef.current === origin.id) {
+        setError(err);
+        taRef.current?.focus();
+      } else {
+        // Ya estás en otro hilo: el texto NO aparece en esta caja (iría al
+        // contacto equivocado). Se avisa dónde quedó.
+        setError(
+          `No salió tu mensaje a ${origin.contact.name}: ${err}. Quedó como borrador en su conversación.`
+        );
+      }
     }
   }
 
@@ -449,7 +477,6 @@ export function Composer({
                 const firstName = conversation.contact.name.split(" ")[0] ?? "";
                 setText(t.body.replace(/\{\{\s*1\s*\}\}/g, firstName));
                 taRef.current?.focus();
-                setTimeout(autogrow, 0);
               }}
               title={t.body}
             >
@@ -663,10 +690,7 @@ export function Composer({
           }
           value={text}
           rows={1}
-          onChange={(e) => {
-            setText(e.target.value);
-            autogrow();
-          }}
+          onChange={(e) => setText(e.target.value)}
           onPaste={(e) => {
             // Pegar una captura o una imagen copiada la adjunta directo.
             const files = Array.from(e.clipboardData?.files ?? []);

@@ -10,6 +10,7 @@ import { matchesQuery } from "@/lib/search";
 import { cn } from "@/lib/utils";
 import { ContactAvatar } from "@/components/avatar";
 import { formatTime, previewText } from "./helpers";
+import { useOtherDrafts, type DraftStore } from "./drafts";
 
 /* Puntos de etapa con la paleta de la landing: azul, ámbar, verde WhatsApp. */
 const STAGE_DOT: Record<string, string> = {
@@ -56,13 +57,17 @@ export function ConversationList({
   channels,
   selectedId,
   onSelect,
+  drafts,
 }: {
   conversations: ConversationDto[] | null;
   /** Canales encendidos en esta instancia (ADR-001). */
   channels: readonly Channel[];
   selectedId: string | null;
   onSelect: (id: string) => void;
+  drafts: DraftStore;
 }) {
+  // El de la conversación abierta no se marca: ya está a la vista en la caja.
+  const borradores = useOtherDrafts(drafts, selectedId);
   const [query, setQuery] = useState("");
   const [filter, setFilter] = useState<"all" | "unread" | "anuncios">("all");
   const [stage, setStage] = useState<string>("all");
@@ -275,6 +280,7 @@ export function ConversationList({
             {visible.map((c) => {
               const unread = c.unreadCount > 0;
               const active = selectedId === c.id;
+              const borrador = borradores.get(c.id);
               return (
                 <li key={c.id} className="relative border-b border-border">
                   {active && (
@@ -316,14 +322,28 @@ export function ConversationList({
                         </span>
                       </span>
                       <span className="mt-0.5 flex items-center justify-between gap-2">
-                        <span
-                          className={cn(
-                            "truncate text-[13px]",
-                            unread ? "font-medium text-text-2" : "text-text-3"
-                          )}
-                        >
-                          {previewText(c.preview)}
-                        </span>
+                        {/* Como en WhatsApp: lo que dejaste a medias se ve
+                            en lugar del último mensaje, para no olvidarlo. */}
+                        {borrador ? (
+                          <span
+                            data-testid="draft-preview"
+                            className="truncate text-[13px] text-text-2"
+                          >
+                            <span className="font-semibold text-brand-text">
+                              Borrador:
+                            </span>{" "}
+                            {borrador}
+                          </span>
+                        ) : (
+                          <span
+                            className={cn(
+                              "truncate text-[13px]",
+                              unread ? "font-medium text-text-2" : "text-text-3"
+                            )}
+                          >
+                            {previewText(c.preview)}
+                          </span>
+                        )}
                         {unread && (
                           <span className="flex h-[18px] min-w-[18px] shrink-0 items-center justify-center rounded-full bg-brand px-1.5 text-[10.5px] font-semibold text-brand-fg">
                             {c.unreadCount}
