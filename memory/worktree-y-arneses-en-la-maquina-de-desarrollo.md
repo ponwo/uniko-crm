@@ -43,3 +43,14 @@ pestaña del panel de vista previa sobre `localhost:3000` (carga `/inbox`,
 las páginas `/login`, `/inbox`, `/bookings`, `/settings/calendar`. El log
 `[agente] inventario: timeout al consultar MS-Stock` junto a un `Compiled /…`
 largo es la firma. Alternativa robusta: `pnpm build && pnpm start -p 3100`.
+
+**Añadido 2026-10-10 (por qué hace falta "base limpia", PR #72)**: el wa-mock
+numera los entrantes como `wamid.mock.in.N` con un contador EN MEMORIA
+(`src/server/dev/wa-mock-inbound.ts`) que vuelve a cero al reiniciar `next dev`.
+En una base ya usada, el entrante nuevo choca con uno viejo, el ingest
+idempotente lo descarta y la conversación queda creada pero SIN mensaje y con
+la ventana cerrada: la caja de texto se vuelve el selector de plantillas y
+cualquier guion que espere el compositor se cuelga. La firma: el contacto
+aparece al final de la lista, sin vista previa. Un guion nuevo se vuelve
+re-ejecutable sobre la misma base pasando un `waMessageId` único por corrida
+(como hace `scripts/e2e-borradores.mjs`).
