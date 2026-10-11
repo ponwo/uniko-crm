@@ -44,6 +44,34 @@ es salto de línea y se envía con Ctrl/⌘+Enter (o el botón).
      ✅ Ctrl+Enter envía UN mensaje con los dos renglones, y a WhatsApp llega
      con el salto de línea.
 
+## Borrador por conversación
+
+Automatizado en `scripts/e2e-borradores.mjs`. La caja de escritura es una sola
+para toda la Bandeja; antes su texto se quedaba puesto al cambiar de
+conversación y podía salir hacia otro contacto. Ahora cada conversación guarda
+su borrador, como en WhatsApp Web.
+
+- **Cambiar de conversación**: escribir sin enviar en la de Ana y abrir la de
+  Beto.
+  ✅ La caja de Beto aparece vacía: lo escrito para Ana no viaja.
+  ✅ En la lista, el renglón de Ana dice «Borrador: …» con lo que se dejó.
+  ✅ Al volver con Ana, su texto sigue en la caja.
+  ✅ La conversación abierta no se marca como borrador: ya está a la vista.
+- **Recargar la página**: los borradores siguen ahí (viven en el navegador, por
+  usuario).
+- **Formularios de ubicación y contacto**: abiertos en una conversación, se
+  cierran al cambiar a otra.
+- **Enviar**: el mensaje sale a la conversación donde se escribió y su borrador
+  desaparece.
+- **Un envío falla después de cambiar de conversación**: enviar en la de Beto,
+  abrir la de Ana antes de que responda el servidor y que el envío falle.
+  ✅ El texto NO aparece en la caja de Ana.
+  ✅ Un aviso dice que no salió el mensaje a Beto y que quedó como borrador.
+  ✅ El renglón de Beto muestra el borrador y, al abrirla, el texto está en la
+  caja.
+- **Un envío falla sin cambiar de conversación**: el texto vuelve a la caja,
+  como antes.
+
 ## Ficha del lead
 
 Automatizado en `scripts/e2e-ficha-lead.mjs`. `PUT /api/bot/ficha` ya dejaba al
