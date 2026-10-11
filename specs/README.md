@@ -39,7 +39,11 @@ valía la pena (el arreglo del Principio III) y documenta qué sobrevivió de la
 022 y qué se disolvió.
 
 Se dice aquí porque una rama abandonada en silencio hace creer, dentro de un
-año, que la feature se olvidó. Su análisis vive en la rama, cabeza `76ff482`.
+año, que la feature se olvidó. Su análisis vive en el tag
+`archivo/022-guardia-seed-demo` (cabeza `76ff482`). Para verlo:
+`git fetch --tags` y `git checkout archivo/022-guardia-seed-demo`. Hasta el
+2026-10-10 fue una rama que solo existía en una máquina; pasó a tag en la
+limpieza de ramas para que no se perdiera con ella.
 
 Los tres carriles —ciclo completo, ligero y exento— están definidos en el
 [Principio VI de la constitución](../.specify/memory/constitution.md). El
