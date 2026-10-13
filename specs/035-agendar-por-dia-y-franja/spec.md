@@ -4,8 +4,9 @@
 
 **Created**: 2026-10-12
 
-**Status**: Implementada; verificada en local (unitarios + arnés E2E con mocks). Falta
-la prueba en vivo en uniko-lanco con el modelo real.
+**Status**: Implementada; verificada en local (unitarios + arnés E2E con mocks) y **en
+vivo en uniko-lanco** por el dueño (2026-10-13). **Promovida a `production` en
+`0022cb7` el 2026-10-13**, flota 3/3.
 
 **Carril**: **ligero** (`spec.md` únicamente). No toca el modelo de datos —sin
 migración: la oferta sigue en `offered_slot`, la misma tabla de la 015— ni un contrato
@@ -209,10 +210,31 @@ En local, worktree `035-agendar-por-dia` (puerto 3005, base `uniko_035a` fresca)
   ¡Perfecto, queda agendado!
   ```
 
-**Pendiente**: SC-004, la prueba en vivo con el modelo real. Lo que el mock no puede
-medir es si `glm-5.3-flash` repite el día al contestar la franja y si lee «el
-primero» contra el menú y no contra la lista; las dos cosas están en el prompt
-(FR-2012) y son lo primero que hay que mirar en el Laboratorio si algo falla.
+Lo que el mock no puede medir es si `glm-5.3-flash` repite el día al contestar la
+franja y si lee «el primero» contra el menú y no contra la lista; las dos cosas están
+en el prompt (FR-2012) y son lo primero que hay que mirar en el Laboratorio si algo
+falla en adelante.
+
+### En vivo — uniko-lanco en `0022cb7` (2026-10-13)
+
+[PR #74](https://github.com/ponwo/uniko-crm/pull/74) mergeado por el dueño; uniko-lanco
+se redesplegó sola por webhook y `/api/health` reportó `0022cb7` con arranque limpio.
+**SC-004 cerrado por el dueño**: probó el flujo por WhatsApp real con el modelo real y
+funciona.
+
+### Promoción — `0022cb7` (2026-10-13)
+
+Puerta completa (`/uniko-promote`): CI verde en las dos configuraciones de la matriz,
+LanCo en el commit de `main`, sin `drizzle/` (la condición 4 no aplica), uso real y
+self-test declarados por el dueño con su prueba en vivo, y la reversión del PR (revertir
+el merge en `main`, verificar en LanCo, volver a promover). Viajaron cuatro commits: la
+035 y el registro de la promoción del borrador (#73).
+
+`git push origin main:production` (`d6f2bc3 → 0022cb7`, fast-forward). ILTU y
+NuriaAndrea tardaron ~8 min; durante el relevo alternaron un instante entre el
+contenedor viejo y el nuevo, y quedaron estables en `0022cb7` con sus despliegues
+`finished` en Coolify. `verify-fleet.sh`: **flota 3/3**. En los clientes la agenda
+sigue apagada, así que el cambio llega inerte.
 
 ---
 
