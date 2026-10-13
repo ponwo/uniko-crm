@@ -236,13 +236,6 @@ export function aiMockCompletion(messages: InMessage[]): string {
    */
   if (system.includes("offer_slots")) {
     /*
-     * Una hora CONCRETA ("a las 11", "a las 11am"): se busca en el bloque de
-     * ofrecidos y se reserva esa. Modela lo que pasó en vivo en LanCo el
-     * 2026-09-23 — el cliente no elige del menú, pide su hora— y por eso este
-     * mock se pone rojo si el catálogo vuelve a registrar solo tres por día:
-     * la hora pedida no estaría en el prompt y no habría ISO que copiar.
-     */
-    /*
      * Mover vs reservar (ajuste 2026-09-25): si el cliente pide CAMBIAR la
      * cita, la acción es `move_slot`. Se distingue por el verbo, como haría un
      * modelo real; el mock no adivina si ya hay cita — de eso se encarga el
@@ -258,63 +251,114 @@ export function aiMockCompletion(messages: InMessage[]): string {
         // «¿me la cambias?», que es como se dice de verdad.
         /\b(camb\w*|mov\w*|muev\w*|reprogram\w*|recorr\w*)\b/i.test(lastUser));
 
+    /*
+     * La hora se busca SOLO en la etiqueta, nunca en la línea entera: el ISO
+     * lleva la hora en UTC, así que «sáb 26 sep, 10:00 → …T16:00:00.000Z»
+     * contiene "16:00" y se llevaba por delante la petición de las 16:00
+     * (México es UTC-6). Salió en el arnés: pidió las 16:00 y movió las
+     * 10:00.
+     */
+    const isoDeLaHora = (hhmm: string) =>
+      system
+        .split("\n")
+        .map((l) => l.match(/^\s*\d+\.\s*(.+?)\s*→ startUtc "([^"]+)"/))
+        .find((m) => m?.[1]?.includes(hhmm))?.[2];
+    const reservar = (iso: string) =>
+      JSON.stringify(
+        quiereMover
+          ? { action: "move_slot", startUtc: iso, reply: "¡Listo, la moví!" }
+          : { action: "book_slot", startUtc: iso, reply: "¡Perfecto, queda agendado!" }
+      );
+
+    /*
+     * 035 — Lo que el cliente ya dijo, en TODA la conversación: el motor no
+     * recuerda los turnos anteriores, así que un modelo que solo mirara el
+     * último mensaje perdería el «jueves» al contestar «por la tarde». Gana lo
+     * más reciente.
+     */
+    const delCliente = messages.filter((m) => m.role === "user").map((m) => m.content);
+    const ultimoAgente =
+      [...messages].reverse().find((m) => m.role === "assistant")?.content ?? "";
+    // El motor preguntó «¿mañana o tarde?»: un «mañana» a secas es la franja.
+    const preguntoFranja = /¿prefieres por la mañana o por la tarde\?/i.test(ultimoAgente);
+    const respondeFranja = (t: string) =>
+      preguntoFranja && /^\s*(?:en |por |de )?(?:la )?ma[ñn]ana\b/i.test(t);
+    const diaEn = (t: string) => {
+      if (respondeFranja(t)) return undefined;
+      const limpio = t.replace(/\b(?:por|en|de) la (?:ma[ñn]ana|tarde|noche)\b/gi, " ");
+      return limpio.match(
+        /\b(pasado ma[ñn]ana|hoy|ma[ñn]ana|lunes|martes|mi[eé]rcoles|jueves|viernes|s[aá]bado|domingo|lo antes posible|lo m[aá]s pronto|\d{1,2} de [a-z]+)\b/i
+      )?.[1];
+    };
+    const franjaEn = (t: string) =>
+      /\b(?:por|en|de) la (?:tarde|noche)\b|\btarde\b/i.test(t)
+        ? "tarde"
+        : /\b(?:por|en|de) la ma[ñn]ana\b|\btemprano\b/i.test(t) || respondeFranja(t)
+          ? "mañana"
+          : undefined;
+    const ultimo = <T>(f: (t: string) => T | undefined) => {
+      for (const t of [...delCliente].reverse()) {
+        const v = f(t);
+        if (v) return v;
+      }
+      return undefined;
+    };
+    const ofrecer = (extra: Record<string, string | undefined>) => {
+      const dia = ultimo(diaEn);
+      const franja = ultimo(franjaEn);
+      return JSON.stringify({
+        action: "offer_slots",
+        reply: "¡Claro!",
+        ...(dia ? { dia } : {}),
+        ...(franja ? { franja } : {}),
+        ...Object.fromEntries(Object.entries(extra).filter(([, v]) => v)),
+      });
+    };
+
+    /*
+     * Una hora CONCRETA ("a las 11", "a las 11am"): se busca en el bloque de
+     * ofrecidos y se reserva esa. Modela lo que pasó en vivo en LanCo el
+     * 2026-09-23 — el cliente no elige del menú, pide su hora— y por eso este
+     * mock se pone rojo si la oferta vuelve a ser rala: la hora pedida no
+     * estaría en el prompt y no habría ISO que copiar.
+     */
     const hora = lastUser.match(/\ba\s+las?\s+(\d{1,2})(?::(\d{2}))?\s*(am|pm|hrs?)?/i);
     if (hora?.[1]) {
       let h = Number(hora[1]);
       if (/pm/i.test(hora[3] ?? "") && h < 12) h += 12;
       const hhmm = `${String(h).padStart(2, "0")}:${hora[2] ?? "00"}`;
-      /*
-       * La hora se busca SOLO en la etiqueta, nunca en la línea entera: el ISO
-       * lleva la hora en UTC, así que «sáb 26 sep, 10:00 → …T16:00:00.000Z»
-       * contiene "16:00" y se llevaba por delante la petición de las 16:00
-       * (México es UTC-6). Salió en el arnés: pidió las 16:00 y movió las
-       * 10:00.
-       */
-      const iso = system
-        .split("\n")
-        .map((l) => l.match(/^\s*\d+\.\s*(.+?)\s*→ startUtc "([^"]+)"/))
-        .find((m) => m?.[1]?.includes(hhmm))?.[2];
-      if (iso) {
-        return JSON.stringify(
-          quiereMover
-            ? { action: "move_slot", startUtc: iso, reply: "¡Listo, la moví!" }
-            : { action: "book_slot", startUtc: iso, reply: "¡Perfecto, queda agendado!" }
-        );
-      }
-      // No está en el catálogo: se re-ofrece SIN afirmar que no hay hueco.
-      return JSON.stringify({
-        action: "offer_slots",
-        reply: "Déjame confirmarte los horarios que tengo:",
-      });
+      // 035 — Con el día en el mismo mensaje («mañana a las 11») no se adivina
+      // cuál de las líneas es ese día: se le pasa al motor, que enseña lo de
+      // ese día alrededor de esa hora.
+      const iso = diaEn(lastUser) ? undefined : isoDeLaHora(hhmm);
+      if (iso) return reservar(iso);
+      // No está en la oferta: se le pide al motor SIN afirmar que no hay hueco.
+      return ofrecer({ hora: hhmm });
     }
 
+    // «El primero»: el primero del ÚLTIMO menú que vio el cliente, no el 1 de
+    // la lista del prompt (035: la oferta es el día completo y el menú, cuatro
+    // repartidos).
     const eligio = /\b(el primero|primer horario|primera opci[oó]n|ese horario|ag[eé]nda(me|lo))\b/i.test(
       lastUser
     );
-    const ofrecido = system.match(/^1\. .+ → startUtc "([^"]+)"/m)?.[1];
-    if (eligio && ofrecido) {
-      return JSON.stringify({
-        action: "book_slot",
-        startUtc: ofrecido,
-        reply: "¡Perfecto, queda agendado!",
-      });
-    }
-    if (/\b(agendar|cita|horarios?)\b/i.test(lastUser) || /\b(tarde|temprano)\b/i.test(lastUser)) {
-      /*
-       * La franja solo viaja si el cliente habló de la PARTE del día. «mañana»
-       * a secas se deja fuera a propósito: en español es también el día
-       * siguiente, y mandarla como franja filtraría el menú por error.
-       */
-      const franja = /\bpor la tarde|de la tarde|\btarde\b/i.test(lastUser)
-        ? "tarde"
-        : /\bpor la ma[ñn]ana|de la ma[ñn]ana|\btemprano\b/i.test(lastUser)
-          ? "mañana"
-          : undefined;
-      return JSON.stringify({
-        action: "offer_slots",
-        reply: "Claro, tengo estos horarios:",
-        ...(franja ? { franja } : {}),
-      });
+    const primeroDelMenu = ultimoAgente.match(/^•\s*(\d{2}:\d{2})/m)?.[1];
+    const elegido = primeroDelMenu ? isoDeLaHora(primeroDelMenu) : undefined;
+    if (eligio && elegido) return reservar(elegido);
+
+    // Contestar la pregunta del motor cuenta solo si la respuesta trae un día o
+    // una franja: «¿y cuánto cuesta?» después de «¿Para qué día…?» es otra
+    // conversación, y un modelo real no la tomaría por respuesta.
+    const preguntoElMotor = /¿Para qué día|¿prefieres por la mañana o por la tarde\?|¿Cuál te acomoda\?/i.test(
+      ultimoAgente
+    );
+    const contestoAlMotor = preguntoElMotor && Boolean(diaEn(lastUser) ?? franjaEn(lastUser));
+    if (
+      /\b(agendar|cita|horarios?)\b/i.test(lastUser) ||
+      /\b(tarde|temprano)\b/i.test(lastUser) ||
+      contestoAlMotor
+    ) {
+      return ofrecer({});
     }
   }
 

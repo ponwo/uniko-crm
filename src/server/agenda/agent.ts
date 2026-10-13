@@ -1,10 +1,12 @@
 import { and, asc, eq } from "drizzle-orm";
 import { getDb, schema } from "@/lib/db";
 import { scoped } from "@/lib/db/tenant";
-import { labelInTz } from "@/lib/time/slots";
+import { labelInTz, todayInTz } from "@/lib/time/slots";
 import { computeAvailability } from "@/server/agenda/availability";
 import { getSettings } from "@/server/agenda/settings";
-import { catalogByDay, enFranja, parseFranja } from "@/server/agenda/spread";
+import { conducirOferta, entradaDelModelo, MENU } from "@/server/agenda/conduccion";
+import { parseDia, parseHora } from "@/server/agenda/pedido";
+import { parseFranja } from "@/server/agenda/spread";
 import { getOffers, replaceOffers, type OfferedSlot } from "@/server/agenda/offers";
 import {
   BookingError,
@@ -26,12 +28,10 @@ import {
  */
 
 /**
- * Cuántos huecos se le enseñan al cliente en un mensaje.
- *
- * Cuatro desde el 2026-09-26 (decisión del dueño): con tres, pedir una franja
- * dejaba un menú demasiado pobre para elegir dentro de ella.
+ * Cuántos huecos se le enseñan al cliente en un mensaje: los mismos que en el
+ * menú del conductor (035), también al re-ofrecer tras un horario ocupado.
  */
-const SHOWN = 4;
+const SHOWN = MENU;
 
 /**
  * Lo que el motor pega debajo de la confirmación: el enlace de una cita
@@ -137,72 +137,52 @@ export async function offerSlots(input: {
   conversationId: string;
   intro?: string;
   /**
-   * La parte del día que pidió el cliente («por la tarde», «temprano»), si
-   * dijo alguna. Filtra lo que se ENSEÑA, nunca lo que se registra: el
-   * catálogo reservable sigue ancho, porque el cliente puede acabar
-   * aceptando otra hora.
+   * 035 — Lo que el cliente ya dijo de su cita, en sus palabras, tal como lo
+   * mande el modelo: el día («jueves», «mañana», «15 de octubre»), la franja
+   * («por la tarde») y la hora («a las 4»). Lo traduce el motor; lo que no
+   * entienda cuenta como no dicho y se vuelve a preguntar.
    */
+  dia?: string;
   franja?: string;
+  hora?: string;
 }): Promise<AgendaTurn> {
   const settings = await getSettings(input.organizationId);
   const now = new Date();
-  const all = await computeAvailability(input.organizationId, {
+  const libres = await computeAvailability(input.organizationId, {
     settings,
     now,
   });
-  const spread = catalogByDay(all, {
-    timezone: settings.timezone,
-    denseDays: OFFERED_DENSE_DAYS,
-    perDayAfter: OFFERED_PER_DAY_AFTER,
-    limit: OFFERED_MAX,
-    now,
-  });
 
-  if (spread.length === 0) {
-    // Agenda llena no es un error: es una respuesta que el cliente entiende.
-    return {
-      ok: false,
-      text:
-        input.intro?.trim() ||
-        "Por ahora no me quedan horarios libres. Déjame confirmarlo con el equipo y te aviso.",
-    };
-  }
+  const plan = conducirOferta(
+    libres,
+    {
+      dia: parseDia(input.dia, todayInTz(now, settings.timezone)),
+      franja: parseFranja(input.franja),
+      hora: parseHora(input.hora),
+    },
+    {
+      settings,
+      now,
+      catalogo: {
+        denseDays: OFFERED_DENSE_DAYS,
+        perDayAfter: OFFERED_PER_DAY_AFTER,
+        limit: OFFERED_MAX,
+      },
+    }
+  );
 
-  // Se REGISTRA todo el catálogo, no solo lo que se enseña: si el cliente pide
-  // otro día, el agente tiene alternativas legítimas que aceptar.
+  if (plan.paso === "agenda_llena") return { ok: false, text: plan.text };
+
+  // La oferta vigente se REEMPLAZA en cada paso: es lo único que el modelo
+  // puede reservar en el turno siguiente (ver `Conduccion.registrar`).
   await replaceOffers(
     input.organizationId,
     input.conversationId,
-    spread.map((s) => ({ startUtc: s.startUtc, label: s.label }))
+    plan.registrar.map((s) => ({ startUtc: s.startUtc, label: s.label }))
   );
 
-  /*
-   * El MENÚ se filtra por la franja pedida; el catálogo de arriba no. Antes el
-   * menú eran siempre los primeros del catálogo, y el modelo los narraba como
-   * si fueran lo pedido: «horarios del lunes por la tarde» seguido de 09:00,
-   * 09:30 y 10:00. Medido con dos modelos distintos, así que no era del
-   * modelo: era que no se le daba otra cosa que enseñar.
-   */
-  const franja = parseFranja(input.franja);
-  const deLaFranja = franja ? spread.filter((s) => enFranja(s, franja)) : [];
-  const sinHuecosEnLaFranja = Boolean(franja) && deLaFranja.length === 0;
-  const fuente = deLaFranja.length > 0 ? deLaFranja : spread;
-
-  const shown = fuente.slice(0, SHOWN);
-  const lista = shown.map((s) => `• ${s.dayLabel} a las ${s.time}`).join("\n");
-  const intro = input.intro?.trim() || "Tengo estos horarios disponibles:";
-  // Pidió una franja y no hay NADA en ella: se dice, en vez de enseñar otra
-  // cosa como si fuera lo pedido. Es la mentira que esto viene a arreglar.
-  const aclaracion = sinHuecosEnLaFranja
-    ? `\n(Por ${franja === "pm" ? "la tarde" : "la mañana"} no me queda nada; estos son los que sí tengo.)`
-    : "";
-  // El menú son cuatro, el catálogo son decenas: si el cliente no lo sabe,
-  // cree que eso es toda la agenda y se va. Decírselo cuesta una línea.
-  const masOpciones =
-    spread.length > shown.length
-      ? "\nSi te acomoda mejor otra hora o algún otro día, dímelo y lo reviso."
-      : "";
-  return { ok: true, text: `${intro}${aclaracion}\n${lista}${masOpciones}` };
+  const entrada = entradaDelModelo(input.intro);
+  return { ok: true, text: entrada ? `${entrada} ${plan.text}` : plan.text };
 }
 
 export async function bookSlot(input: {

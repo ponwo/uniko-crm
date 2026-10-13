@@ -28,19 +28,43 @@ function run(system: string, user: string) {
   );
 }
 
+/** Una conversación entera: turnos alternos cliente/agente, empezando por el cliente. */
+function conversar(system: string, turnos: string[]) {
+  return JSON.parse(
+    aiMockCompletion([
+      { role: "system", content: system },
+      ...turnos.map((content, i) => ({ role: i % 2 === 0 ? "user" : "assistant", content })),
+    ])
+  );
+}
+
 describe("015 — ai-mock y la agenda", () => {
-  it("«quiero agendar una cita» → offer_slots (el sistema pega los horarios)", () => {
+  it("«quiero agendar una cita» → offer_slots sin día ni franja (el sistema pregunta)", () => {
     expect(run(ACCIONES, "Hola, quiero agendar una cita")).toEqual({
       action: "offer_slots",
-      reply: "Claro, tengo estos horarios:",
+      reply: "¡Claro!",
     });
     expect(run(ACCIONES, "¿qué horarios tienen?").action).toBe("offer_slots");
   });
 
-  it("«el primer horario» con el bloque en el prompt → book_slot con ESE startUtc, tal cual", () => {
-    const r = run(CON_OFRECIDOS, "El primer horario, agéndamelo por favor");
+  it("«el primer horario» tras un menú → book_slot con el startUtc de ESE horario, tal cual", () => {
+    const r = conversar(CON_OFRECIDOS, [
+      "Quiero una cita el jueves por la tarde",
+      "Para el jueves 17 de septiembre por la tarde tengo:\n• 16:00\n• 16:30\n¿Cuál te queda mejor?",
+      "El primer horario, agéndamelo por favor",
+    ]);
     expect(r.action).toBe("book_slot");
     expect(r.startUtc).toBe("2026-09-17T22:00:00.000Z");
+  });
+
+  it("035 — «el primero» es el primero del MENÚ, no el 1 de la lista del prompt", () => {
+    // La oferta es el día completo; el menú, cuatro repartidos.
+    const r = conversar(CON_OFRECIDOS, [
+      "Quiero una cita el jueves por la tarde",
+      "Para el jueves 17 de septiembre por la tarde tengo:\n• 16:30\n¿Cuál te queda mejor?",
+      "El primero, agéndamelo",
+    ]);
+    expect(r.startUtc).toBe("2026-09-17T22:30:00.000Z");
   });
 
   it("«el primero» SIN el bloque en el prompt → no puede reservar: vuelve a ofrecer", () => {
@@ -79,7 +103,21 @@ describe("015 — ai-mock y la hora concreta", () => {
       '1. jue 24 sep, 09:00 → startUtc "2026-09-24T15:00:00.000Z"',
       '2. jue 24 sep, 11:00 → startUtc "2026-09-24T17:00:00.000Z"',
     ].join("\n");
-    expect(run(system, "Para mañana a las 11am").startUtc).toBe("2026-09-24T17:00:00.000Z");
+    expect(run(system, "Mejor a las 11am").startUtc).toBe("2026-09-24T17:00:00.000Z");
+  });
+
+  it("035 — con el día en el mismo mensaje no adivina la línea: se lo pasa al motor", () => {
+    const system = [
+      ACCIONES,
+      '1. mié 23 sep, 11:00 → startUtc "2026-09-23T17:00:00.000Z"',
+      '2. jue 24 sep, 11:00 → startUtc "2026-09-24T17:00:00.000Z"',
+    ].join("\n");
+    expect(run(system, "Para mañana a las 11am")).toEqual({
+      action: "offer_slots",
+      reply: "¡Claro!",
+      dia: "mañana",
+      hora: "11:00",
+    });
   });
 
   it("una hora que NO está en el catálogo se re-ofrece, sin declarar nada ocupado", () => {
@@ -206,5 +244,70 @@ describe("015 — ai-mock y la franja del día", () => {
 
   it("sin franja pedida, se ofrece sin filtrar", () => {
     expect(run(ACCIONES, "Quiero agendar una cita").franja).toBeUndefined();
+  });
+});
+
+/**
+ * 035 — El mock modela a un modelo que extrae lo que el cliente ya dijo en
+ * TODA la conversación y se lo repite al motor en cada turno: el motor no
+ * recuerda los anteriores. Es lo que el arnés E2E conduce con el motor real.
+ */
+describe("035 — ai-mock: día y franja a lo largo de la conversación", () => {
+  const PREGUNTA_DIA = "¿Para qué día te gustaría la cita?";
+  const PREGUNTA_FRANJA = "Para el jueves 15 de octubre, ¿prefieres por la mañana o por la tarde?";
+
+  it("contesta el día a la pregunta del día → offer_slots con ese día", () => {
+    const r = conversar(ACCIONES, ["Quiero agendar una cita", PREGUNTA_DIA, "El jueves"]);
+    expect(r).toEqual({ action: "offer_slots", reply: "¡Claro!", dia: "jueves" });
+  });
+
+  it("contesta la franja → manda la franja Y el día que dijo antes", () => {
+    const r = conversar(ACCIONES, [
+      "Quiero agendar una cita",
+      PREGUNTA_DIA,
+      "El jueves",
+      PREGUNTA_FRANJA,
+      "Por la tarde",
+    ]);
+    expect(r).toMatchObject({ action: "offer_slots", dia: "jueves", franja: "tarde" });
+  });
+
+  it("«mañana» tras la pregunta de la franja es la FRANJA, no el día siguiente", () => {
+    for (const respuesta of ["Mañana", "en la mañana", "Por la mañana"]) {
+      const r = conversar(ACCIONES, [
+        "Quiero agendar una cita",
+        PREGUNTA_DIA,
+        "El jueves",
+        PREGUNTA_FRANJA,
+        respuesta,
+      ]);
+      expect(r).toMatchObject({ dia: "jueves", franja: "mañana" });
+    }
+  });
+
+  it("«mañana» tras la pregunta del día es el DÍA", () => {
+    const r = conversar(ACCIONES, ["Quiero agendar una cita", PREGUNTA_DIA, "Mañana"]);
+    expect(r).toMatchObject({ dia: "Mañana" });
+    expect(r.franja).toBeUndefined();
+  });
+
+  it("la franja dicha al principio viaja cuando llega el día", () => {
+    const r = conversar(ACCIONES, [
+      "Hola, quiero una cita por la tarde",
+      "¿Para qué día te gustaría la cita por la tarde?",
+      "El viernes",
+    ]);
+    expect(r).toMatchObject({ dia: "viernes", franja: "tarde" });
+  });
+});
+
+describe("035 — ai-mock: otra pregunta después de «¿Para qué día…?» no es respuesta", () => {
+  it("«¿y cuánto cuesta?» no se toma por un día", () => {
+    const r = conversar(ACCIONES, [
+      "Quiero agendar una cita",
+      "¿Para qué día te gustaría la cita?",
+      "¿Y cuánto cuesta?",
+    ]);
+    expect(r.action).not.toBe("offer_slots");
   });
 });

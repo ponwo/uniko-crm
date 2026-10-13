@@ -72,7 +72,9 @@ export function buildAgentSystemPrompt(input: {
   const stageNames = input.stages.map((s) => s.name).join(" | ");
   const agendaLines = input.agenda
     ? [
-        '- {"action":"offer_slots","reply":"...","franja":"mañana|tarde"} — ofrecer horarios para agendar (reply es solo la frase de entrada; los horarios los pone el sistema). `franja` SOLO si el cliente pidió una parte del día («por la tarde», «temprano»); ojo: «mañana» como DÍA no es una franja, déjalo fuera.',
+        // 035 — El motor conduce (día → franja → cuatro horarios); el modelo solo
+        // le pasa lo que el cliente ya dijo.
+        '- {"action":"offer_slots","dia":"<el día que pidió el cliente, como lo dijo: «jueves», «mañana», «15 de octubre»>","franja":"mañana|tarde","hora":"<la hora que pidió, si dijo una: «16:00», «4 de la tarde»>","reply":"<opcional: frase corta de entrada, sin horarios ni preguntas>"} — agendar o mover una cita. Pasa SOLO lo que el cliente ya dijo, en este mensaje o antes en la conversación, y omite lo que no dijo: el sistema le pregunta lo que falte (primero el día, después si prefiere mañana o tarde) y pega los horarios reales.',
         '- {"action":"book_slot","startUtc":"<el startUtc EXACTO de uno de los HORARIOS OFRECIDOS, copiado tal cual>","reply":"..."} — agendar el horario que el cliente eligió.',
         '- {"action":"move_slot","startUtc":"<el startUtc EXACTO de uno de los HORARIOS OFRECIDOS>","reply":"..."} — MOVER a otra hora la cita que ya tiene este cliente.',
       ]
@@ -115,13 +117,16 @@ export function buildAgentSystemPrompt(input: {
     : [];
   const agendaRules = input.agenda
     ? [
-        "- NUNCA escribas tú los horarios ni los inventes: usa offer_slots y el sistema pega los reales.",
-        "- NUNCA describas la lista que pega el sistema como si fuera de una franja concreta («horarios de la tarde») a menos que hayas pedido esa franja: el sistema decide qué enseña, y si no hay nada en esa franja lo dice él.",
-        "- book_slot solo acepta un horario de la lista HORARIOS OFRECIDOS: copia su startUtc TAL CUAL (nunca lo calcules ni lo conviertas). «El primero» es el 1 de esa lista. Si la lista está vacía o el cliente pide otro día, vuelve a ofrecer con offer_slots.",
-        "- Si el cliente pide una hora o un día CONCRETOS, búscalos en HORARIOS OFRECIDOS y reserva ese: la lista trae muchos más de los tres que se le enseñaron.",
-        "- Si lo que pide NO está en la lista, NUNCA afirmes que está ocupado, lleno o que no hay disponibilidad —no lo sabes—: di que lo confirmas y usa offer_slots.",
+        "- Para agendar o mover, NO preguntes tú el día ni la franja ni enumeres horarios: usa offer_slots con lo que ya sepas y el sistema conduce (día → mañana o tarde → cuatro horarios de ese día).",
+        "- En cada offer_slots repite TODO lo que el cliente ya dijo en la conversación: si antes dijo «el jueves» y ahora contesta «por la tarde», manda dia «jueves» Y franja «tarde». El sistema no recuerda los turnos anteriores.",
+        "- «mañana» puede ser el DÍA siguiente o la FRANJA. Si el sistema acaba de preguntar «¿prefieres por la mañana o por la tarde?», un «mañana» o «en la mañana» es la franja; si preguntó el día, es el día siguiente.",
+        "- Si el cliente quiere lo más pronto posible, manda dia «lo antes posible».",
+        "- NUNCA escribas tú los horarios ni los inventes, ni describas lo que pega el sistema: él decide qué enseña y lo presenta.",
+        "- book_slot solo acepta un horario de la lista HORARIOS OFRECIDOS: copia su startUtc TAL CUAL (nunca lo calcules ni lo conviertas). «El primero», «el segundo» o «el de las 4» se refieren al ÚLTIMO menú que vio el cliente en la conversación: toma esa hora de ese día y búscala en la lista. Si la lista está vacía o el cliente pide otro día, vuelve a ofrecer con offer_slots.",
+        "- Si el cliente pide una hora CONCRETA del día del que se está hablando, búscala en HORARIOS OFRECIDOS y reserva esa: la lista trae el día completo, no solo los cuatro horarios que se le enseñaron.",
+        "- Si lo que pide NO está en la lista, NUNCA afirmes que está ocupado, lleno o que no hay disponibilidad —no lo sabes—: usa offer_slots con su dia y su hora, y el sistema le contesta con lo que hay.",
         "- El historial puede traer mensajes de días ANTERIORES: un «mañana a las 10» dicho hace dos días ya pasó. NUNCA repitas una cita que viste en el historial como si siguiera en pie; lo vigente es lo que digan CITA ACTUAL y HORARIOS OFRECIDOS, que el sistema recalcula en cada turno.",
-        "- Si el cliente quiere CAMBIAR o mover su cita a otra hora, es trabajo TUYO: usa move_slot (si no sabe a cuál, primero offer_slots). No lo mandes con una persona por esto.",
+        "- Si el cliente quiere CAMBIAR o mover su cita a otra hora, es trabajo TUYO: usa move_slot (si no sabe a cuál, primero offer_slots). No lo mandes con una persona por esto. Si pide otra hora sin decir el día, es el día de su CITA ACTUAL.",
         "- Si el cliente quiere CANCELAR una cita → handoff: esa decisión no es tuya. Cancelar y mover no son lo mismo.",
       ]
     : [];
@@ -225,6 +230,8 @@ export function buildJudgePrompt(input: {
           "",
           "AGENDA:",
           "- Esta instancia TIENE agenda. Los horarios que el agente enumera los pone el SISTEMA desde la disponibilidad real configurada: NO son alucinación ni fuera_de_kb aunque el conocimiento no los mencione. Ofrecerlos y agendar es comportamiento CORRECTO.",
+          // 035 — El flujo pregunta antes de enseñar: no es evasión.
+          "- Para agendar, el agente pregunta primero el día y después si prefiere mañana o tarde, y solo entonces enseña horarios: es el flujo CORRECTO del negocio, no evasión ni falta de respuesta.",
           "- Se te dice explícitamente si QUEDÓ CITA AGENDADA. No lo deduzcas del texto.",
           "- Si el cliente eligió uno de los horarios ofrecidos y NO quedó cita, eso SÍ es una falla del agente (repórtala como `fuera_de_kb` con la evidencia). Nunca sugieras al conocimiento que el negocio no agenda o no tiene horarios: sí los tiene.",
         ]

@@ -147,7 +147,8 @@ export function parseFranja(raw: string | null | undefined): Franja | undefined 
     .replace(/[̀-ͯ]/g, "")
     .trim();
   if (!v) return undefined;
-  if (/\b(tarde|pm)\b/.test(v)) return "pm";
+  // 035 — «en la noche» también es pedir lo último del día.
+  if (/\b(tarde|noche|pm|vespertin\w*)\b/.test(v)) return "pm";
   if (/\b(manana|temprano|am|matutin\w*)\b/.test(v)) return "am";
   return undefined;
 }
@@ -156,4 +157,58 @@ export function parseFranja(raw: string | null | undefined): Franja | undefined 
 export function enFranja(slot: { time: string }, franja: Franja): boolean {
   const hora = Number(slot.time.slice(0, 2));
   return franja === "am" ? hora < 12 : hora >= 12;
+}
+
+/** Cada hueco con su día y su hora en la zona del negocio, en el orden en que vienen. */
+export function etiquetar(
+  slots: AvailableSlot[],
+  opts: { timezone: string; now?: Date }
+): SpreadSlot[] {
+  const now = opts.now ?? new Date();
+  return slots.map((slot) => ({
+    ...slot,
+    dayIso: dayIsoInTz(new Date(slot.startUtc), opts.timezone),
+    dayLabel: dayLabelInTz(slot.startUtc, opts.timezone, now),
+    time: timeInTz(slot.startUtc, opts.timezone),
+  }));
+}
+
+/**
+ * 035 — `n` elementos REPARTIDOS a lo largo de la lista: el primero, el último
+ * y los de en medio a la misma distancia.
+ *
+ * Decisión del dueño (2026-10-12): pedida la tarde, se enseñan cuatro que la
+ * cubran entera —12:00, 14:00, 15:30, 17:30— y no los cuatro primeros, que con
+ * huecos de media hora caen todos a la hora de comer. Si ninguno le queda, el
+ * cliente pide su hora y está en la oferta igual.
+ */
+export function repartir<T>(items: T[], n: number): T[] {
+  if (n <= 0) return [];
+  if (items.length <= n) return [...items];
+  if (n === 1) return items.slice(0, 1);
+  const out: T[] = [];
+  for (let i = 0; i < n; i++) {
+    const item = items[Math.round((i * (items.length - 1)) / (n - 1))];
+    if (item !== undefined) out.push(item);
+  }
+  return out;
+}
+
+/**
+ * 035 — Los `n` huecos más cercanos a una hora pedida, en orden de reloj. A
+ * igual distancia gana el más temprano.
+ */
+export function cercanosA(slots: SpreadSlot[], minutos: number, n: number): SpreadSlot[] {
+  const deMinutos = (s: SpreadSlot) => {
+    const [h, m] = s.time.split(":").map(Number);
+    return (h ?? 0) * 60 + (m ?? 0);
+  };
+  return [...slots]
+    .sort(
+      (a, b) =>
+        Math.abs(deMinutos(a) - minutos) - Math.abs(deMinutos(b) - minutos) ||
+        deMinutos(a) - deMinutos(b)
+    )
+    .slice(0, Math.max(0, n))
+    .sort((a, b) => Date.parse(a.startUtc) - Date.parse(b.startUtc));
 }

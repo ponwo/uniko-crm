@@ -275,7 +275,9 @@ export async function runAgentTurn(
                 organizationId,
                 conversationId,
                 intro: action.reply,
+                dia: action.dia,
                 franja: action.franja,
+                hora: action.hora,
               })
             : action.action === "move_slot"
               ? await moveSlot({

@@ -53,7 +53,10 @@ describe("015 — el prompt y los horarios ofrecidos (FR-023)", () => {
   it("…y la regla manda copiar el startUtc tal cual, nunca calcularlo", () => {
     const p = prompt({ agenda: true, offeredSlots: ofrecidos });
     expect(p).toMatch(/copia su startUtc TAL CUAL/);
-    expect(p).toMatch(/«El primero» es el 1 de esa lista/);
+    // 035 — La oferta es el día completo y el menú, cuatro repartidos: «el
+    // primero» ya no es el 1 de la lista sino el primero del último menú.
+    expect(p).toMatch(/«El primero», «el segundo» o «el de las 4» se refieren al ÚLTIMO menú/);
+    expect(p).not.toMatch(/«El primero» es el 1 de esa lista/);
     expect(p).toContain('"startUtc":"<el startUtc EXACTO de uno de los HORARIOS OFRECIDOS');
   });
 
@@ -83,14 +86,14 @@ describe("015 — el prompt y los horarios ofrecidos (FR-023)", () => {
 describe("015 — el prompt prohíbe declarar falta de disponibilidad (ajuste 2026-09-23)", () => {
   it("dice que la lista es más ancha que el menú y manda buscar la hora pedida", () => {
     const p = prompt({ agenda: true, offeredSlots: ofrecidos });
-    expect(p).toMatch(/búscalos en HORARIOS OFRECIDOS y reserva ese/);
-    expect(p).toMatch(/muchos más de los tres que se le enseñaron/);
+    expect(p).toMatch(/búscala en HORARIOS OFRECIDOS y reserva esa/);
+    expect(p).toMatch(/la lista trae el día completo, no solo los cuatro horarios que se le enseñaron/);
   });
 
   it("prohíbe afirmar ocupado/lleno/sin disponibilidad, y manda volver a ofrecer", () => {
     const p = prompt({ agenda: true, offeredSlots: ofrecidos });
     expect(p).toMatch(/NUNCA afirmes que está ocupado, lleno o que no hay disponibilidad/);
-    expect(p).toMatch(/di que lo confirmas y usa offer_slots/);
+    expect(p).toMatch(/usa offer_slots con su dia y su hora/);
   });
 
   it("sin agenda, ninguna de esas reglas aparece", () => {
@@ -162,5 +165,48 @@ describe("015 — la cita actual viaja al prompt (ajuste 2026-09-25)", () => {
       citaActual: "sáb 26 sep, 10:30",
     });
     expect(sinAgenda).not.toContain("CITA ACTUAL DE ESTE CLIENTE");
+  });
+});
+
+/**
+ * 035 — El motor conduce el agendado (día → franja → cuatro horarios) y el
+ * modelo solo le pasa lo que el cliente ya dijo. El motor no recuerda los
+ * turnos anteriores: si el prompt deja de pedir que se repita TODO, el
+ * «jueves» se pierde al contestar «por la tarde» y el cliente vuelve a oír
+ * «¿Para qué día…?».
+ */
+describe("035 — el prompt y el agendado por día y franja", () => {
+  it("offer_slots lleva día, franja y hora, y dice que el sistema pregunta lo que falte", () => {
+    const p = prompt({ agenda: true });
+    expect(p).toContain('{"action":"offer_slots","dia":"<el día que pidió el cliente');
+    expect(p).toContain('"franja":"mañana|tarde","hora":"<la hora que pidió');
+    expect(p).toMatch(/el sistema le pregunta lo que falte \(primero el día, después si prefiere mañana o tarde\)/);
+  });
+
+  it("el modelo no pregunta ni enumera: conduce el sistema", () => {
+    const p = prompt({ agenda: true });
+    expect(p).toMatch(/NO preguntes tú el día ni la franja ni enumeres horarios/);
+  });
+
+  it("cada offer_slots repite lo ya dicho, porque el sistema no lo recuerda", () => {
+    const p = prompt({ agenda: true });
+    expect(p).toMatch(/repite TODO lo que el cliente ya dijo/);
+    expect(p).toMatch(/manda dia «jueves» Y franja «tarde»/);
+  });
+
+  it("aclara la doble «mañana» y el «lo antes posible»", () => {
+    const p = prompt({ agenda: true });
+    expect(p).toMatch(/«mañana» puede ser el DÍA siguiente o la FRANJA/);
+    expect(p).toMatch(/manda dia «lo antes posible»/);
+  });
+
+  it("mover sin decir el día es el día de la cita actual", () => {
+    expect(prompt({ agenda: true })).toMatch(/sin decir el día, es el día de su CITA ACTUAL/);
+  });
+
+  it("sin agenda, nada de esto aparece", () => {
+    const p = prompt({ agenda: false });
+    expect(p).not.toMatch(/prefiere mañana o tarde/);
+    expect(p).not.toContain("offer_slots");
   });
 });
