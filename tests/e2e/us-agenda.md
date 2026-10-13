@@ -117,13 +117,14 @@ completa. Antes de este ajuste el LLM real ofrecía bien y después re-ofrecía 
 bucle: nunca veía el instante exacto de lo ofrecido y el motor compara por epoch.
 
 1. Con el agente encendido, un lead escribe por wa-mock «Hola, quiero agendar
-   una cita» → la respuesta trae **horarios reales** con viñetas
-   (`offer_slots`; los pega el sistema).
+   una cita» → el agente pregunta **para qué día** (035; detalle abajo), y tras
+   el día y la franja enseña **horarios reales** con viñetas (`offer_slots`;
+   los pega el sistema).
 2. El mismo lead escribe «El primer horario, agéndamelo por favor» → la
    respuesta **confirma la cita** y comparte la sala fija (`book_slot` copió el
    `startUtc` del bloque HORARIOS OFRECIDOS del prompt).
-3. En **Citas** aparece la cita con `source: ai`, en el **primer hueco libre**
-   que había antes de ofrecer.
+3. En **Citas** aparece la cita con `source: ai`, en el **primer horario del
+   menú** que vio el cliente.
 4. Camino infeliz (modelado por el ai-mock): sin el bloque de ofrecidos en el
    prompt, «el primer horario» **no reserva** y vuelve a ofrecer — el check 3 se
    pone rojo. Es exactamente el fallo observado en LanCo, y por eso el arnés lo
@@ -135,10 +136,10 @@ Medido en vivo en LanCo con un cliente real: tras ver tres horarios pidió «par
 mañana a las 11am», las 11:00 estaban libres y el agente le contestó que no
 había disponibilidad — el catálogo solo registraba tres huecos por día.
 
-1. Un lead nuevo escribe «Hola, quiero agendar una cita» → el menú enseña tres
-   horarios **y avisa** de que hay más («si te acomoda mejor otra hora…»).
-2. El mismo lead pide una hora libre **que no está en esos tres** («Mejor a las
-   14:30») → el agente **la agenda**.
+1. Un lead nuevo escribe «Hola, quiero agendar una cita» → el agente pregunta
+   el día (035). Lo reservable en ese momento es el catálogo ancho de siempre.
+2. El mismo lead contesta con una hora libre («Mejor a las 14:30») → el agente
+   **la agenda** sin otra vuelta.
 3. La cita queda en **esa** hora, no en una del menú.
 4. La respuesta **no** contiene «no hay disponibilidad», «ocupado» ni «lleno»:
    el agente no puede saberlo, así que tiene prohibido afirmarlo.
@@ -181,11 +182,37 @@ ante «¿me la cambias a la tarde?» el agente decía «horarios del lunes por l
 tarde» y enseñaba 09:00, 09:30 y 10:00. No era del modelo — el menú daba
 siempre los primeros del catálogo y no había otra cosa que enseñar.
 
-1. Un lead escribe «quiero una cita **por la tarde**» → el menú enseña **solo**
+1. Un lead escribe «quiero una cita **por la tarde**» → el agente pregunta el
+   día **recordando la tarde** (035); dicho el día, el menú enseña **solo**
    horarios de las 12:00 en adelante.
 2. Son **cuatro** opciones, no tres.
-3. Lo reservable **no** se filtra: si después pide una hora de la mañana, se
-   agenda igual (el catálogo sigue ancho).
-4. Si en esa franja no queda nada, el motor lo dice —«por la tarde no me queda
-   nada; estos son los que sí tengo»— en vez de enseñar la mañana como si fuera
-   la tarde.
+3. Lo reservable **no** se filtra por la franja: si después pide una hora de la
+   mañana de ese día, se agenda igual (la oferta es el día completo).
+4. Si en esa franja no queda nada ese día, el motor lo dice y enseña la otra
+   franja de ese día más el día más cercano con la pedida (035), en vez de
+   enseñar la mañana como si fuera la tarde.
+
+## Primero el día, después la franja (035, 2026-10-12)
+
+Pedido del dueño: «si pides una cita solo muestra los horarios … eso no es muy
+natural». Antes, «quiero una cita» recibía de golpe cuatro horarios de los
+primeros días libres. Ahora conduce el motor —el modelo solo le pasa lo que el
+cliente ya dijo— y el guion lo conduce `scripts/e2e-selftest.mjs` con el día
+real de la agenda del arnés:
+
+1. «Hola, quiero agendar una cita» → «¿Para qué día te gustaría la cita?», **sin
+   un solo horario**.
+2. «Para el miércoles» → «Para mañana miércoles 14 de octubre, ¿prefieres por la
+   mañana o por la tarde?» — el día dicho completo, sin horarios.
+3. «Por la tarde» → **cuatro horarios de ese día por la tarde, repartidos** (con
+   huecos de media hora de 12:00 a 18:00: 12:00, 14:00, 15:30 y 17:30) y el aviso
+   de que puede pedir otra hora.
+4. «El primer horario, agéndamelo» → la cita queda en el primero **del menú**.
+5. Pedir la tarde sin día pregunta el día **recordando la tarde**; pedir el
+   cambio de una cita también empieza por el día.
+
+Las ramas que el arnés no puede provocar con una agenda vacía —un día lleno, un
+día cerrado, una fecha fuera de la ventana, la franja pedida sin lugar, una
+hora concreta ocupada, «lo antes posible»— están en
+`tests/unit/agenda-conduccion.test.ts`, contra el motor real con huecos
+fabricados.

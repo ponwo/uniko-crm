@@ -35,17 +35,31 @@ const baseActions = [
  * exactamente uno de los que el sistema ofreció — si no, el motor lo rechaza y
  * se re-ofrece.
  */
+/**
+ * Texto libre del cliente que el motor interpreta (035). Se aceptan también un
+ * número («hora»: 16) y un `null` («dia»: null, lo que muchos modelos mandan
+ * por «no lo dijo»): rechazarlos haría reintentar el turno por una forma que el
+ * motor entiende de todos modos.
+ */
+const textoLibre = z
+  .union([z.string(), z.number()])
+  .nullish()
+  .transform((v) => (v === null || v === undefined ? undefined : String(v)));
+
 const agendaActions = [
   z.object({
     action: z.literal("offer_slots"),
     reply: z.string().optional(),
     /*
-     * La parte del día que pidió el cliente (ajuste 2026-09-26). Se acepta
-     * como texto libre y lo normaliza el motor: exigir un literal exacto haría
-     * que un acento de más costara el turno, y la salida del modelo es
-     * impredecible por definición.
+     * 035 — Lo que el cliente ya dijo de su cita, en sus palabras: el motor
+     * pregunta lo que falte (primero el día, después la franja) y traduce lo
+     * demás. La franja venía del ajuste 2026-09-26. Texto libre a propósito:
+     * exigir un literal exacto haría que un acento de más costara el turno, y
+     * la salida del modelo es impredecible por definición.
      */
-    franja: z.string().optional(),
+    dia: textoLibre,
+    franja: textoLibre,
+    hora: textoLibre,
   }),
   z.object({
     action: z.literal("book_slot"),

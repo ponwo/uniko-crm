@@ -1583,37 +1583,71 @@ async function agendaChecks() {
     console.log(`  (turno de calentamiento: ${calentar.ms} ms)`);
 
     const LEAD_C = "5214627015003";
-    // El primer hueco libre ANTES de ofrecer: es el que "el primero" debe reservar.
-    const primeroLibre = ((await api("/api/calendar/availability")).json?.slots ?? [])[0];
+    /*
+     * 035 — El flujo que pidió el dueño (2026-10-12): primero el día, después
+     * mañana o tarde, y entonces cuatro horarios de ese día en esa franja,
+     * repartidos. Antes, «quiero una cita» recibía de golpe cuatro horarios de
+     * los primeros días libres, que casi nunca eran el día del cliente.
+     */
+    const elegidoC = diaParaPedir((await api("/api/calendar/availability")).json?.slots ?? []);
 
     const oferta = await decir(LEAD_C, "Hola, quiero agendar una cita", "1");
     ok(
-      "«quiero agendar una cita» → el agente ofrece horarios reales (offer_slots)",
-      typeof oferta.text === "string" && oferta.text.includes("•"),
+      "035: «quiero agendar una cita» → pregunta el día, sin enseñar horarios",
+      typeof oferta.text === "string" &&
+        /para qué día/i.test(oferta.text) &&
+        !oferta.text.includes("•"),
       JSON.stringify(oferta)
     );
-    const reserva = await decir(LEAD_C, "El primer horario, agéndamelo por favor", "2");
-    ok(
-      "«el primer horario» → el agente agenda copiando el ISO ofrecido (book_slot)",
-      typeof reserva.text === "string" && /queda agendado|Te agendé/i.test(reserva.text),
-      JSON.stringify(reserva)
-    );
-    ok(
-      "…y comparte la sala fija en la confirmación",
-      typeof reserva.text === "string" && reserva.text.includes(SALA),
-      JSON.stringify(reserva)
-    );
-    console.log(`  (turnos de agenda: ${oferta.ms} ms y ${reserva.ms} ms)`);
-    const citaC = ((await api("/api/bookings")).json?.bookings ?? []).find(
-      (b) => b.contact?.name === "Lead agenda C" && b.status === "agendada"
-    );
-    ok(
-      "la cita existe en Citas, agendada por la IA, en el primer hueco que se ofreció",
-      citaC?.source === "ai" &&
-        Boolean(primeroLibre) &&
-        citaC?.scheduledAtUtc === primeroLibre?.startUtc,
-      JSON.stringify({ citaC, primeroLibre })
-    );
+    if (elegidoC) {
+      const pideFranja = await decir(LEAD_C, `Para el ${elegidoC.nombre}`, "1b");
+      ok(
+        "035: dicho el día → pregunta mañana o tarde, nombrando ese día",
+        typeof pideFranja.text === "string" &&
+          /¿prefieres por la mañana o por la tarde\?/.test(pideFranja.text) &&
+          pideFranja.text.includes(elegidoC.fecha) &&
+          !pideFranja.text.includes("•"),
+        JSON.stringify({ dia: elegidoC.nombre, pideFranja })
+      );
+      const menuC = await decir(LEAD_C, "Por la tarde", "1c");
+      const esperadas = repartidas(elegidoC.tarde.map((s) => s.time), 4);
+      ok(
+        "035: dicha la franja → cuatro horarios de ESE día por la tarde, repartidos",
+        typeof menuC.text === "string" &&
+          menuC.text.includes(elegidoC.fecha) &&
+          JSON.stringify(horasDelMenu(menuC.text)) === JSON.stringify(esperadas),
+        JSON.stringify({ esperadas, menuC })
+      );
+      ok(
+        "…y avisa de que puede pedir otra hora",
+        typeof menuC.text === "string" && /otra hora/i.test(menuC.text),
+        JSON.stringify(menuC)
+      );
+      const reserva = await decir(LEAD_C, "El primer horario, agéndamelo por favor", "2");
+      ok(
+        "«el primer horario» → el agente agenda copiando el ISO ofrecido (book_slot)",
+        typeof reserva.text === "string" && /queda agendado|Te agendé/i.test(reserva.text),
+        JSON.stringify(reserva)
+      );
+      ok(
+        "…y comparte la sala fija en la confirmación",
+        typeof reserva.text === "string" && reserva.text.includes(SALA),
+        JSON.stringify(reserva)
+      );
+      console.log(
+        `  (turnos de agenda: ${oferta.ms}, ${pideFranja.ms}, ${menuC.ms} y ${reserva.ms} ms)`
+      );
+      const citaC = ((await api("/api/bookings")).json?.bookings ?? []).find(
+        (b) => b.contact?.name === "Lead agenda C" && b.status === "agendada"
+      );
+      ok(
+        "la cita existe en Citas, agendada por la IA, en el primer horario DEL MENÚ",
+        citaC?.source === "ai" && citaC?.scheduledAtUtc === elegidoC.tarde[0]?.startUtc,
+        JSON.stringify({ citaC, primero: elegidoC.tarde[0] })
+      );
+    } else {
+      console.log("  (sin un día con mañana y tarde de sobra: se omite el flujo día → franja)");
+    }
 
     /* -- El cliente no elige del menú: pide SU hora (ajuste 2026-09-23) -- */
     //
@@ -1673,8 +1707,8 @@ async function agendaChecks() {
 
       const menu = await decirD("Hola, quiero agendar una cita", "1");
       ok(
-        "el menú avisa de que hay más horarios que los tres que enseña",
-        typeof menu === "string" && /otra hora|otro d[ií]a/i.test(menu),
+        "035: sin día, el agente pregunta el día antes de enseñar horarios",
+        typeof menu === "string" && /para qué día/i.test(menu) && !menu.includes("•"),
         JSON.stringify(menu)
       );
       const trasMenu = (await (await fetch(`${BASE}/api/dev/ai-mock/_state`)).json())
@@ -1747,12 +1781,17 @@ async function agendaChecks() {
         }
         return null;
       }
-      const menuTarde = await decirT("Hola, quiero una cita por la tarde", "1");
-      const horasOfrecidas = (menuTarde ?? "")
-        .split("\n")
-        .map((l) => l.match(/a las (\d{2}):(\d{2})/))
-        .filter(Boolean)
-        .map((m) => Number(m[1]));
+      const pideDiaT = await decirT("Hola, quiero una cita por la tarde", "1");
+      ok(
+        "035: pedir «por la tarde» sin día → pregunta el día, recordando la tarde",
+        typeof pideDiaT === "string" &&
+          /para qué día/i.test(pideDiaT) &&
+          /por la tarde/i.test(pideDiaT),
+        JSON.stringify(pideDiaT)
+      );
+      const elegidoT = diaParaPedir((await api("/api/calendar/availability")).json?.slots ?? []);
+      const menuTarde = elegidoT ? await decirT(`El ${elegidoT.nombre}`, "2") : null;
+      const horasOfrecidas = horasDelMenu(menuTarde).map((h) => Number(h.slice(0, 2)));
       ok(
         "pedir «por la tarde» enseña SOLO horarios de la tarde",
         horasOfrecidas.length > 0 && horasOfrecidas.every((h) => h >= 12),
@@ -1838,6 +1877,46 @@ async function agendaChecks() {
  * hora, MUEVE esa misma cita en vez de reservar una segunda. Corre dentro del
  * tramo del agente de la 015, que lo deja encendido y presta `decir`.
  * ============================================================ */
+/**
+ * 035 — Un día para pedir en el arnés: el primero DESPUÉS de hoy con mañana y
+ * tarde de sobra (más de cuatro en cada una, para que se vea el reparto), con
+ * su nombre como lo diría un cliente («jueves») y su fecha como la escribe el
+ * motor («15 de octubre»). Hoy no sirve: según la hora, ya no tiene mañana.
+ */
+function diaParaPedir(libres) {
+  const porDia = new Map();
+  for (const s of libres) {
+    const b = porDia.get(s.dayIso);
+    if (b) b.push(s);
+    else porDia.set(s.dayIso, [s]);
+  }
+  for (const [dayIso, slots] of porDia) {
+    const etiqueta = slots[0]?.dayLabel ?? "";
+    if (etiqueta.startsWith("hoy ")) continue;
+    const manana = slots.filter((s) => Number(s.time.slice(0, 2)) < 12);
+    const tarde = slots.filter((s) => Number(s.time.slice(0, 2)) >= 12);
+    if (manana.length <= 4 || tarde.length <= 4) continue;
+    // «mañana miércoles, 14 de octubre» → «miércoles» y «14 de octubre».
+    const [semana, fecha] = etiqueta.replace(/^mañana /, "").split(", ");
+    return { dayIso, nombre: semana, fecha, manana, tarde };
+  }
+  return null;
+}
+
+/** Las horas de las viñetas «• 16:00» de un mensaje del motor (035). */
+function horasDelMenu(texto) {
+  return (texto ?? "")
+    .split("\n")
+    .map((l) => l.match(/^•\s*(\d{2}:\d{2})/)?.[1])
+    .filter(Boolean);
+}
+
+/** Lo que el motor enseña de una franja: `n` repartidas, primero y último incluidos. */
+function repartidas(items, n) {
+  if (items.length <= n) return items;
+  return Array.from({ length: n }, (_, i) => items[Math.round((i * (items.length - 1)) / (n - 1))]);
+}
+
 async function citaManualChecks({ decir, outboxDe }) {
   console.log("\n== 030: la cita que agenda el operador desde la conversación ==");
   const LEAD_M = "5214627015030";
@@ -1914,18 +1993,24 @@ async function citaManualChecks({ decir, outboxDe }) {
   /* -- El agente la ve: pedir otra hora la MUEVE -- */
   // Sin «tienes», «tienen» ni «hay»: con INVENTARIO encendido, el ai-mock lee
   // esas palabras como una consulta de existencias.
-  const reoferta = await decir(LEAD_M, "Quiero cambiar mi cita, ¿me pasas los horarios?", "030-2", NOMBRE);
+  const pideDiaM = await decir(LEAD_M, "Quiero cambiar mi cita, ¿me pasas los horarios?", "030-2", NOMBRE);
   ok(
-    "030: al pedir el cambio, el agente ofrece horarios",
+    "030: al pedir el cambio, el agente pregunta para qué día (035)",
+    typeof pideDiaM.text === "string" && /para qué día/i.test(pideDiaM.text),
+    JSON.stringify(pideDiaM)
+  );
+  const diaM = diaParaPedir((await api("/api/calendar/availability")).json?.slots ?? []);
+  const reoferta = diaM
+    ? await decir(LEAD_M, `Para el ${diaM.nombre} por la tarde`, "030-2b", NOMBRE)
+    : { text: null };
+  ok(
+    "030: dicho el día y la franja, el agente ofrece horarios",
     typeof reoferta.text === "string" && reoferta.text.includes("•"),
     JSON.stringify(reoferta)
   );
   // La hora se toma del menú que el agente enseñó: así está, seguro, entre lo
   // ofrecido en esta conversación, que es lo único que el motor deja mover.
-  const pedida = (reoferta.text ?? "")
-    .split("\n")
-    .map((l) => l.match(/a las (\d{2}:\d{2})/)?.[1])
-    .find((h) => h && h !== huecoM?.time);
+  const pedida = horasDelMenu(reoferta.text).find((h) => h !== huecoM?.time);
   if (pedida) {
     const movida = await decir(LEAD_M, `Sí, a las ${pedida}`, "030-3", NOMBRE);
     ok(

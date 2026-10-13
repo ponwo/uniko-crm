@@ -32,7 +32,9 @@ export function judgeModelName(): string | undefined {
 }
 
 export async function chatJson<T>(
-  schema: z.ZodType<T>,
+  // La entrada puede diferir de la salida: un esquema que normaliza lo que
+  // manda el modelo (035, `textoLibre`) devuelve ya el tipo limpio.
+  schema: z.ZodType<T, z.ZodTypeDef, unknown>,
   messages: ChatMessage[],
   opts?: { model?: string; judge?: boolean; timeoutMs?: number }
 ): Promise<ChatJsonResult<T>> {
