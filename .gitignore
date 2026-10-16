@@ -42,6 +42,10 @@ Thumbs.db
 .dev-media/
 # Capturas y salidas de los self-tests (p. ej. scripts/e2e-responsive.mjs)
 scratch/
+# Capturas y videos demostrativos (scripts/demo-media.mjs): se publican en la
+# página oficial de LanCo, no viven en este repo.
+docs/demo/capturas/
+docs/demo/videos/
 
 # Sesión reutilizada por los arneses E2E: evita gastar un login por corrida
 # (el límite de intentos de la app es real y no se toca). Local, no se comparte.
