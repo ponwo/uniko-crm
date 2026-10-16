@@ -189,8 +189,11 @@ que antes de esta feature.
   productos ya armados salen igual.
 - **Un solo producto con recorte**: no ocurre en la práctica (el recorte implica más de
   25 coincidencias); si ocurriera, se aplica la misma regla de cierre.
-- **El negocio no vende por talla**: el pie fijo dice «modelo y talla»; adaptar esa frase
-  por negocio queda fuera de alcance (decisión del contrato).
+- **El negocio no vende por talla**: el pie fijo decía «modelo y talla»; adaptar esa frase
+  por negocio queda fuera de alcance (decisión del contrato). *Actualizado 2026-10-15*: el
+  pie pasó a ser neutro para todo giro, «Dime qué producto te interesa y te confirmo
+  existencia y precio» (MS-Stock 006 deja ese texto a Uniko); un producto con tallas sigue
+  servido porque `check_stock` responde talla por talla.
 
 ## Requirements *(mandatory)*
 
@@ -321,6 +324,8 @@ solo lectura) sigue vigente.
   texto con el enlace (FR-1705).
 - **Pie fijo**: «Dime modelo y talla…» sirve a los negocios que venden por talla (los
   pilotos actuales); adaptarlo por negocio es una decisión futura del contrato.
+  *Actualizado 2026-10-15*: reemplazado por el pie neutro (ver «El negocio no vende por
+  talla»).
 - **Instancias**: `INVENTARIO` está encendida en `uniko-lanco` y en la instancia de
   NuriaAndrea; esta feature llega a esta última solo con la promoción a `production`,
   que es señal aparte del dueño.

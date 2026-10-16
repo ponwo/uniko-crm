@@ -48,7 +48,7 @@ vi.mock("@/lib/db", () => ({
   },
 }));
 
-const PIE = "Playera negra (PLY-NEG): 7 pieza — $199 MXN";
+const PIE = "Playera negra (PLY-NEG): 7 piezas — $199 MXN";
 
 function fotoDelAgente(status = "pending") {
   return { id: "msg_1", conversationId: "cv_1", status, type: "image", text: PIE, origin: "ai" };
@@ -121,7 +121,7 @@ describe("026 — failed tardío de la foto ⇒ el pie sale como texto", () => {
  * sin nada, así que sale el texto de respaldo —el pie y, en la línea siguiente, el
  * enlace del PDF, que sale del asset— una sola vez.
  */
-const PIE_CATALOGO = "¡Claro!\n\nDime modelo y talla y te confirmo existencia y precio";
+const PIE_CATALOGO = "¡Claro!\n\nDime qué producto te interesa y te confirmo existencia y precio";
 const URL_PDF = "https://img.stock.example/catalog/ab12.pdf";
 
 function catalogoDelAgente(status = "pending") {

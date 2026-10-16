@@ -4,6 +4,7 @@ import {
   type StockProduct,
   type StockVariant,
 } from "@/server/inventario/client";
+import { unidadPara } from "@/server/inventario/unidad";
 
 /**
  * 026 — Lo que el agente incluido puede hacer con el inventario: consultar.
@@ -186,8 +187,8 @@ function withIntro(intro: string, messages: StockMessage[]): StockMessage[] {
 
 /**
  * Una línea por producto, siempre redactada por el sistema:
- * - simple: `Playera negra (PLY-NEG): 7 pieza — $199 MXN` · agotado · sin precio;
- * - talla resuelta por SKU: `Playera roja (PLY-ROJ-G) talla G: 7 pieza — $219 MXN`;
+ * - simple: `Playera negra (PLY-NEG): 7 piezas — $199 MXN` · agotado · sin precio;
+ * - talla resuelta por SKU: `Playera roja (PLY-ROJ-G) talla G: 7 piezas — $219 MXN`;
  * - modelo sin talla pedida: `Playera roja (PLY-ROJ) — $219 MXN. Tallas: CH 4, M agotada, G 7, XG 1`;
  * - modelo con talla pedida: la existencia de esa talla; "agotada" más las que sí
  *   hay; o "no viene en talla X" más las que tiene.
@@ -221,8 +222,9 @@ function listaTallas(variants: StockVariant[]): string {
     .join(", ");
 }
 
+/** `7 piezas`, `1 pieza`, `2.5 kg`: la unidad del negocio en plural si no es 1 (`unidadPara`). */
 function existenciaDe(stock: number, unit: string): string {
-  return stock > 0 ? `${formatQuantity(stock)} ${unit}` : "agotado";
+  return stock > 0 ? `${formatQuantity(stock)} ${unidadPara(unit, stock)}` : "agotado";
 }
 
 /**
@@ -287,8 +289,19 @@ function formatPrice(amount: number, currency: string): string {
 /**
  * La frase fija del pie (contrato §4b de MS-Stock): el PDF enseña qué se vende; la
  * existencia y el precio los confirma `check_stock`. Nunca se recorta (FR-1704).
+ *
+ * Neutra para cualquier giro (2026-10-15): la primera decía «Dime modelo y talla…» y
+ * en una ferretería o una clínica «talla» no tiene sentido. Un producto con tallas
+ * sigue bien servido: si el cliente no dice la talla, `check_stock` contesta con la
+ * existencia de cada una; si la dice, con la de esa (MS-Stock 006 deja este texto a
+ * Uniko).
  */
-export const CATALOG_FOOTER = "Dime modelo y talla y te confirmo existencia y precio";
+export const CATALOG_FOOTER = "Dime qué producto te interesa y te confirmo existencia y precio";
+/**
+ * Pies que ya salieron en hilos reales. `stripCatalogLink` los sigue reconociendo:
+ * sin esto, el enlace de un catálogo enviado antes del cambio volvería al prompt.
+ */
+const CATALOG_FOOTERS_ANTERIORES = ["Dime modelo y talla y te confirmo existencia y precio"];
 /** Límite de WhatsApp para el pie de un documento. */
 export const CATALOG_CAPTION_MAX = 1024;
 
@@ -329,14 +342,16 @@ export function buildCatalogCaption(intro: string): string {
 /**
  * La URL del PDF nunca llega al modelo (FR-1709). El texto de respaldo (pie + enlace)
  * queda en el hilo tal como lo recibió el cliente; al armar el historial del prompt
- * se le quita la última línea si es un enlace y la anterior es la frase fija.
- * Cualquier otro texto —un enlace de reunión, por ejemplo— queda igual.
+ * se le quita la última línea si es un enlace y la anterior es la frase fija (la de
+ * hoy o una anterior). Cualquier otro texto —un enlace de reunión, por ejemplo— queda
+ * igual.
  */
 export function stripCatalogLink(text: string): string {
   const lineas = text.split("\n");
+  const pie = lineas.at(-2) ?? "";
   if (
     lineas.length >= 2 &&
-    lineas.at(-2) === CATALOG_FOOTER &&
+    (pie === CATALOG_FOOTER || CATALOG_FOOTERS_ANTERIORES.includes(pie)) &&
     /^https?:\/\/\S+$/.test(lineas.at(-1) ?? "")
   ) {
     return lineas.slice(0, -1).join("\n");

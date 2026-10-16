@@ -89,7 +89,7 @@ function conversationRow(isTest = false) {
 }
 
 const LINK = "https://img.stock.example/products/1/ply-neg.jpg";
-const PIE = "Playera negra (PLY-NEG): 7 pieza — $199 MXN";
+const PIE = "Playera negra (PLY-NEG): 7 piezas — $199 MXN";
 
 describe("026 — sendImageLink (foto por URL)", () => {
   beforeEach(() => {

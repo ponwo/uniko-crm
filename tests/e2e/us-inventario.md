@@ -30,9 +30,9 @@ Con `INVENTARIO=on`, todo lo de abajo.
 ## US2 — El agente consulta existencias reales antes de afirmarlas
 
 1. "¿tienen playera negra?" → la respuesta saliente contiene
-   `Playera negra (PLY-NEG): 7 pieza — $199 MXN` (los datos los pega el
+   `Playera negra (PLY-NEG): 7 piezas — $199 MXN` (los datos los pega el
    sistema; el modelo solo aportó "Déjame revisar.").
-2. "¿tienen gorra?" → `Gorra (GOR-01): 3 pieza — sin precio`; la gorra inactiva
+2. "¿tienen gorra?" → `Gorra (GOR-01): 3 piezas — sin precio`; la gorra inactiva
    (`GOR-02`) no aparece.
 3. "¿tienen playera blanca?" → `agotado`.
 4. "¿tienen zapatos?" → `No encontré productos para «zapatos».`
@@ -77,25 +77,25 @@ El stock-mock devuelve `image_url` para `PLY-NEG` (`{origen}/icon-192.png`) y
     con precio y la existencia de cada talla en orden, agotadas marcadas:
     `Playera roja (PLY-ROJ) — $219 MXN. Tallas: CH 4, M agotada, G 7, XG 1`.
 14. "¿tienen playera roja en G?" → el modelo manda `query` = "playera roja" y
-    `size` = "G"; el cliente recibe `Playera roja (PLY-ROJ) talla G: 7 pieza —
+    `size` = "G"; el cliente recibe `Playera roja (PLY-ROJ) talla G: 7 piezas —
     $219 MXN`.
 15. "¿tienen playera roja en M?" → `talla M: agotada … Con existencia: CH 4, G 7,
     XG 1`; "… en XXG" → `no viene en talla XXG. Tallas: …`.
 16. "¿cuánto cuesta la PLY-ROJ-G?" → el SKU de la talla se consulta exacto:
-    `Playera roja (PLY-ROJ-G) talla G: 7 pieza — $219 MXN`.
+    `Playera roja (PLY-ROJ-G) talla G: 7 piezas — $219 MXN`.
 17. Los casos 1–5 responden exactamente igual que antes (productos sin tallas).
 18. **028 (2026-09-15)** "¿tienen playeras en G?" (plural) → solo los modelos con
     existencia en G, uno por mensaje con su foto y su precio: `image` negra (simple,
-    talla única) con pie `Déjame revisar.\nPlayera negra (PLY-NEG): 7 pieza — $199
-    MXN`, `text` `Playera roja (PLY-ROJ) talla G: 7 pieza — $219 MXN` (sin foto),
-    `image` gris `Playera gris (PLA-GRS) talla G: 3 pieza — $250 MXN`; ningún texto
+    talla única) con pie `Déjame revisar.\nPlayera negra (PLY-NEG): 7 piezas — $199
+    MXN`, `text` `Playera roja (PLY-ROJ) talla G: 7 piezas — $219 MXN` (sin foto),
+    `image` gris `Playera gris (PLA-GRS) talla G: 3 piezas — $250 MXN`; ningún texto
     menciona "agotad", "no viene" ni otra talla.
-19. "¿tienen playeras en M?" → negra y verde (`talla M: 10 pieza — $200 MXN`); roja
+19. "¿tienen playeras en M?" → negra y verde (`talla M: 10 piezas — $200 MXN`); roja
     y gris (M agotada), azul y amarilla (sin M) ausentes. "… en extra chica" → negra y
     azul (`talla XCH: 1 pieza — $800 MXN`, equivalencia).
 20. "¿tienen pantalones en 40?" → un solo texto: `Déjame revisar.\nPor ahora no
     tengo pantalones en talla 40.`; "¿… en 32?" → `image` Pantalón azul (`talla 32:
-    4 pieza — $650 MXN`) y `text` Pantalón negro (`talla 32: 1 pieza — $650 MXN`).
+    4 piezas — $650 MXN`) y `text` Pantalón negro (`talla 32: 1 pieza — $650 MXN`).
 21. Un solo modelo se contesta como en 13–16 ("¿tienen playera roja en M?" →
     `agotada — … Con existencia: CH 4, G 7, XG 1`).
 22. "¿tienen playeras?" (sin talla, 6 con existencia) → 5 mensajes (negra img, roja
@@ -117,15 +117,15 @@ El stock-mock devuelve `image_url` para `PLY-NEG` (`{origen}/icon-192.png`) y
 Automatizado en `catalogoChecks()` de `scripts/e2e-selftest.mjs` (sección `032`,
 solo con `INVENTARIO=on`) y en `scripts/e2e-lab.mjs` (el caso del Laboratorio).
 El stock-mock trae «Catálogo de prueba.pdf» (`…/catalogo.pdf?v=1`), 12 calcetines con
-foto y 7 sudaderas sin foto. Pie esperado: `¡Claro!\n\nDime modelo y talla y te
-confirmo existencia y precio`.
+foto y 7 sudaderas sin foto. Pie esperado: `¡Claro!\n\nDime qué producto te interesa y
+te confirmo existencia y precio`.
 
 26. "¿qué venden?" → UN `document` con `link` `…/api/dev/stock-mock/catalogo.pdf?v=1`,
     `filename` «Catálogo de prueba.pdf» y el pie, antes de coalescencia + 5 s; el link
     sirve un PDF; en el hilo, un `document` IA con nombre, `media.payload.url` y el pie
     como texto, sin `failed`; `/api/media/<asset>` → 302 al PDF.
 27. "mándame el catálogo completo" (el ai-mock devuelve una frase de más de 1024) → el
-    pie no pasa de 1024, termina en `…\n\nDime modelo y talla…` y empieza con «¡Claro!».
+    pie no pasa de 1024, termina en `…\n\nDime qué producto te interesa…` y empieza con «¡Claro!».
 28. `_catalog {present:true, filename:"Catálogo Otoño 2026.pdf"}` + "¿tienes
     catálogo?" → el nombre nuevo y `?v=2`: cada envío consulta el catálogo en ese
     momento.

@@ -92,24 +92,24 @@ describe("028 — deliverReplies", () => {
 
   it("con fotos: un envío por mensaje, en orden; el sin foto va como texto en su lugar", async () => {
     await deliverReplies(conv(), [
-      { text: "Déjame revisar.\nPlayera negra (PLY-NEG): 7 pieza — $199 MXN", imageUrl: FOTO_A },
-      { text: "Playera roja (PLY-ROJ) talla G: 7 pieza — $219 MXN", imageUrl: null },
-      { text: "Playera gris (PLA-GRS) talla G: 3 pieza — $250 MXN", imageUrl: FOTO_B },
+      { text: "Déjame revisar.\nPlayera negra (PLY-NEG): 7 piezas — $199 MXN", imageUrl: FOTO_A },
+      { text: "Playera roja (PLY-ROJ) talla G: 7 piezas — $219 MXN", imageUrl: null },
+      { text: "Playera gris (PLA-GRS) talla G: 3 piezas — $250 MXN", imageUrl: FOTO_B },
     ]);
     expect(llamadas).toEqual([
-      `image:${FOTO_A}:Déjame revisar.\nPlayera negra (PLY-NEG): 7 pieza — $199 MXN`,
-      "text:Playera roja (PLY-ROJ) talla G: 7 pieza — $219 MXN",
-      `image:${FOTO_B}:Playera gris (PLA-GRS) talla G: 3 pieza — $250 MXN`,
+      `image:${FOTO_A}:Déjame revisar.\nPlayera negra (PLY-NEG): 7 piezas — $199 MXN`,
+      "text:Playera roja (PLY-ROJ) talla G: 7 piezas — $219 MXN",
+      `image:${FOTO_B}:Playera gris (PLA-GRS) talla G: 3 piezas — $250 MXN`,
     ]);
   });
 
   it("sin ninguna foto: UN solo texto con todas las líneas (idéntico a la 026)", async () => {
     await deliverReplies(conv(), [
-      { text: "Playera roja (PLY-ROJ) talla G: 7 pieza — $219 MXN", imageUrl: null },
+      { text: "Playera roja (PLY-ROJ) talla G: 7 piezas — $219 MXN", imageUrl: null },
       { text: "Pantalón negro (PAN-NG) talla 32: 1 pieza — $650 MXN", imageUrl: null },
     ]);
     expect(llamadas).toEqual([
-      "text:Playera roja (PLY-ROJ) talla G: 7 pieza — $219 MXN\nPantalón negro (PAN-NG) talla 32: 1 pieza — $650 MXN",
+      "text:Playera roja (PLY-ROJ) talla G: 7 piezas — $219 MXN\nPantalón negro (PAN-NG) talla 32: 1 pieza — $650 MXN",
     ]);
   });
 

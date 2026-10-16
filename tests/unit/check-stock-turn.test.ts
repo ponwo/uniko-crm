@@ -115,7 +115,7 @@ describe("026 — checkStockTurn", () => {
     lookup.mockResolvedValue({ ok: true, data: { products: [negra], truncated: false } });
     const turn = await checkStockTurn({ query: "playera negra" });
     expect(turn.ok).toBe(true);
-    expect(textOf(turn)).toBe("Playera negra (PLY-NEG): 7 pieza — $199 MXN");
+    expect(textOf(turn)).toBe("Playera negra (PLY-NEG): 7 piezas — $199 MXN");
     expect(lookup).toHaveBeenCalledWith("playera negra");
   });
 
@@ -124,14 +124,14 @@ describe("026 — checkStockTurn", () => {
     const turn = await checkStockTurn({ query: "playera negra", intro: "Claro:" });
     expect(turn).toEqual({
       ok: true,
-      messages: [{ text: "Claro:\nPlayera negra (PLY-NEG): 7 pieza — $199 MXN", imageUrl: FOTO }],
+      messages: [{ text: "Claro:\nPlayera negra (PLY-NEG): 7 piezas — $199 MXN", imageUrl: FOTO }],
     });
   });
 
   it("la frase de entrada del modelo va antes de los datos", async () => {
     lookup.mockResolvedValue({ ok: true, data: { products: [negra], truncated: false } });
     const turn = await checkStockTurn({ query: "playera", intro: "Claro, te digo:" });
-    expect(textOf(turn)).toBe("Claro, te digo:\nPlayera negra (PLY-NEG): 7 pieza — $199 MXN");
+    expect(textOf(turn)).toBe("Claro, te digo:\nPlayera negra (PLY-NEG): 7 piezas — $199 MXN");
   });
 
   it("agotado, sin precio y decimales (un producto cada vez: la redacción de la 026)", async () => {
@@ -140,11 +140,17 @@ describe("026 — checkStockTurn", () => {
         { ...negra, sku: "PLY-BLA", name: "Playera blanca", stock: 0, available: false },
         "Playera blanca (PLY-BLA): agotado — $199 MXN",
       ],
-      [{ ...negra, sku: "GOR-01", name: "Gorra", stock: 3, price: null }, "Gorra (GOR-01): 3 pieza — sin precio"],
+      [{ ...negra, sku: "GOR-01", name: "Gorra", stock: 3, price: null }, "Gorra (GOR-01): 3 piezas — sin precio"],
       [
         { ...negra, sku: "HAR-01", name: "Harina", stock: 2.5, unit: "kg", price: 1234.5 },
         "Harina (HAR-01): 2.5 kg — $1,234.50 MXN",
       ],
+      // La unidad del negocio en plural cuando no es 1; en singular con 1 (2026-10-15).
+      [
+        { ...negra, sku: "TOR-01", name: "Tornillo 1/4", stock: 14, unit: "caja", price: 85 },
+        "Tornillo 1/4 (TOR-01): 14 cajas — $85 MXN",
+      ],
+      [{ ...negra, sku: "TAL-01", name: "Taladro", stock: 1, price: 1499 }, "Taladro (TAL-01): 1 pieza — $1,499 MXN"],
     ];
     for (const [producto, esperado] of casos) {
       con([producto]);
@@ -170,7 +176,7 @@ describe("026 — checkStockTurn", () => {
     // Con un solo producto y truncated (SKU exacto nunca lo marca; la búsqueda podría): el mismo cierre.
     lookup.mockResolvedValue({ ok: true, data: { products: [negra], truncated: true } });
     expect(textOf(await checkStockTurn({ query: "prod" })).split("\n")).toEqual([
-      "Playera negra (PLY-NEG): 7 pieza — $199 MXN",
+      "Playera negra (PLY-NEG): 7 piezas — $199 MXN",
       "Hay más coincidencias, ¿me dices cuál te interesa?",
     ]);
   });
@@ -182,7 +188,7 @@ describe("026 — checkStockTurn", () => {
     });
     const turn = await checkStockTurn({ query: "playera negra" });
     expect(imageOf(turn)).toBe(FOTO);
-    expect(textOf(turn)).toBe("Playera negra (PLY-NEG): 7 pieza — $199 MXN");
+    expect(textOf(turn)).toBe("Playera negra (PLY-NEG): 7 piezas — $199 MXN");
     expect(textOf(turn)).not.toContain("http");
   });
 
@@ -226,7 +232,7 @@ describe("026 — checkStockTurn", () => {
   it("talla pedida con existencia: solo esa talla", async () => {
     con([roja]);
     const turn = await checkStockTurn({ query: "playera roja", size: "g" });
-    expect(textOf(turn)).toBe("Playera roja (PLY-ROJ) talla G: 7 pieza — $219 MXN");
+    expect(textOf(turn)).toBe("Playera roja (PLY-ROJ) talla G: 7 piezas — $219 MXN");
   });
 
   it("talla pedida agotada: lo dice y ofrece las que sí hay", async () => {
@@ -248,7 +254,7 @@ describe("026 — checkStockTurn", () => {
   it("equivalencias solo de respaldo: «grande» ⇒ G, «extra grande» ⇒ XG, con acentos", async () => {
     con([roja]);
     expect(textOf(await checkStockTurn({ query: "playera roja", size: "grande" }))).toContain(
-      "talla G: 7 pieza"
+      "talla G: 7 piezas"
     );
     expect(textOf(await checkStockTurn({ query: "playera roja", size: "Extra Grande" }))).toContain(
       "talla XG: 1 pieza"
@@ -256,19 +262,19 @@ describe("026 — checkStockTurn", () => {
     // Una etiqueta literal gana a la equivalencia: el negocio manda.
     const literal = { ...roja, variants: [{ sku: "X-L", label: "L", stock: 2, available: true }] };
     con([literal]);
-    expect(textOf(await checkStockTurn({ query: "x", size: "L" }))).toContain("talla L: 2 pieza");
+    expect(textOf(await checkStockTurn({ query: "x", size: "L" }))).toContain("talla L: 2 piezas");
   });
 
   it("talla resuelta por SKU exacto: muestra su etiqueta y su existencia", async () => {
     con([{ ...negra, sku: "PLY-ROJ-G", name: "Playera roja", price: 219, label: "G", parent_sku: "PLY-ROJ" }]);
     const turn = await checkStockTurn({ query: "PLY-ROJ-G" });
-    expect(textOf(turn)).toBe("Playera roja (PLY-ROJ-G) talla G: 7 pieza — $219 MXN");
+    expect(textOf(turn)).toBe("Playera roja (PLY-ROJ-G) talla G: 7 piezas — $219 MXN");
   });
 
   it("producto simple con talla pedida: se ignora la talla; modelo sin tallas activas: agotado", async () => {
     con([negra]);
     expect(textOf(await checkStockTurn({ query: "playera negra", size: "G" }))).toBe(
-      "Playera negra (PLY-NEG): 7 pieza — $199 MXN"
+      "Playera negra (PLY-NEG): 7 piezas — $199 MXN"
     );
     con([{ ...roja, variants: [], stock: 0, available: false }]);
     expect(textOf(await checkStockTurn({ query: "playera roja" }))).toBe(
@@ -313,10 +319,10 @@ describe("028 — talla pedida con varios modelos", () => {
     expect(turn.ok).toBe(true);
     expect(turn.messages).toEqual([
       // Sin tallas y con existencia: es de talla única, se muestra con su línea de siempre (FR-1304).
-      { text: "Déjame revisar.\nPlayera negra (PLY-NEG): 7 pieza — $199 MXN", imageUrl: FOTO },
+      { text: "Déjame revisar.\nPlayera negra (PLY-NEG): 7 piezas — $199 MXN", imageUrl: FOTO },
       // Sin foto: texto en su lugar del orden.
-      { text: "Playera roja (PLY-ROJ) talla G: 7 pieza — $219 MXN", imageUrl: null },
-      { text: "Playera gris (PLA-GRS) talla G: 3 pieza — $250 MXN", imageUrl: gris.image_url },
+      { text: "Playera roja (PLY-ROJ) talla G: 7 piezas — $219 MXN", imageUrl: null },
+      { text: "Playera gris (PLA-GRS) talla G: 3 piezas — $250 MXN", imageUrl: gris.image_url },
     ]);
     // Agotados en la talla, sin la talla y agotados sin tallas: ni una palabra.
     for (const m of turn.messages) {
@@ -328,8 +334,8 @@ describe("028 — talla pedida con varios modelos", () => {
     con(PLAYERAS);
     const turn = await checkStockTurn({ query: "playeras", size: "M" });
     expect(turn.messages.map((m) => m.text)).toEqual([
-      "Playera negra (PLY-NEG): 7 pieza — $199 MXN",
-      "Playera verde (PLA-VRD) talla M: 10 pieza — $200 MXN",
+      "Playera negra (PLY-NEG): 7 piezas — $199 MXN",
+      "Playera verde (PLA-VRD) talla M: 10 piezas — $200 MXN",
     ]);
     expect(turn.messages.map((m) => m.imageUrl)).toEqual([FOTO, verde.image_url]);
   });
@@ -338,7 +344,7 @@ describe("028 — talla pedida con varios modelos", () => {
     con(PLAYERAS);
     const turn = await checkStockTurn({ query: "playeras", size: "extra chica" });
     expect(turn.messages.map((m) => m.text)).toEqual([
-      "Playera negra (PLY-NEG): 7 pieza — $199 MXN",
+      "Playera negra (PLY-NEG): 7 piezas — $199 MXN",
       "Playera azul (PLA-AZL) talla XCH: 1 pieza — $800 MXN",
     ]);
   });
@@ -352,7 +358,7 @@ describe("028 — talla pedida con varios modelos", () => {
     // 34: el azul la trae agotada y el negro con existencia ⇒ solo el negro (sin foto ⇒ texto).
     const treinta4 = await checkStockTurn({ query: "pantalones", size: "34" });
     expect(treinta4.messages).toEqual([
-      { text: "Pantalón negro (PAN-NG) talla 34: 3 pieza — $650 MXN", imageUrl: null },
+      { text: "Pantalón negro (PAN-NG) talla 34: 3 piezas — $650 MXN", imageUrl: null },
     ]);
   });
 
@@ -361,7 +367,7 @@ describe("028 — talla pedida con varios modelos", () => {
     const turn = await checkStockTurn({ query: "pantalones", size: "32", intro: "Claro:" });
     expect(turn.messages).toEqual([
       { text: "Claro:\nPantalón negro (PAN-NG) talla 32: 1 pieza — $650 MXN", imageUrl: null },
-      { text: "Pantalón azul (PAN-AZ) talla 32: 4 pieza — $650 MXN", imageUrl: pantalonAzul.image_url },
+      { text: "Pantalón azul (PAN-AZ) talla 32: 4 piezas — $650 MXN", imageUrl: pantalonAzul.image_url },
     ]);
   });
 
@@ -386,7 +392,7 @@ describe("028 — sin talla pedida con varios modelos", () => {
     con(PLAYERAS);
     const turn = await checkStockTurn({ query: "playeras", intro: "Déjame revisar." });
     expect(turn.messages).toEqual([
-      { text: "Déjame revisar.\nPlayera negra (PLY-NEG): 7 pieza — $199 MXN", imageUrl: FOTO },
+      { text: "Déjame revisar.\nPlayera negra (PLY-NEG): 7 piezas — $199 MXN", imageUrl: FOTO },
       { text: "Playera roja (PLY-ROJ) — $219 MXN. Tallas: CH 4, M agotada, G 7, XG 1", imageUrl: null },
       { text: "Playera azul (PLA-AZL) — $800 MXN. Tallas: XCH 1, CH 5, XG 2", imageUrl: azul.image_url },
       { text: "Playera verde (PLA-VRD) — $200 MXN. Tallas: CH 2, M 10, XG 10", imageUrl: verde.image_url },
@@ -421,7 +427,7 @@ describe("028 — sin talla pedida con varios modelos", () => {
     con([{ ...negra, image_url: FOTO }, verde], true);
     const turn = await checkStockTurn({ query: "playera" });
     expect(turn.messages.map((m) => m.text)).toEqual([
-      "Playera negra (PLY-NEG): 7 pieza — $199 MXN",
+      "Playera negra (PLY-NEG): 7 piezas — $199 MXN",
       "Playera verde (PLA-VRD) — $200 MXN. Tallas: CH 2, M 10, XG 10",
       "Hay más coincidencias, ¿me dices cuál te interesa?",
     ]);
@@ -513,7 +519,7 @@ describe("032 — el cierre de check_stock y el catálogo", () => {
     expect((await checkStockTurn({ query: "calcetín" })).messages.at(-1)?.text).toBe(OFERTA);
     con([negra], true);
     expect(textOf(await checkStockTurn({ query: "playera negra" })).split("\n")).toEqual([
-      "Playera negra (PLY-NEG): 7 pieza — $199 MXN",
+      "Playera negra (PLY-NEG): 7 piezas — $199 MXN",
       OFERTA,
     ]);
     getCatalog.mockResolvedValue({ ok: false, error: "not_found" });
