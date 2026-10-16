@@ -21,6 +21,10 @@ const APP = process.env.DEMO_APP_BASE ?? "http://localhost:3100";
 /** Respuestas por tema, en el orden en que se prueban. */
 const RESPUESTAS = [
   {
+    re: /descuento|promoci[oó]n|oferta|anuncio/i,
+    text: "¡Hola! Sí, sigue vigente: esta temporada los impermeabilizantes tienen 20% de descuento. El acrílico de 5 años queda en $1,344 MXN y el fibratado de 10 años en $1,880 MXN. ¿De cuántos metros es tu azotea? Te digo cuántas cubetas necesitas.",
+  },
+  {
     re: /taladro/i,
     text: "¡Hola! Sí, tenemos dos opciones inalámbricas: el Truper 20V en $1,899 MXN y el DeWalt 20V MAX en $3,450 MXN, ambos con batería y cargador incluidos. ¿Para qué trabajo lo vas a usar? Así te recomiendo el mejor.",
   },

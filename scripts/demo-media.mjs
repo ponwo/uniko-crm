@@ -20,13 +20,24 @@
 import { spawnSync } from "node:child_process";
 import { mkdir, rename, rm } from "node:fs/promises";
 import { homedir } from "node:os";
-import { readdirSync } from "node:fs";
+import { readdirSync, readFileSync } from "node:fs";
+import { createHmac } from "node:crypto";
 import os from "node:os";
 import path from "node:path";
 import { chromium } from "playwright";
 
 const BASE = process.env.DEMO_BASE ?? "http://localhost:3100";
-const OUT = path.resolve("docs/demo");
+// Los medios se publican en la página de LanCo y NO viven en este repo: la
+// salida es obligatoria y tiene que quedar fuera de él.
+if (!process.env.DEMO_OUT) {
+  console.error('Falta DEMO_OUT: la carpeta (fuera del repo) donde guardar capturas y videos.');
+  process.exit(1);
+}
+const OUT = path.resolve(process.env.DEMO_OUT);
+if (!path.relative(process.cwd(), OUT).startsWith("..") && !path.isAbsolute(path.relative(process.cwd(), OUT))) {
+  console.error(`DEMO_OUT (${OUT}) está dentro del repo: los medios no se versionan aquí.`);
+  process.exit(1);
+}
 const SHOTS = path.join(OUT, "capturas");
 const VIDEOS = path.join(OUT, "videos");
 const TMP = path.join(os.tmpdir(), "uniko-demo-video");
@@ -35,6 +46,23 @@ const VIEWPORT = { width: 1440, height: 900 };
 const EMAIL = "demo@uniko.test";
 const PASSWORD = "demo-uniko-123";
 const PN = "pn-demo-001";
+const IG_ACCOUNT = "zernio-ig-account-001";
+const FB_ACCOUNT = "zernio-account-001";
+const ZERNIO_SECRET = "secreto-demo-zernio";
+/** Origen del proxy de Meta (scripts/demo-meta.mjs): de ahí sale el creativo del anuncio. */
+const META_ORIGIN = process.env.DEMO_META_ORIGIN ?? "http://localhost:3103";
+
+/** Lee una variable del entorno o, si no está, del .env local. */
+function envVar(k) {
+  if (process.env[k]) return process.env[k];
+  try {
+    const line = readFileSync(".env", "utf8").split(/\r?\n/).find((l) => l.startsWith(k + "="));
+    return line?.slice(k.length + 1).trim();
+  } catch {
+    return undefined;
+  }
+}
+const VERIFY_TOKEN = envVar("META_WEBHOOK_VERIFY_TOKEN");
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
@@ -124,6 +152,27 @@ async function bootstrap() {
     data: { name: "Uniko", accent: "#0d5bff", currency: "MXN" },
   });
   await call("/api/agent/profile", { method: "PUT", data: { enabled: true } });
+  // Módulos opcionales: con la bandera apagada responden 404 y no pasa nada.
+  const dia = [{ start: "09:00", end: "18:00" }];
+  await call("/api/calendar/settings", {
+    method: "PUT",
+    data: {
+      weeklyHours: { mon: dia, tue: dia, wed: dia, thu: dia, fri: dia, sat: [{ start: "09:00", end: "14:00" }], sun: [] },
+      slotMinutes: 30,
+      minNoticeHours: 2,
+      maxDaysAhead: 14,
+      connector: "enlace-fijo",
+      meetingLink: "https://meet.elmartillo.mx/asesoria",
+    },
+  });
+  await call("/api/settings/instagram", {
+    method: "PUT",
+    data: { source: "zernio", igUserId: null, accountRef: IG_ACCOUNT, token: "sk_test-ok", webhookSecret: ZERNIO_SECRET },
+  });
+  await call("/api/settings/messenger", {
+    method: "PUT",
+    data: { source: "zernio", accountRef: FB_ACCOUNT, token: "sk_test-ok" },
+  });
   await ctx.storageState({ path: STATE });
   await browser.close();
 }
@@ -205,10 +254,10 @@ const api = (ctx) => (p, init = {}) =>
   });
 
 /** Un cliente escribe por WhatsApp (mock del webhook de Meta). */
-async function inbound(ctx, { from, name, text }) {
+async function inbound(ctx, { from, name, text, referral }) {
   const r = await api(ctx)("/api/dev/wa-mock/inbound", {
     method: "POST",
-    data: { phoneNumberId: PN, from, name, text },
+    data: { phoneNumberId: PN, from, name, text, ...(referral ? { referral } : {}) },
   });
   if (!r.ok()) throw new Error(`inbound ${r.status()}`);
 }
@@ -240,6 +289,55 @@ async function marcarLeidos(ctx) {
       data: { waMessageId: m.waMessageId, status: "read" },
     }).catch(() => {});
   }
+}
+
+/** Un DM de Instagram o Messenger, como lo entrega Zernio (firmado). */
+async function dm(canal, { id, name, username, text }) {
+  const account = canal === "instagram" ? IG_ACCOUNT : FB_ACCOUNT;
+  const evt = {
+    id: `evt-${Math.random().toString(36).slice(2)}`,
+    event: "message.received",
+    message: {
+      id: `zmsg-${Math.random().toString(36).slice(2)}`,
+      conversationId: `zconv-${id}`,
+      direction: "incoming",
+      text,
+      sentAt: new Date().toISOString(),
+      sender: { id, name, ...(username ? { username } : {}) },
+    },
+    account: {
+      id: account,
+      accountId: account,
+      platform: canal === "instagram" ? "instagram" : "facebook",
+      username: "ferreteria.elmartillo",
+    },
+  };
+  const body = JSON.stringify(evt);
+  const ruta = canal === "instagram" ? "ig" : "messenger";
+  const r = await fetch(`${BASE}/api/webhooks/${ruta}/${VERIFY_TOKEN}`, {
+    method: "POST",
+    headers: {
+      "content-type": "application/json",
+      "x-zernio-signature": createHmac("sha256", ZERNIO_SECRET).update(body).digest("hex"),
+    },
+    body,
+  });
+  if (!r.ok) throw new Error(`webhook ${ruta} ${r.status}`);
+}
+
+/** Foto fija en plena escena, sin cursor ni subtítulo. */
+async function foto(page, name) {
+  await mkdir(SHOTS, { recursive: true });
+  const ocultar = (v) =>
+    page.evaluate((vis) => {
+      for (const id of ["__demo_cur", "__demo_cap"]) {
+        const el = document.getElementById(id);
+        if (el) el.style.visibility = vis;
+      }
+    }, v);
+  await ocultar("hidden");
+  await page.screenshot({ path: path.join(SHOTS, `${name}.png`), animations: "disabled" });
+  await ocultar("");
 }
 
 async function listo(page) {
@@ -555,6 +653,148 @@ SCENES["05"] = {
   },
 };
 
+SCENES["06"] = {
+  file: "06-agenda-citas",
+  async run(page, ctx, T) {
+    await ir(page, "/inbox");
+    await page.getByText("Jorge Castillo").first().waitFor();
+    T.mark();
+    await cap(page, "Tu agente también agenda citas, directo en WhatsApp", 3000);
+    const c = { from: "5215587654321", name: "Laura Méndez" };
+    await inbound(ctx, { ...c, text: "Hola, quiero agendar una cita para que vengan a medir mi cocina" });
+    const fila = page.getByRole("button", { name: /Laura Méndez/ }).first();
+    await fila.waitFor({ timeout: 20_000 });
+    await click(page, fila);
+    await page.getByText(/¿Para qué día/).last().waitFor({ timeout: 60_000 });
+    await marcarLeidos(ctx);
+    await cap(page, "Primero pregunta el día…", 2400);
+    await inbound(ctx, { ...c, text: "El viernes" });
+    await page.getByText(/mañana o por la tarde/).last().waitFor({ timeout: 60_000 });
+    await marcarLeidos(ctx);
+    await cap(page, "…luego si prefiere mañana o tarde…", 2400);
+    await inbound(ctx, { ...c, text: "Por la tarde" });
+    await page.getByText(/te queda mejor|te acomoda/).last().waitFor({ timeout: 60_000 });
+    await marcarLeidos(ctx);
+    await cap(page, "…y ofrece cuatro horarios libres de tu agenda real", 3400);
+    await inbound(ctx, { ...c, text: "Me queda bien el primero" });
+    await page.getByText(/agendad/i).last().waitFor({ timeout: 60_000 });
+    await marcarLeidos(ctx);
+    await sleep(1500);
+    await cap(page, "Cita confirmada, con su enlace, sin que intervengas", 3400);
+    await foto(page, "16-agenda-cita-por-whatsapp");
+    await cap(page, "La ves en la ficha del cliente: puedes moverla o cancelarla a mano", 3600);
+
+    await click(page, page.getByRole("link", { name: "Citas" }));
+    await page.getByText("Laura Méndez").first().waitFor({ timeout: 30_000 });
+    await sleep(800);
+    await cap(page, "Y todas las citas del negocio, en un solo lugar", 3400);
+    await foto(page, "17-agenda-citas");
+    await cap(page, "", 300);
+  },
+};
+
+SCENES["07"] = {
+  file: "07-inventario-y-catalogo",
+  async run(page, ctx, T) {
+    await ir(page, "/inbox");
+    await page.getByText("Jorge Castillo").first().waitFor();
+    T.mark();
+    await cap(page, "Conectado a tu inventario, el agente consulta existencias reales", 3200);
+    const c = { from: "5215576543210", name: "Sofía Ramírez" };
+    await inbound(ctx, { ...c, text: "Hola, ¿tienen impermeabilizante?" });
+    const fila = page.getByRole("button", { name: /Sofía Ramírez/ }).first();
+    await fila.waitFor({ timeout: 20_000 });
+    await click(page, fila);
+    await page.getByText(/fibratado/i).last().waitFor({ timeout: 60_000 });
+    await marcarLeidos(ctx);
+    await sleep(1500);
+    await cap(page, "Cada producto con su foto, su precio y su existencia", 3600);
+    await cap(page, "Solo ofrece lo que hay: el que está agotado no aparece", 3400);
+    await foto(page, "18-inventario-productos-con-foto");
+    await inbound(ctx, { ...c, text: "¿Tienen catálogo?" });
+    await page.getByText(/Catalogo-Ferreteria/i).last().waitFor({ timeout: 60_000 });
+    await marcarLeidos(ctx);
+    await sleep(1200);
+    await cap(page, "Y si piden el catálogo, se lo manda en PDF", 3600);
+    await foto(page, "19-inventario-catalogo-pdf");
+    await cap(page, "", 300);
+  },
+};
+
+SCENES["08"] = {
+  file: "08-anuncio-de-origen",
+  async run(page, ctx, T) {
+    await ir(page, "/inbox");
+    await page.getByText("Jorge Castillo").first().waitFor();
+    T.mark();
+    await cap(page, "¿Anuncias en Facebook o Instagram con botón de WhatsApp?", 3000);
+    await inbound(ctx, {
+      from: "5215565432109",
+      name: "Gabriela Ortiz",
+      text: "Hola, vi su anuncio. ¿Sigue el descuento?",
+      referral: {
+        source_url: "https://fb.me/elmartillo-lluvias",
+        source_id: "120990000000001",
+        source_type: "ad",
+        headline: "Que no se te llueva la azotea",
+        body: "Impermeabilizantes con 20% de descuento esta temporada.",
+        media_type: "image",
+        image_url: `${META_ORIGIN}/api/dev/wa-mock/media-file/creativo-demo-lluvias`,
+        ctwa_clid: "clid-demo-lluvias-1",
+      },
+    });
+    const fila = page.getByRole("button", { name: /Gabriela Ortiz/ }).first();
+    await fila.waitFor({ timeout: 20_000 });
+    await cap(page, "Cada conversación que llega de un anuncio queda marcada", 3000);
+    await click(page, fila);
+    await page.getByText(/20% de descuento/).last().waitFor({ timeout: 60_000 });
+    await marcarLeidos(ctx);
+    await sleep(1500);
+    await cap(page, "Y sabes exactamente qué anuncio la trajo, con su imagen", 3800);
+    await foto(page, "20-anuncio-de-origen");
+    const chip = page.getByRole("button", { name: /Anuncios/ }).first();
+    if (await chip.count()) {
+      await click(page, chip);
+      await sleep(1200);
+      await cap(page, "Filtra con un clic las que vinieron de publicidad", 3200);
+    }
+    await cap(page, "", 300);
+  },
+};
+
+SCENES["09"] = {
+  file: "09-instagram-y-messenger",
+  async run(page, ctx, T) {
+    await ir(page, "/inbox");
+    await page.getByText("Jorge Castillo").first().waitFor();
+    T.mark();
+    await cap(page, "Instagram y Messenger, en la misma bandeja que WhatsApp", 3000);
+    await dm("instagram", {
+      id: "igsid-demo-valeria",
+      name: "Valeria Campos",
+      username: "valeria.decora",
+      text: "Hola! ¿hacen envíos a domicilio?",
+    });
+    const ig = page.getByRole("button", { name: /Valeria Campos/ }).first();
+    await ig.waitFor({ timeout: 20_000 });
+    await dm("messenger", { id: "psid-demo-fernando", name: "Fernando Ruiz", text: "Buenas, ¿a qué hora abren el domingo?" });
+    const fb = page.getByRole("button", { name: /Fernando Ruiz/ }).first();
+    await fb.waitFor({ timeout: 20_000 });
+    await cap(page, "Cada mensaje dice de qué red llegó", 3200);
+    await click(page, ig);
+    await page.getByText(/entrega a domicilio/).last().waitFor({ timeout: 60_000 });
+    await sleep(1200);
+    await cap(page, "El mismo agente contesta en cada canal", 3200);
+    await foto(page, "21-instagram-en-la-bandeja");
+    await click(page, fb);
+    await page.getByText(/domingos de 9:00/).last().waitFor({ timeout: 60_000 });
+    await sleep(1200);
+    await cap(page, "Un solo equipo, un solo historial por cliente", 3400);
+    await foto(page, "22-messenger-en-la-bandeja");
+    await cap(page, "", 300);
+  },
+};
+
 async function escena(browser, id) {
   const sc = SCENES[id];
   if (!sc) throw new Error(`Escena desconocida: ${id}`);
@@ -602,7 +842,7 @@ async function escena(browser, id) {
 async function prewarm(browser) {
   const ctx = await newContext(browser);
   const page = await ctx.newPage();
-  for (const r of ["/inbox", "/pipeline", "/agent", "/lab", "/contacts", "/settings/whatsapp", "/settings/templates", "/settings/branding"]) {
+  for (const r of ["/inbox", "/pipeline", "/agent", "/lab", "/contacts", "/bookings", "/settings/whatsapp", "/settings/templates", "/settings/branding"]) {
     await page.goto(`${BASE}${r}`, { waitUntil: "load", timeout: 120_000 }).catch(() => {});
     await sleep(2500);
   }
@@ -614,6 +854,20 @@ async function prewarm(browser) {
     body: JSON.stringify({ messages: [{ role: "system", content: "x" }, { role: "user", content: "hola" }] }),
   }).catch(() => {});
   await api(ctx)("/api/dev/wa-mock/inbound", { method: "POST", data: {} }).catch(() => {});
+  // En dev cada ruta compila la primera vez (~9 s): si eso cae en pleno turno
+  // del agente, el envío de la foto se agota y sale solo el texto.
+  await fetch("http://localhost:3101/v1/chat/completions", {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ messages: [{ role: "system", content: "x" }, { role: "user", content: "hola" }] }),
+  }).catch(() => {});
+  await fetch(`${META_ORIGIN}/api/dev/wa-mock/graph/v25.0/${PN}/messages`, { method: "POST", body: "{}" }).catch(() => {});
+  for (const ruta of ["ig", "messenger"]) {
+    await fetch(`${BASE}/api/webhooks/${ruta}/${VERIFY_TOKEN}`, { method: "POST", body: "{}" }).catch(() => {});
+  }
+  for (const p of ["/api/bookings", "/api/calendar/availability", "/api/templates"]) {
+    await api(ctx)(p).catch(() => {});
+  }
   await ctx.close();
 }
 
