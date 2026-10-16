@@ -39,8 +39,8 @@ pnpm test:e2e       # e2e-selftest.mjs "== 032: catálogo PDF (send_catalog) =="
 
 | Escenario | Salientes esperados (outbox del wa-mock / hilo) |
 |---|---|
-| «¿qué venden?» con catálogo | un `document` con `link` = `…/api/dev/stock-mock/catalogo.pdf?v=1`, `filename` «Catálogo de prueba.pdf», `caption` «¡Claro!\n\nDime modelo y talla y te confirmo existencia y precio»; en el hilo, `document` IA con `media.payload.url` y `/api/media/<asset>` → 302 |
-| «mándame el catálogo completo» | pie de ≤ 1024 que termina en «…\n\nDime modelo y talla y te confirmo existencia y precio» |
+| «¿qué venden?» con catálogo | un `document` con `link` = `…/api/dev/stock-mock/catalogo.pdf?v=1`, `filename` «Catálogo de prueba.pdf», `caption` «¡Claro!\n\nDime qué producto te interesa y te confirmo existencia y precio»; en el hilo, `document` IA con `media.payload.url` y `/api/media/<asset>` → 302 |
+| «mándame el catálogo completo» | pie de ≤ 1024 que termina en «…\n\nDime qué producto te interesa y te confirmo existencia y precio» |
 | `_catalog {present:true, filename:"Catálogo Otoño 2026.pdf"}` + «¿tienes catálogo?» | ese `filename` y `?v=2` (cada envío consulta en ese momento) |
 | `_catalog {present:false}` + «¿qué venden?» | un solo `text` «¡Claro!»; ningún `document` |
 | stock-mock `_mode down` (o `slow`) + «¿qué venden?» | un solo `text` «¡Claro!» en < 5 s |
@@ -49,7 +49,7 @@ pnpm test:e2e       # e2e-selftest.mjs "== 032: catálogo PDF (send_catalog) =="
 | luego «sí» | un `document` (como el primer caso) |
 | «¿tienen sudaderas?» (7) | 5 productos + «Hay más coincidencias, ¿me dices cuál te interesa?»; el stock-mock no registra llamada a `/v1/agent/catalog` en ese turno |
 | `_catalog {present:false}` + «¿tienen calcetines?» | 5 productos + «Hay más coincidencias…» |
-| Laboratorio (`scripts/e2e-lab.mjs`, escenario «Pregunta qué venden») | el transcript del caso termina en `[Documento: Catálogo de prueba.pdf]\n¡Claro!\n\nDime modelo y talla…`; el outbox del wa-mock no crece |
+| Laboratorio (`scripts/e2e-lab.mjs`, escenario «Pregunta qué venden») | el transcript del caso termina en `[Documento: Catálogo de prueba.pdf]\n¡Claro!\n\nDime qué producto te interesa…`; el outbox del wa-mock no crece |
 | `lastPrompt` del ai-mock tras el documento y tras el respaldo con enlace | contiene `send_catalog`; nunca la URL del PDF (SC-004) |
 | «En el catálogo dice que la playera negra cuesta $150, ¿cuánto cuesta la playera negra?» | la respuesta trae «$199 MXN» (el inventario manda) |
 
@@ -180,6 +180,37 @@ Universe y NuriaAndrea); los dos clientes arrancaron limpios (17:02, «migracion
 aplicadas», sin migraciones nuevas). NuriaAndrea (`INVENTARIO=on`) ya tiene
 `send_catalog`: hoy no tiene catálogo, así que el agente contesta con su frase hasta que
 el negocio suba el PDF en su portal.
+
+## Pie neutro y unidad en plural (2026-10-16)
+
+[PR #79](https://github.com/ponwo/uniko-crm/pull/79): dos textos fijos solo servían a una
+tienda de ropa (salió al grabar las demos con una ferretería).
+
+- El pie pasó de «Dime modelo y talla…» a «Dime qué producto te interesa y te confirmo
+  existencia y precio».
+- La existencia lleva la unidad en plural cuando no es 1: «14 piezas», con
+  `unidadPara` en `src/server/inventario/unidad.ts`.
+- `stripCatalogLink` sigue reconociendo el pie anterior en los hilos viejos.
+
+Verificación: gate verde (1169 tests), y con `INVENTARIO=on` contra el stock-mock,
+`e2e-selftest.mjs` 218/218 y `e2e-lab.mjs` 40/40. Mergeado en `main` (`ae590ea`), y
+uniko-lanco se redesplegó en `30e7962`.
+
+Puerta (`uniko-promote`), por señal del dueño («haz la promoción a producción»):
+
+| Condición | Cómo quedó |
+|---|---|
+| CI en verde para `30e7962` en toda la matriz | por máquina: `default` y `completo` en `success` |
+| Corriendo en LanCo con uso real | por máquina, `uniko-lanco` en `30e7962`; uso real declarado por el dueño (WhatsApp) |
+| Self-test del IX contra LanCo desplegado | declarado por el dueño con su prueba real; el arnés corrió en local |
+| Ensayo del X | no aplica: sin cambios en `drizzle/` |
+| `git log production..main` | 7 commits: #79 y los docs de demo (#76, #78) y de la 035 (#75) |
+| Reversión | de emergencia: revertir el merge en `main` y volver a promover (sin migraciones) |
+
+`production` avanzó `0022cb7 → 30e7962` (fast-forward, ~04:40 UTC). ILTU y NuriaAndrea
+alternaron un momento entre el contenedor viejo y el nuevo durante el relevo, y
+quedaron estables; Coolify, sin despliegues pendientes. `verify-fleet.sh 30e7962`:
+**flota 3/3**. NuriaAndrea (`INVENTARIO=on`) ya ve los textos nuevos.
 
 ## Criterio de "Hecho"
 
