@@ -8,7 +8,7 @@ import { transcriptDe } from "@/server/lab/runner";
  * PDF salió, en vez de leer un pie suelto.
  */
 
-const PIE = "¡Claro!\n\nDime modelo y talla y te confirmo existencia y precio";
+const PIE = "¡Claro!\n\nDime qué producto te interesa y te confirmo existencia y precio";
 
 const msg = (
   direction: "in" | "out",
@@ -23,14 +23,14 @@ describe("032 — transcriptDe", () => {
       transcriptDe(
         [
           msg("in", "text", "¿tienen playera negra?"),
-          msg("out", "image", "Déjame revisar.\nPlayera negra (PLY-NEG): 7 pieza — $199 MXN", "ma_1"),
+          msg("out", "image", "Déjame revisar.\nPlayera negra (PLY-NEG): 7 piezas — $199 MXN", "ma_1"),
           msg("out", "text", "¿Algo más?"),
         ],
         new Map()
       )
     ).toEqual([
       { role: "cliente", text: "¿tienen playera negra?" },
-      { role: "agente", text: "Déjame revisar.\nPlayera negra (PLY-NEG): 7 pieza — $199 MXN" },
+      { role: "agente", text: "Déjame revisar.\nPlayera negra (PLY-NEG): 7 piezas — $199 MXN" },
       { role: "agente", text: "¿Algo más?" },
     ]);
   });

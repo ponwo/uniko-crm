@@ -73,7 +73,7 @@ const conv = (over: Partial<Conversation> = {}) =>
 
 const URL_PDF = "https://img.stock.example/catalog/ab12.pdf";
 const NOMBRE = "Catálogo Otoño 2026.pdf";
-const PIE = "¡Claro!\n\nDime modelo y talla y te confirmo existencia y precio";
+const PIE = "¡Claro!\n\nDime qué producto te interesa y te confirmo existencia y precio";
 const RESPALDO = `${PIE}\n${URL_PDF}`;
 const TURNO = {
   ok: true as const,

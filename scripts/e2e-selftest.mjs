@@ -2893,8 +2893,8 @@ async function inventarioChecks() {
   await api("/api/agent/profile", { method: "PUT", body: JSON.stringify({ enabled: true }) });
 
   const casos = [
-    ["5214627026001", "¿tienen playera negra?", "Playera negra (PLY-NEG): 7 pieza — $199 MXN", "un producto: nombre, SKU, existencia, unidad y precio"],
-    ["5214627026002", "¿tienen gorra?", "Gorra (GOR-01): 3 pieza — sin precio", "sin precio; la gorra inactiva no aparece"],
+    ["5214627026001", "¿tienen playera negra?", "Playera negra (PLY-NEG): 7 piezas — $199 MXN", "un producto: nombre, SKU, existencia, unidad y precio"],
+    ["5214627026002", "¿tienen gorra?", "Gorra (GOR-01): 3 piezas — sin precio", "sin precio; la gorra inactiva no aparece"],
     ["5214627026003", "¿tienen playera blanca?", "Playera blanca (PLY-BLA): agotado", "agotado"],
     ["5214627026004", "¿tienen zapatos?", "No encontré productos para «zapatos»", "sin coincidencias"],
     ["5214627026005", "¿cuánto cuesta la PLY-NEG?", "$199 MXN", "SKU exacto → precio"],
@@ -2918,10 +2918,10 @@ async function inventarioChecks() {
   console.log("\n== 026: tallas en check_stock ==");
   const tallas = [
     ["5214627026011", "¿tienen playera roja?", "Playera roja (PLY-ROJ) — $219 MXN. Tallas: CH 4, M agotada, G 7, XG 1", "modelo sin talla pedida: una línea con cada talla en orden, agotadas incluidas"],
-    ["5214627026012", "¿tienen playera roja en G?", "Playera roja (PLY-ROJ) talla G: 7 pieza — $219 MXN", "talla pedida con existencia"],
+    ["5214627026012", "¿tienen playera roja en G?", "Playera roja (PLY-ROJ) talla G: 7 piezas — $219 MXN", "talla pedida con existencia"],
     ["5214627026013", "¿tienen playera roja en M?", "Playera roja (PLY-ROJ) talla M: agotada — $219 MXN. Con existencia: CH 4, G 7, XG 1", "talla pedida agotada: ofrece las que sí hay"],
     ["5214627026014", "¿tienen playera roja en XXG?", "Playera roja (PLY-ROJ) no viene en talla XXG. Tallas: CH 4, M agotada, G 7, XG 1", "talla que el modelo no tiene"],
-    ["5214627026015", "¿cuánto cuesta la PLY-ROJ-G?", "Playera roja (PLY-ROJ-G) talla G: 7 pieza — $219 MXN", "SKU exacto de una talla"],
+    ["5214627026015", "¿cuánto cuesta la PLY-ROJ-G?", "Playera roja (PLY-ROJ-G) talla G: 7 piezas — $219 MXN", "SKU exacto de una talla"],
   ];
   let t = 0;
   for (const [lead, pregunta, esperado, titulo] of tallas) {
@@ -2984,12 +2984,12 @@ async function inventarioChecks() {
     resumen(enG.salientes).length === 3 &&
       enG.salientes[0].type === "image" &&
       enG.salientes[0].body?.image?.link === fotoDe("/icon-192.png") &&
-      textoDe(enG.salientes[0]) === "Déjame revisar.\nPlayera negra (PLY-NEG): 7 pieza — $199 MXN" &&
+      textoDe(enG.salientes[0]) === "Déjame revisar.\nPlayera negra (PLY-NEG): 7 piezas — $199 MXN" &&
       enG.salientes[1].type === "text" &&
-      textoDe(enG.salientes[1]) === "Playera roja (PLY-ROJ) talla G: 7 pieza — $219 MXN" &&
+      textoDe(enG.salientes[1]) === "Playera roja (PLY-ROJ) talla G: 7 piezas — $219 MXN" &&
       enG.salientes[2].type === "image" &&
       enG.salientes[2].body?.image?.link === fotoDe("/icon-512.png?m=grs") &&
-      textoDe(enG.salientes[2]) === "Playera gris (PLA-GRS) talla G: 3 pieza — $250 MXN",
+      textoDe(enG.salientes[2]) === "Playera gris (PLA-GRS) talla G: 3 piezas — $250 MXN",
     JSON.stringify(resumen(enG.salientes))
   );
   ok(
@@ -3001,9 +3001,9 @@ async function inventarioChecks() {
   // US1.2 — en M: roja y gris agotadas en M, azul y amarilla sin M ⇒ solo negra y verde.
   const enM = await preguntarVarios("5214627028002", "¿tienen playeras en M?", "us1.M", 2);
   ok(
-    "«playeras en M»: negra (imagen) y verde (imagen, talla M: 10 pieza); las demás no se mencionan",
+    "«playeras en M»: negra (imagen) y verde (imagen, talla M: 10 piezas); las demás no se mencionan",
     resumen(enM.salientes).map((r) => r[0]).join(",") === "image,image" &&
-      textoDe(enM.salientes[1]) === "Playera verde (PLA-VRD) talla M: 10 pieza — $200 MXN" &&
+      textoDe(enM.salientes[1]) === "Playera verde (PLA-VRD) talla M: 10 piezas — $200 MXN" &&
       enM.salientes[1].body?.image?.link === fotoDe("/icon-192.png?m=vrd") &&
       !enM.salientes.some((o) => /roja|gris|azul|amarilla/i.test(textoDe(o))),
     JSON.stringify(resumen(enM.salientes))
@@ -3031,9 +3031,9 @@ async function inventarioChecks() {
   // US1.5 — talla numérica con existencia en los dos: uno con foto, otro sin.
   const en32 = await preguntarVarios("5214627028005", "¿tienen pantalones en 32?", "us1.32", 2);
   ok(
-    "«pantalones en 32»: azul (imagen, talla 32: 4 pieza) y negro (texto, talla 32: 1 pieza)",
+    "«pantalones en 32»: azul (imagen, talla 32: 4 piezas) y negro (texto, talla 32: 1 pieza)",
     resumen(en32.salientes).map((r) => r[0]).join(",") === "image,text" &&
-      textoDe(en32.salientes[0]) === "Déjame revisar.\nPantalón azul (PAN-AZ) talla 32: 4 pieza — $650 MXN" &&
+      textoDe(en32.salientes[0]) === "Déjame revisar.\nPantalón azul (PAN-AZ) talla 32: 4 piezas — $650 MXN" &&
       textoDe(en32.salientes[1]) === "Pantalón negro (PAN-NG) talla 32: 1 pieza — $650 MXN",
     JSON.stringify(resumen(en32.salientes))
   );
@@ -3069,7 +3069,7 @@ async function inventarioChecks() {
   ok(
     "Meta rechaza SOLO la foto de la gris: negra (imagen) · roja (texto) · gris (TEXTO con su línea), en ese orden",
     resumen(rechazoG.salientes).map((r) => r[0]).join(",") === "image,text,text" &&
-      textoDe(rechazoG.salientes[2]) === "Playera gris (PLA-GRS) talla G: 3 pieza — $250 MXN" &&
+      textoDe(rechazoG.salientes[2]) === "Playera gris (PLA-GRS) talla G: 3 piezas — $250 MXN" &&
       rechazoG.salientes[0].body?.image?.link === fotoDe("/icon-192.png"),
     JSON.stringify(resumen(rechazoG.salientes))
   );
@@ -3087,7 +3087,7 @@ async function inventarioChecks() {
   ok(
     `Meta tarda SOLO con la foto de la verde: negra (imagen) y verde como texto, dentro del límite (${lentaM.ms} ms)`,
     resumen(lentaM.salientes).map((r) => r[0]).join(",") === "image,text" &&
-      textoDe(lentaM.salientes[1]) === "Playera verde (PLA-VRD) talla M: 10 pieza — $200 MXN" &&
+      textoDe(lentaM.salientes[1]) === "Playera verde (PLA-VRD) talla M: 10 piezas — $200 MXN" &&
       lentaM.ms < coalesce + 5000 + 4000,
     JSON.stringify({ ...lentaM, salientes: resumen(lentaM.salientes) })
   );
@@ -3124,7 +3124,7 @@ async function inventarioChecks() {
   );
   ok(
     "el texto del turno viaja como pie de la foto (frase del modelo + datos)",
-    negra[0]?.body?.image?.caption === "Déjame revisar.\nPlayera negra (PLY-NEG): 7 pieza — $199 MXN",
+    negra[0]?.body?.image?.caption === "Déjame revisar.\nPlayera negra (PLY-NEG): 7 piezas — $199 MXN",
     JSON.stringify(negra[0]?.body?.image?.caption)
   );
   const gorra1 = await outboxDe("5214627026002");
@@ -3141,7 +3141,7 @@ async function inventarioChecks() {
     "búsqueda con varios resultados (028): un mensaje por modelo con existencia, con su foto; la blanca agotada no aparece; 5 + «Hay más coincidencias»",
     variasOut.length === 6 &&
       variasOut.map((o) => o.type).join(",") === "image,text,image,image,image,text" &&
-      textoDe(variasOut[0]) === "Déjame revisar.\nPlayera negra (PLY-NEG): 7 pieza — $199 MXN" &&
+      textoDe(variasOut[0]) === "Déjame revisar.\nPlayera negra (PLY-NEG): 7 piezas — $199 MXN" &&
       variasOut[0].body?.image?.link === FOTO &&
       textoDe(variasOut[1]) === "Playera roja (PLY-ROJ) — $219 MXN. Tallas: CH 4, M agotada, G 7, XG 1" &&
       textoDe(variasOut[5]) === "Hay más coincidencias, ¿me dices cuál te interesa?" &&
@@ -3187,7 +3187,7 @@ async function inventarioChecks() {
     `Meta rechaza la imagen: sale solo el texto (${rechazo.ms} ms) y ninguna imagen`,
     rechazoOut.length === 1 &&
       rechazoOut[0].type === "text" &&
-      rechazo.text === "Déjame revisar.\nPlayera negra (PLY-NEG): 7 pieza — $199 MXN",
+      rechazo.text === "Déjame revisar.\nPlayera negra (PLY-NEG): 7 piezas — $199 MXN",
     JSON.stringify({ tipos: rechazoOut.map((o) => o.type), texto: rechazo.text })
   );
   const hiloRechazo = await hiloDe("Lead inventario foto.reject");
@@ -3372,7 +3372,7 @@ async function catalogoChecks({ STOCK, coalesce, ventana, outboxDe, hiloDe, modo
   console.log("\n== 032: catálogo PDF (send_catalog) ==");
   const ORIGEN = new URL(STOCK).origin;
   const PDF = (v) => `${ORIGEN}/api/dev/stock-mock/catalogo.pdf?v=${v}`;
-  const FOOTER = "Dime modelo y talla y te confirmo existencia y precio";
+  const FOOTER = "Dime qué producto te interesa y te confirmo existencia y precio";
   const PIE = `¡Claro!\n\n${FOOTER}`;
   // El agente debe responder antes de coalescencia + 5 s (SC-001, SC-002).
   const limite = coalesce + 5000;
@@ -3574,7 +3574,7 @@ async function catalogoChecks({ STOCK, coalesce, ventana, outboxDe, hiloDe, modo
       r7.salientes
         .slice(0, 5)
         .every((o, i) => o.type === "image" && o.body?.image?.link === `${ORIGEN}/icon-192.png?m=cal0${i + 1}`) &&
-      textoDe(r7.salientes[0]) === "Déjame revisar.\nCalcetín blanco (CAL-01): 10 pieza — $59 MXN" &&
+      textoDe(r7.salientes[0]) === "Déjame revisar.\nCalcetín blanco (CAL-01): 10 piezas — $59 MXN" &&
       r7.salientes[5].type === "text" &&
       textoDe(r7.salientes[5]) === "Hay más modelos en nuestro catálogo, ¿te lo mando?",
     JSON.stringify(resumen(r7.salientes))
@@ -3602,7 +3602,7 @@ async function catalogoChecks({ STOCK, coalesce, ventana, outboxDe, hiloDe, modo
       r9.salientes[0].type === "text" &&
       lineas9.length === 7 &&
       lineas9[0] === "Déjame revisar." &&
-      lineas9.slice(1, 6).every((l) => /^Sudadera .+ \(SUD-0\d\): 3 pieza — \$499 MXN$/.test(l)) &&
+      lineas9.slice(1, 6).every((l) => /^Sudadera .+ \(SUD-0\d\): 3 piezas — \$499 MXN$/.test(l)) &&
       lineas9[6] === "Hay más coincidencias, ¿me dices cuál te interesa?" &&
       consultas9.length === 0,
     JSON.stringify({ lineas: lineas9, consultas: consultas9 })
@@ -3634,7 +3634,7 @@ async function catalogoChecks({ STOCK, coalesce, ventana, outboxDe, hiloDe, modo
   const prompt12 = await ultimoPrompt();
   ok(
     "tras el respaldo con enlace, el hilo lo guarda pero el prompt no lo trae (SC-004)",
-    prompt12.includes("Dime modelo y talla") && !prompt12.includes("stock-mock/catalogo.pdf"),
+    prompt12.includes("Dime qué producto te interesa") && !prompt12.includes("stock-mock/catalogo.pdf"),
     prompt12.slice(-300)
   );
   const r13 = await turno(

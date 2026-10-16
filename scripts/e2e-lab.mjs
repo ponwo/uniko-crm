@@ -392,7 +392,7 @@ if (inventarioOn) {
   const respuesta = (caso?.transcript ?? []).filter((t) => t.role === "agente").at(-1)?.text ?? "";
   ok(
     "el agente consultó el inventario y el transcript trae el texto (el pie de la foto)",
-    respuesta.includes("Playera negra (PLY-NEG): 7 pieza — $199 MXN"),
+    respuesta.includes("Playera negra (PLY-NEG): 7 piezas — $199 MXN"),
     JSON.stringify(caso?.transcript ?? reporte4?.run)
   );
   ok("la URL de la foto no se cuela en el transcript", respuesta.length > 0 && !respuesta.includes("icon-192"));
@@ -432,7 +432,7 @@ if (inventarioOn) {
   ok(
     "el transcript muestra el documento con su nombre y el pie",
     agenteCatalogo.at(-1)?.text ===
-      "[Documento: Catálogo de prueba.pdf]\n¡Claro!\n\nDime modelo y talla y te confirmo existencia y precio",
+      "[Documento: Catálogo de prueba.pdf]\n¡Claro!\n\nDime qué producto te interesa y te confirmo existencia y precio",
     JSON.stringify(casoCatalogo?.transcript ?? reporte5?.run)
   );
   ok(

@@ -15,7 +15,7 @@ const { buildCatalogCaption, CATALOG_FOOTER, sendCatalogTurn, stripCatalogLink }
   "@/server/inventario/agent"
 );
 
-const FOOTER = "Dime modelo y talla y te confirmo existencia y precio";
+const FOOTER = "Dime qué producto te interesa y te confirmo existencia y precio";
 const CATALOG: CatalogInfo = {
   url: "https://img.stock.example/catalog/ab12.pdf",
   filename: "Catálogo Otoño 2026.pdf",
@@ -32,6 +32,10 @@ afterEach(() => {
 describe("032 — el pie del catálogo (FR-1703, FR-1704)", () => {
   it("la frase fija es la del contrato §4b", () => {
     expect(CATALOG_FOOTER).toBe(FOOTER);
+  });
+
+  it("la frase fija sirve a cualquier giro: no habla de tallas ni de modelos", () => {
+    expect(CATALOG_FOOTER).not.toMatch(/talla|modelo/i);
   });
 
   it("sin frase de entrada (o solo espacios): el pie es la frase fija sola", () => {
@@ -121,13 +125,18 @@ describe("032 — stripCatalogLink (FR-1709)", () => {
     ).toBe(FOOTER);
   });
 
+  it("también tras el pie anterior: el enlace de un catálogo ya enviado no vuelve al prompt", () => {
+    const anterior = "Dime modelo y talla y te confirmo existencia y precio";
+    expect(stripCatalogLink(`¡Claro!\n\n${anterior}\n${CATALOG.url}`)).toBe(`¡Claro!\n\n${anterior}`);
+  });
+
   it("todo lo demás queda igual (incluido un enlace de reunión)", () => {
     const iguales = [
       `¡Claro!\n\n${FOOTER}`,
       "Te espero mañana a las 10:00.\nhttps://meet.google.com/abc-defg-hij",
       `${FOOTER}\nno es un enlace`,
       `Mira: ${CATALOG.url}`,
-      "Playera negra (PLY-NEG): 7 pieza — $199 MXN",
+      "Playera negra (PLY-NEG): 7 piezas — $199 MXN",
       "",
     ];
     for (const texto of iguales) expect(stripCatalogLink(texto), texto).toBe(texto);

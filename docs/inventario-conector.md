@@ -20,7 +20,10 @@ opcionales ([ADR-001](adr-001-canales-opcionales.md), Principio II).
   MS-Stock no tiene usuarios: la identidad es la de Uniko.
 - **`check_stock` en el agente**: antes de afirmar que hay existencia de algo o
   cuánto cuesta, el agente consulta MS-Stock y responde con lo que devuelve
-  (nombre, SKU, existencia con unidad, precio con moneda). El modelo solo aporta
+  (nombre, SKU, existencia con unidad, precio con moneda). La unidad es la que
+  el negocio escribió en MS-Stock y va en plural cuando la cantidad no es 1
+  («14 piezas», «3 cajas», «2 pares»); las abreviaturas y símbolos (kg, m, L,
+  pza, pzas) quedan como están (`src/server/inventario/unidad.ts`). El modelo solo aporta
   la frase de entrada; los datos los pega el sistema, así que **no puede
   inventar existencias**. Si no hay coincidencias lo dice; si hay más de cinco,
   enseña cinco y pide precisar (con más de diez, ofrece el catálogo PDF).
@@ -73,10 +76,10 @@ talla (`{"action":"check_stock","query":"playera roja","size":"G"}`) y el sistem
 redacta:
 
 - sin talla pedida: `Playera roja (PLY-ROJ) — $219 MXN. Tallas: CH 4, M agotada, G 7, XG 1`;
-- con talla pedida: `Playera roja (PLY-ROJ) talla G: 7 pieza — $219 MXN`; agotada:
+- con talla pedida: `Playera roja (PLY-ROJ) talla G: 7 piezas — $219 MXN`; agotada:
   `… talla M: agotada — $219 MXN. Con existencia: CH 4, G 7, XG 1`; una talla que el
   modelo no tiene: `… no viene en talla XXG. Tallas: CH 4, M agotada, G 7, XG 1`;
-- SKU exacto de una talla: `Playera roja (PLY-ROJ-G) talla G: 7 pieza — $219 MXN`.
+- SKU exacto de una talla: `Playera roja (PLY-ROJ-G) talla G: 7 piezas — $219 MXN`.
 
 Las etiquetas son las del negocio (`G`, `38`, `Única`); si el cliente escribe
 "grande", "mediana", "chica", "extra grande" o "extra chica" y ninguna etiqueta
@@ -94,7 +97,7 @@ playeras), el agente ya no enumera cada modelo ni manda la foto del primero:
 
 - **Con talla pedida**: solo los modelos que tienen **existencia en esa talla**,
   cada uno en **su propio mensaje**, con **su foto** (si la tiene) y su línea como
-  pie: `Playera Negra (PLA-NGO) talla G: 8 pieza — $300 MXN`. Los agotados en esa
+  pie: `Playera Negra (PLA-NGO) talla G: 8 piezas — $300 MXN`. Los agotados en esa
   talla y los que no la traen **no se mencionan**. Un producto sin tallas cuenta si
   tiene existencia (es de talla única). Si ninguno tiene existencia: `Por ahora no
   tengo playera en talla 24.`
@@ -133,7 +136,7 @@ leen: el PDF enseña qué se vende, y la existencia y el precio los confirma
   `GET /v1/agent/catalog` (3 s, sin reintentos y sin caché: la URL cambia con cada
   reemplazo) y manda **un** mensaje de documento por URL, con el nombre que eligió el
   negocio y como pie la frase de entrada del agente (si la hay), una línea en blanco y
-  «Dime modelo y talla y te confirmo existencia y precio». El pie no pasa de 1024
+  «Dime qué producto te interesa y te confirmo existencia y precio». El pie no pasa de 1024
   caracteres: si no cabe, se recorta la frase del agente con «…», nunca la frase fija.
   El PDF no pasa por Uniko (WhatsApp lo descarga de la URL) y la URL nunca llega al
   modelo.
