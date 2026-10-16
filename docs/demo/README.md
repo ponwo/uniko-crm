@@ -4,6 +4,10 @@ Material para enseñar cómo funciona Uniko sin abrir una instancia real. Todo s
 del negocio de ejemplo **Ferretería El Martillo**, con datos ficticios y contra
 los mocks locales: ningún mensaje, cliente ni número es real.
 
+**Los archivos no viven en este repo**: se publican en la página oficial de
+LanCo. Aquí quedan solo el guion que los produce y esta guía; al regenerarlos,
+`capturas/` y `videos/` se escriben en esta carpeta y git los ignora.
+
 ## Videos (`videos/`)
 
 Formato WebM (VP8), 1440×900, sin audio: cada paso lleva un **subtítulo en
